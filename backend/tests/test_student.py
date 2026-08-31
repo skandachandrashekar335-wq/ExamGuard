@@ -13,6 +13,7 @@ class TestStudentModel:
         assert student.id is not None
         assert student.usn == "TEST001"
         assert student.name == "Test Student Alpha"
+        assert student.is_active is True
         assert student.created_at is not None
         assert student.updated_at is not None
 
@@ -55,3 +56,17 @@ class TestStudentModel:
 
         assert student.created_at is not None
         assert student.updated_at is not None
+
+    def test_is_active_defaults_to_true(self, db_session):
+        student = Student(usn="ACT001", name="Active Student")
+        db_session.add(student)
+        db_session.commit()
+
+        assert student.is_active is True
+
+    def test_is_active_can_be_set_false(self, db_session):
+        student = Student(usn="ACT002", name="Inactive Student", is_active=False)
+        db_session.add(student)
+        db_session.commit()
+
+        assert student.is_active is False

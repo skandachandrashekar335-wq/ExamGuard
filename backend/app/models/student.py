@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, func
+from sqlalchemy import Boolean, DateTime, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models import Base
@@ -20,6 +20,13 @@ class Student(Base):
     name: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default="true",
+        index=True,
+        comment="Soft-delete flag. Inactive students are hidden from active operations.",
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
