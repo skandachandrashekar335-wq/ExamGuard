@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.api.v1.router import router as v1_router
 from app.core.config import get_settings
+from app.core.database import engine
 
 settings = get_settings()
 
@@ -24,8 +26,16 @@ def create_app() -> FastAPI:
     application.include_router(v1_router, prefix=settings.API_V1_PREFIX)
 
     @application.get("/health")
-    def health_check() -> dict[str, str]:
-        return {"status": "healthy"}
+    def health_check() -> dict[str, str | dict[str, str]]:
+        result: dict[str, str | dict[str, str]] = {"status": "healthy"}
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            result["database"] = "connected"
+        except Exception:
+            result["database"] = "disconnected"
+            result["status"] = "degraded"
+        return result
 
     return application
 
