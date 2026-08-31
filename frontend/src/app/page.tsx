@@ -10,12 +10,20 @@ export default function Home() {
         <p className="text-[#999] text-lg mb-8">
           AI-powered Examination Entry Verification Platform
         </p>
-        <Link
-          href="/students"
-          className="inline-block bg-gradient-to-r from-cyan-500 to-pink-500 px-8 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
-        >
-          Manage Students
-        </Link>
+        <div className="flex gap-4">
+          <Link
+            href="/students"
+            className="inline-block bg-gradient-to-r from-cyan-500 to-pink-500 px-8 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
+          >
+            Manage Students
+          </Link>
+          <Link
+            href="/documents"
+            className="inline-block border border-white/20 px-8 py-3 rounded-lg font-medium hover:bg-white/5 transition-colors"
+          >
+            Upload Documents
+          </Link>
+        </div>
       </main>
     </div>
   );

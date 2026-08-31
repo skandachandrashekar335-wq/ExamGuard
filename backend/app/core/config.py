@@ -25,6 +25,11 @@ class Settings(BaseSettings):
 
     NEXT_PUBLIC_API_URL: str = "http://localhost:8000"
 
+    # Upload settings
+    MAX_UPLOAD_SIZE_MB: int = 10
+    UPLOAD_DIR: str = str(PROJECT_ROOT / "uploads")
+    ALLOWED_DOCUMENT_TYPES: list[str] = ["HALL_TICKET"]
+
 
 @lru_cache
 def get_settings() -> Settings:
