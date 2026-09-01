@@ -12,6 +12,7 @@ from app.main import app
 from app.models.document import Document
 from app.models.extraction import ExtractedField, ExtractionResult
 from app.models.hall_ticket_match import HallTicketMatchResult, HallTicketMatchSignal
+from app.models.verification import VerificationOutcome
 
 settings = get_settings()
 
@@ -28,6 +29,7 @@ def clean_test_uploads():
     """Clean test uploads and document records before each test."""
     db = SessionLocal()
     try:
+        db.execute(delete(VerificationOutcome))
         all_match_results = db.query(HallTicketMatchResult.id).subquery()
         db.execute(delete(HallTicketMatchSignal).where(
             HallTicketMatchSignal.match_result_id.in_(db.query(all_match_results))

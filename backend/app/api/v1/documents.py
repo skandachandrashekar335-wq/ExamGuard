@@ -13,10 +13,12 @@ from app.schemas.extraction_review import (
     ReviewProgress,
 )
 from app.schemas.hall_ticket_match import HallTicketMatchResultResponse, HallTicketMatchSignalResponse
+from app.schemas.verification import VerificationOutcomeResponse, VerificationSummaryResponse
 from app.services import document as doc_service
 from app.services import extraction_review
 from app.services import hall_ticket_matching
 from app.services import processing
+from app.services import verification
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -343,4 +345,81 @@ def get_match_result(document_id: int, db: Session = Depends(get_db)):
             )
             for s in signals
         ],
+    )
+
+
+@router.get(
+    "/{document_id}/verification/summary",
+    response_model=VerificationSummaryResponse,
+    summary="Get verification readiness summary for a document",
+)
+def get_verification_summary(document_id: int, db: Session = Depends(get_db)):
+    try:
+        data = verification.get_verification_summary(db, document_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    return VerificationSummaryResponse(**data)
+
+
+@router.post(
+    "/{document_id}/verification",
+    response_model=VerificationOutcomeResponse,
+    status_code=201,
+    summary="Run verification and produce an auditable outcome",
+)
+def run_verification(document_id: int, db: Session = Depends(get_db)):
+    try:
+        outcome = verification.run_verification(db, document_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    return VerificationOutcomeResponse(
+        id=outcome.id,
+        document_id=outcome.document_id,
+        extraction_result_id=outcome.extraction_result_id,
+        match_result_id=outcome.match_result_id,
+        student_id=outcome.student_id,
+        exam_id=outcome.exam_id,
+        decision=outcome.decision,
+        extraction_check=outcome.extraction_check,
+        match_check=outcome.match_check,
+        review_check=outcome.review_check,
+        ocr_avg_confidence=outcome.ocr_avg_confidence,
+        match_status=outcome.match_status,
+        review_completed=outcome.review_completed,
+        reasoning=outcome.reasoning,
+        created_at=outcome.created_at,
+    )
+
+
+@router.get(
+    "/{document_id}/verification",
+    response_model=VerificationOutcomeResponse,
+    summary="Get the latest verification outcome for a document",
+)
+def get_verification_outcome(document_id: int, db: Session = Depends(get_db)):
+    outcome = verification.get_latest_outcome(db, document_id)
+    if not outcome:
+        raise HTTPException(
+            status_code=404,
+            detail="No verification outcome found for this document",
+        )
+
+    return VerificationOutcomeResponse(
+        id=outcome.id,
+        document_id=outcome.document_id,
+        extraction_result_id=outcome.extraction_result_id,
+        match_result_id=outcome.match_result_id,
+        student_id=outcome.student_id,
+        exam_id=outcome.exam_id,
+        decision=outcome.decision,
+        extraction_check=outcome.extraction_check,
+        match_check=outcome.match_check,
+        review_check=outcome.review_check,
+        ocr_avg_confidence=outcome.ocr_avg_confidence,
+        match_status=outcome.match_status,
+        review_completed=outcome.review_completed,
+        reasoning=outcome.reasoning,
+        created_at=outcome.created_at,
     )

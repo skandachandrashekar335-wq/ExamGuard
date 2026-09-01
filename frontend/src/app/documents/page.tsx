@@ -106,6 +106,24 @@ interface ReviewData {
   fields: ReviewField[];
 }
 
+interface VerificationOutcome {
+  id: number;
+  document_id: number;
+  extraction_result_id: number | null;
+  match_result_id: number | null;
+  student_id: number | null;
+  exam_id: number | null;
+  decision: string;
+  extraction_check: string;
+  match_check: string;
+  review_check: string;
+  ocr_avg_confidence: number | null;
+  match_status: string | null;
+  review_completed: boolean;
+  reasoning: string | null;
+  created_at: string;
+}
+
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function DocumentsPage() {
@@ -129,6 +147,9 @@ export default function DocumentsPage() {
   const [editingFieldId, setEditingFieldId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
   const [completingReview, setCompletingReview] = useState(false);
+  const [verifyingId, setVerifyingId] = useState<number | null>(null);
+  const [verificationOutcome, setVerificationOutcome] = useState<VerificationOutcome | null>(null);
+  const [showVerification, setShowVerification] = useState(false);
 
   const fetchDocuments = async () => {
     const params = new URLSearchParams({
@@ -290,6 +311,27 @@ export default function DocumentsPage() {
       setError(err.detail || "Failed to complete review");
     }
     setCompletingReview(false);
+  };
+
+  const handleVerify = async (docId: number) => {
+    setVerifyingId(docId);
+    setMessage("");
+    setError("");
+
+    const res = await fetch(`${API}/api/v1/documents/${docId}/verification`, {
+      method: "POST",
+    });
+
+    if (res.ok) {
+      const outcome: VerificationOutcome = await res.json();
+      setVerificationOutcome(outcome);
+      setShowVerification(true);
+      setMessage(`Verification: ${outcome.decision.replace("_", " ")}`);
+    } else {
+      const err = await res.json();
+      setError(err.detail || "Verification failed");
+    }
+    setVerifyingId(null);
   };
 
   const handleMatch = async (docId: number) => {
@@ -480,6 +522,125 @@ export default function DocumentsPage() {
               {completingReview ? "Completing..." : "Complete Review"}
             </button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (showVerification && verificationOutcome) {
+    const decisionColor =
+      verificationOutcome.decision === "VERIFIED"
+        ? "emerald"
+        : verificationOutcome.decision === "FAILED"
+        ? "pink"
+        : verificationOutcome.decision === "REVIEW_REQUIRED"
+        ? "amber"
+        : "cyan";
+
+    return (
+      <div className="min-h-screen bg-[#050505] text-white p-8">
+        <div className="max-w-5xl mx-auto">
+          <button
+            onClick={() => {
+              setShowVerification(false);
+              setVerificationOutcome(null);
+            }}
+            className="text-cyan-400 hover:text-cyan-300 mb-6 text-sm"
+          >
+            &larr; Back to Documents
+          </button>
+
+          <h1 className="text-3xl font-bold uppercase tracking-wider mb-2">
+            Verification Outcome
+          </h1>
+          <p className="text-[#999] mb-8">
+            Document #{verificationOutcome.document_id} &middot;{" "}
+            <span
+              className={`px-2 py-1 rounded-full text-xs bg-${decisionColor}-500/20 text-${decisionColor}-400`}
+            >
+              {verificationOutcome.decision.replace("_", " ")}
+            </span>
+          </p>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+            <div className="bg-[#111] border border-white/10 rounded-lg p-4">
+              <div className="text-xs text-[#666] mb-1">Extraction Check</div>
+              <div className="text-sm">
+                <span
+                  className={`px-2 py-1 rounded-full text-xs ${
+                    verificationOutcome.extraction_check === "PASSED"
+                      ? "bg-emerald-500/20 text-emerald-400"
+                      : verificationOutcome.extraction_check === "FAILED"
+                      ? "bg-pink-500/20 text-pink-400"
+                      : "bg-amber-500/20 text-amber-400"
+                  }`}
+                >
+                  {verificationOutcome.extraction_check.replace("_", " ")}
+                </span>
+              </div>
+            </div>
+            <div className="bg-[#111] border border-white/10 rounded-lg p-4">
+              <div className="text-xs text-[#666] mb-1">Match Check</div>
+              <div className="text-sm">
+                <span
+                  className={`px-2 py-1 rounded-full text-xs ${
+                    verificationOutcome.match_check === "PASSED"
+                      ? "bg-emerald-500/20 text-emerald-400"
+                      : verificationOutcome.match_check === "FAILED"
+                      ? "bg-pink-500/20 text-pink-400"
+                      : "bg-amber-500/20 text-amber-400"
+                  }`}
+                >
+                  {verificationOutcome.match_check.replace("_", " ")}
+                </span>
+              </div>
+            </div>
+            <div className="bg-[#111] border border-white/10 rounded-lg p-4">
+              <div className="text-xs text-[#666] mb-1">Review Check</div>
+              <div className="text-sm">
+                <span
+                  className={`px-2 py-1 rounded-full text-xs ${
+                    verificationOutcome.review_completed
+                      ? "bg-emerald-500/20 text-emerald-400"
+                      : "bg-amber-500/20 text-amber-400"
+                  }`}
+                >
+                  {verificationOutcome.review_check.replace("_", " ")}
+                </span>
+              </div>
+            </div>
+            <div className="bg-[#111] border border-white/10 rounded-lg p-4">
+              <div className="text-xs text-[#666] mb-1">OCR Confidence</div>
+              <div className="text-sm">
+                {verificationOutcome.ocr_avg_confidence != null
+                  ? `${verificationOutcome.ocr_avg_confidence.toFixed(1)}%`
+                  : "—"}
+              </div>
+            </div>
+            <div className="bg-[#111] border border-white/10 rounded-lg p-4">
+              <div className="text-xs text-[#666] mb-1">Match Status</div>
+              <div className="text-sm">
+                {verificationOutcome.match_status
+                  ? verificationOutcome.match_status.replace("_", " ")
+                  : "—"}
+              </div>
+            </div>
+            <div className="bg-[#111] border border-white/10 rounded-lg p-4">
+              <div className="text-xs text-[#666] mb-1">Student</div>
+              <div className="text-sm">
+                {verificationOutcome.student_id
+                  ? `ID ${verificationOutcome.student_id}`
+                  : "—"}
+              </div>
+            </div>
+          </div>
+
+          {verificationOutcome.reasoning && (
+            <div className="bg-[#111] border border-white/10 rounded-lg p-4 mb-6">
+              <div className="text-xs text-[#666] mb-2">Reasoning</div>
+              <p className="text-sm">{verificationOutcome.reasoning}</p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -809,6 +970,13 @@ export default function DocumentsPage() {
                           className="text-emerald-400 hover:text-emerald-300 text-xs disabled:opacity-30"
                         >
                           {matchingId === d.id ? "Matching..." : "Match Hall Ticket"}
+                        </button>
+                        <button
+                          onClick={() => handleVerify(d.id)}
+                          disabled={verifyingId === d.id}
+                          className="text-violet-400 hover:text-violet-300 text-xs disabled:opacity-30"
+                        >
+                          {verifyingId === d.id ? "Verifying..." : "Verify"}
                         </button>
                       </>
                     ) : (

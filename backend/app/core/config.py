@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     # USN pattern (configurable per institution)
     USN_PATTERN: str | None = None
 
+    # Verification settings
+    MIN_OCR_CONFIDENCE: float = 60.0
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -11,6 +11,7 @@ from app.models.extraction import (
     ReviewStatus,
 )
 from app.models.hall_ticket_match import HallTicketMatchResult, HallTicketMatchSignal
+from app.models.verification import VerificationOutcome
 from app.services import extraction_review
 
 
@@ -18,6 +19,7 @@ from app.services import extraction_review
 def cleanup():
     db = SessionLocal()
     try:
+        db.execute(delete(VerificationOutcome))
         all_match_results = db.query(HallTicketMatchResult.id).subquery()
         db.execute(
             delete(HallTicketMatchSignal).where(

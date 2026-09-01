@@ -11,6 +11,7 @@ from app.main import app
 from app.models.document import Document
 from app.models.extraction import ExtractedField, ExtractionResult
 from app.models.hall_ticket_match import HallTicketMatchResult, HallTicketMatchSignal
+from app.models.verification import VerificationOutcome
 from app.ai.base import OCRResult, OCRWord
 
 settings = get_settings()
@@ -23,6 +24,7 @@ JPEG_CONTENT = b"\xff\xd8\xff\xe0 fake jpeg content"
 def cleanup():
     db = SessionLocal()
     try:
+        db.execute(delete(VerificationOutcome))
         all_match_results = db.query(HallTicketMatchResult.id).subquery()
         db.execute(delete(HallTicketMatchSignal).where(
             HallTicketMatchSignal.match_result_id.in_(db.query(all_match_results))

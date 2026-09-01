@@ -13,12 +13,18 @@ from app.models.hall_ticket_match import HallTicketMatchResult, HallTicketMatchS
 from app.models.seat_assignment import SeatAssignment
 from app.models.student import Student
 from app.models.subject import Subject
+from app.models.verification import VerificationOutcome
 
 
 @pytest.fixture(autouse=True)
 def clean_test_data():
     db = SessionLocal()
     try:
+        db.execute(delete(VerificationOutcome).where(
+            VerificationOutcome.document_id.in_(
+                db.query(Document.id).filter(Document.original_filename.ilike("MATCHTEST%"))
+            )
+        ))
         match_docs = db.query(Document.id).filter(
             Document.original_filename.ilike("MATCHTEST%")
         ).subquery()
