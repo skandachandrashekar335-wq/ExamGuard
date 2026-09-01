@@ -30,6 +30,15 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = str(PROJECT_ROOT / "uploads")
     ALLOWED_DOCUMENT_TYPES: list[str] = ["HALL_TICKET"]
 
+    # OCR settings
+    TESSERACT_CMD: str | None = None
+    POPPLER_PATH: str | None = None
+    MAX_DOCUMENT_PAGES: int = 20
+    OCR_LANGUAGE: str = "eng"
+
+    # USN pattern (configurable per institution)
+    USN_PATTERN: str | None = None
+
 
 @lru_cache
 def get_settings() -> Settings:
