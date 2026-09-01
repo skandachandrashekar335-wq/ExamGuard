@@ -1,4 +1,4 @@
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -17,8 +17,15 @@ def _validate_registration(db: Session, registration_id: int) -> ExamRegistratio
     return reg
 
 
-def _validate_hall(db: Session, hall_id: int) -> ExamHall:
-    hall = db.query(ExamHall).filter(ExamHall.id == hall_id).first()
+def _validate_hall(db: Session, hall_id: int, *, lock: bool = False) -> ExamHall:
+    if lock:
+        hall = db.execute(
+            select(ExamHall)
+            .where(ExamHall.id == hall_id)
+            .with_for_update()
+        ).scalar_one_or_none()
+    else:
+        hall = db.query(ExamHall).filter(ExamHall.id == hall_id).first()
     if not hall:
         raise LookupError(f"Hall with id {hall_id} not found")
     return hall
@@ -93,7 +100,7 @@ def create_assignment(db: Session, data: SeatAssignmentCreate) -> SeatAssignment
             f"(status: {reg.status})"
         )
 
-    hall = _validate_hall(db, data.exam_hall_id)
+    hall = _validate_hall(db, data.exam_hall_id, lock=True)
     if not hall.is_active:
         raise ValueError(f"Hall {data.exam_hall_id} is not active")
 

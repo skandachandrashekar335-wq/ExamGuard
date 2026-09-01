@@ -8,7 +8,6 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -23,13 +22,6 @@ class SeatAssignmentStatus(str, enum.Enum):
 
 class SeatAssignment(Base):
     __tablename__ = "seat_assignments"
-    __table_args__ = (
-        UniqueConstraint(
-            "exam_registration_id",
-            "exam_hall_id",
-            name="uq_active_assignment_per_registration",
-        ),
-    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     exam_registration_id: Mapped[int] = mapped_column(

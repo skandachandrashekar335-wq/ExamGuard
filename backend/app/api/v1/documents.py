@@ -5,7 +5,9 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.schemas.document import DocumentListResponse, DocumentResponse
 from app.schemas.extraction import ExtractionResultResponse, ExtractedFieldResponse, ProcessDocumentResponse
+from app.schemas.hall_ticket_match import HallTicketMatchResultResponse, HallTicketMatchSignalResponse
 from app.services import document as doc_service
+from app.services import hall_ticket_matching
 from app.services import processing
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
@@ -131,5 +133,106 @@ def get_extraction(document_id: int, db: Session = Depends(get_db)):
                 review_status=f.review_status,
             )
             for f in fields
+        ],
+    )
+
+
+@router.post(
+    "/{document_id}/match",
+    response_model=HallTicketMatchResultResponse,
+    status_code=201,
+    summary="Match a hall ticket against domain records",
+)
+def match_hall_ticket(document_id: int, db: Session = Depends(get_db)):
+    try:
+        result = hall_ticket_matching.match_hall_ticket(db, document_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    signals = (
+        db.query(hall_ticket_matching.HallTicketMatchSignal)
+        .filter(
+            hall_ticket_matching.HallTicketMatchSignal.match_result_id == result.id
+        )
+        .order_by(hall_ticket_matching.HallTicketMatchSignal.id)
+        .all()
+    )
+
+    return HallTicketMatchResultResponse(
+        id=result.id,
+        document_id=result.document_id,
+        extraction_result_id=result.extraction_result_id,
+        student_id=result.student_id,
+        exam_id=result.exam_id,
+        registration_id=result.registration_id,
+        seat_assignment_id=result.seat_assignment_id,
+        overall_status=result.overall_status,
+        created_at=result.created_at,
+        updated_at=result.updated_at,
+        signals=[
+            HallTicketMatchSignalResponse(
+                id=s.id,
+                match_result_id=s.match_result_id,
+                field_name=s.field_name,
+                extracted_value=s.extracted_value,
+                expected_value=s.expected_value,
+                matched=s.matched,
+                signal_type=s.signal_type,
+                details=s.details,
+                created_at=s.created_at,
+            )
+            for s in signals
+        ],
+    )
+
+
+@router.get(
+    "/{document_id}/match",
+    response_model=HallTicketMatchResultResponse,
+    summary="Get the latest matching result for a document",
+)
+def get_match_result(document_id: int, db: Session = Depends(get_db)):
+    result = hall_ticket_matching.get_latest_match_result(db, document_id)
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail="No matching results found for this document",
+        )
+
+    signals = (
+        db.query(hall_ticket_matching.HallTicketMatchSignal)
+        .filter(
+            hall_ticket_matching.HallTicketMatchSignal.match_result_id == result.id
+        )
+        .order_by(hall_ticket_matching.HallTicketMatchSignal.id)
+        .all()
+    )
+
+    return HallTicketMatchResultResponse(
+        id=result.id,
+        document_id=result.document_id,
+        extraction_result_id=result.extraction_result_id,
+        student_id=result.student_id,
+        exam_id=result.exam_id,
+        registration_id=result.registration_id,
+        seat_assignment_id=result.seat_assignment_id,
+        overall_status=result.overall_status,
+        created_at=result.created_at,
+        updated_at=result.updated_at,
+        signals=[
+            HallTicketMatchSignalResponse(
+                id=s.id,
+                match_result_id=s.match_result_id,
+                field_name=s.field_name,
+                extracted_value=s.extracted_value,
+                expected_value=s.expected_value,
+                matched=s.matched,
+                signal_type=s.signal_type,
+                details=s.details,
+                created_at=s.created_at,
+            )
+            for s in signals
         ],
     )

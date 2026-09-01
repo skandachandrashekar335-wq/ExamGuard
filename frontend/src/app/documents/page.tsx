@@ -49,6 +49,32 @@ interface ProcessResponse {
   review_required: boolean;
 }
 
+interface MatchSignal {
+  id: number;
+  match_result_id: number;
+  field_name: string;
+  extracted_value: string | null;
+  expected_value: string | null;
+  matched: boolean;
+  signal_type: string;
+  details: string | null;
+  created_at: string;
+}
+
+interface MatchResult {
+  id: number;
+  document_id: number;
+  extraction_result_id: number;
+  student_id: number | null;
+  exam_id: number | null;
+  registration_id: number | null;
+  seat_assignment_id: number | null;
+  overall_status: string;
+  created_at: string;
+  updated_at: string;
+  signals: MatchSignal[];
+}
+
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function DocumentsPage() {
@@ -63,6 +89,9 @@ export default function DocumentsPage() {
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [extractionResult, setExtractionResult] = useState<ExtractionResult | null>(null);
   const [showExtraction, setShowExtraction] = useState(false);
+  const [matchingId, setMatchingId] = useState<number | null>(null);
+  const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
+  const [showMatch, setShowMatch] = useState(false);
 
   const fetchDocuments = async () => {
     const params = new URLSearchParams({
@@ -140,6 +169,27 @@ export default function DocumentsPage() {
     }
   };
 
+  const handleMatch = async (docId: number) => {
+    setMatchingId(docId);
+    setMessage("");
+    setError("");
+
+    const res = await fetch(`${API}/api/v1/documents/${docId}/match`, {
+      method: "POST",
+    });
+
+    if (res.ok) {
+      const result: MatchResult = await res.json();
+      setMatchResult(result);
+      setShowMatch(true);
+      setMessage(`Match completed: ${result.overall_status.replace("_", " ")}`);
+    } else {
+      const err = await res.json();
+      setError(err.detail || "Matching failed");
+    }
+    setMatchingId(null);
+  };
+
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -147,6 +197,129 @@ export default function DocumentsPage() {
   };
 
   const totalPages = Math.ceil(total / 10);
+
+  if (showMatch && matchResult) {
+    return (
+      <div className="min-h-screen bg-[#050505] text-white p-8">
+        <div className="max-w-5xl mx-auto">
+          <button
+            onClick={() => {
+              setShowMatch(false);
+              setMatchResult(null);
+            }}
+            className="text-cyan-400 hover:text-cyan-300 mb-6 text-sm"
+          >
+            &larr; Back to Documents
+          </button>
+
+          <h1 className="text-3xl font-bold uppercase tracking-wider mb-2">
+            Hall Ticket Match Result
+          </h1>
+          <p className="text-[#999] mb-8">
+            Document #{matchResult.document_id} &middot;{" "}
+            <span
+              className={`px-2 py-1 rounded-full text-xs ${
+                matchResult.overall_status === "MATCHED"
+                  ? "bg-emerald-500/20 text-emerald-400"
+                  : matchResult.overall_status === "PARTIAL_MATCH"
+                  ? "bg-amber-500/20 text-amber-400"
+                  : matchResult.overall_status === "NOT_FOUND"
+                  ? "bg-pink-500/20 text-pink-400"
+                  : "bg-red-500/20 text-red-400"
+              }`}
+            >
+              {matchResult.overall_status.replace("_", " ")}
+            </span>
+          </p>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div className="bg-[#111] border border-white/10 rounded-lg p-4">
+              <div className="text-xs text-[#666] mb-1">Student</div>
+              <div className="text-sm">
+                {matchResult.student_id ? `ID ${matchResult.student_id}` : "—"}
+              </div>
+            </div>
+            <div className="bg-[#111] border border-white/10 rounded-lg p-4">
+              <div className="text-xs text-[#666] mb-1">Exam</div>
+              <div className="text-sm">
+                {matchResult.exam_id ? `ID ${matchResult.exam_id}` : "—"}
+              </div>
+            </div>
+            <div className="bg-[#111] border border-white/10 rounded-lg p-4">
+              <div className="text-xs text-[#666] mb-1">Registration</div>
+              <div className="text-sm">
+                {matchResult.registration_id ? `ID ${matchResult.registration_id}` : "—"}
+              </div>
+            </div>
+            <div className="bg-[#111] border border-white/10 rounded-lg p-4">
+              <div className="text-xs text-[#666] mb-1">Seat Assignment</div>
+              <div className="text-sm">
+                {matchResult.seat_assignment_id ? `ID ${matchResult.seat_assignment_id}` : "—"}
+              </div>
+            </div>
+          </div>
+
+          <h2 className="text-xl font-semibold mb-4">Verification Signals</h2>
+          <div className="bg-[#111] border border-white/10 rounded-lg overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/10 text-left text-sm text-[#999]">
+                  <th className="px-6 py-3">Field</th>
+                  <th className="px-6 py-3">Extracted</th>
+                  <th className="px-6 py-3">Expected</th>
+                  <th className="px-6 py-3">Match</th>
+                  <th className="px-6 py-3">Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {matchResult.signals.map((s) => (
+                  <tr
+                    key={s.id}
+                    className="border-b border-white/5 hover:bg-white/[0.02]"
+                  >
+                    <td className="px-6 py-3 text-sm font-medium">
+                      {s.field_name.replace("_", " ")}
+                    </td>
+                    <td className="px-6 py-3 text-sm">
+                      {s.extracted_value || (
+                        <span className="text-[#666]">—</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-3 text-sm">
+                      {s.expected_value || (
+                        <span className="text-[#666]">—</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-3">
+                      {s.matched ? (
+                        <span className="text-emerald-400 text-xs px-2 py-1 rounded-full bg-emerald-500/20">
+                          Match
+                        </span>
+                      ) : (
+                        <span className="text-pink-400 text-xs px-2 py-1 rounded-full bg-pink-500/20">
+                          Mismatch
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-3 text-xs text-[#999]">
+                      {s.details || "—"}
+                    </td>
+                  </tr>
+                ))}
+                {matchResult.signals.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-[#666]">
+                      No signals recorded
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (showExtraction && extractionResult) {
     return (
@@ -327,12 +500,21 @@ export default function DocumentsPage() {
                   </td>
                   <td className="px-6 py-3 text-sm flex gap-2">
                     {d.status === "PROCESSED" || d.status === "REVIEW_REQUIRED" ? (
-                      <button
-                        onClick={() => handleViewExtraction(d.id)}
-                        className="text-cyan-400 hover:text-cyan-300 text-xs"
-                      >
-                        View Extraction
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleViewExtraction(d.id)}
+                          className="text-cyan-400 hover:text-cyan-300 text-xs"
+                        >
+                          View Extraction
+                        </button>
+                        <button
+                          onClick={() => handleMatch(d.id)}
+                          disabled={matchingId === d.id}
+                          className="text-emerald-400 hover:text-emerald-300 text-xs disabled:opacity-30"
+                        >
+                          {matchingId === d.id ? "Matching..." : "Match Hall Ticket"}
+                        </button>
+                      </>
                     ) : (
                       <button
                         onClick={() => handleProcess(d.id)}

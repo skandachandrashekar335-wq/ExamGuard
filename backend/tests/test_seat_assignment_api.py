@@ -7,6 +7,7 @@ from app.main import app
 from app.models.exam import Exam
 from app.models.exam_hall import ExamHall
 from app.models.exam_registration import ExamRegistration
+from app.models.hall_ticket_match import HallTicketMatchResult, HallTicketMatchSignal
 from app.models.seat_assignment import SeatAssignment
 from app.models.student import Student
 from app.models.subject import Subject
@@ -17,6 +18,19 @@ def clean_test_data():
     """Remove test data before each test to avoid conflicts."""
     db = SessionLocal()
     try:
+        match_exam_ids = db.query(Exam.id).filter(
+            Exam.exam_name.ilike("SEATEXAM%")
+        ).subquery()
+        db.execute(delete(HallTicketMatchSignal).where(
+            HallTicketMatchSignal.match_result_id.in_(
+                db.query(HallTicketMatchResult.id).filter(
+                    HallTicketMatchResult.exam_id.in_(db.query(match_exam_ids))
+                )
+            )
+        ))
+        db.execute(delete(HallTicketMatchResult).where(
+            HallTicketMatchResult.exam_id.in_(db.query(match_exam_ids))
+        ))
         db.execute(delete(SeatAssignment).where(
             SeatAssignment.student_id.in_(
                 db.query(Student.id).filter(Student.usn.ilike("SEATSTU%"))
@@ -668,3 +682,316 @@ class TestSeatAssignmentAPI:
         )
         assert response.status_code == 201
         assert response.json()["seat_number"] == "TRIM1"
+
+
+class TestSeatAssignmentRegressionOneActivePerRegistration:
+    """Issue 1 regression: one active seat per registration across ALL halls."""
+
+    def test_registration_two_active_seats_different_halls_rejected(
+        self, client, test_registration
+    ):
+        hall1 = client.post(
+            "/api/v1/exam-halls",
+            json={
+                "building": "SEATHALL RegHall1",
+                "room_number": "SEATHALLR101",
+                "capacity": 10,
+            },
+        ).json()
+        hall2 = client.post(
+            "/api/v1/exam-halls",
+            json={
+                "building": "SEATHALL RegHall2",
+                "room_number": "SEATHALLR201",
+                "capacity": 10,
+            },
+        ).json()
+
+        resp1 = client.post(
+            "/api/v1/seat-assignments",
+            json={
+                "exam_registration_id": test_registration["id"],
+                "exam_hall_id": hall1["id"],
+                "seat_number": "REG1",
+            },
+        )
+        assert resp1.status_code == 201
+
+        resp2 = client.post(
+            "/api/v1/seat-assignments",
+            json={
+                "exam_registration_id": test_registration["id"],
+                "exam_hall_id": hall2["id"],
+                "seat_number": "REG1",
+            },
+        )
+        assert resp2.status_code == 409
+
+    def test_cancelled_allows_new_active_assignment(
+        self, client, test_registration
+    ):
+        hall1 = client.post(
+            "/api/v1/exam-halls",
+            json={
+                "building": "SEATHALL CancelHall1",
+                "room_number": "SEATHALLC101",
+                "capacity": 10,
+            },
+        ).json()
+        hall2 = client.post(
+            "/api/v1/exam-halls",
+            json={
+                "building": "SEATHALL CancelHall2",
+                "room_number": "SEATHALLC201",
+                "capacity": 10,
+            },
+        ).json()
+
+        create1 = client.post(
+            "/api/v1/seat-assignments",
+            json={
+                "exam_registration_id": test_registration["id"],
+                "exam_hall_id": hall1["id"],
+                "seat_number": "CANREG1",
+            },
+        )
+        assert create1.status_code == 201
+        assign1_id = create1.json()["id"]
+
+        cancel = client.delete(f"/api/v1/seat-assignments/{assign1_id}")
+        assert cancel.status_code == 200
+        assert cancel.json()["status"] == "CANCELLED"
+
+        create2 = client.post(
+            "/api/v1/seat-assignments",
+            json={
+                "exam_registration_id": test_registration["id"],
+                "exam_hall_id": hall2["id"],
+                "seat_number": "CANREG2",
+            },
+        )
+        assert create2.status_code == 201
+        assert create2.json()["status"] == "ASSIGNED"
+
+    def test_database_enforces_one_active_per_registration(
+        self, client, test_registration
+    ):
+        hall1 = client.post(
+            "/api/v1/exam-halls",
+            json={
+                "building": "SEATHALL DbHall1",
+                "room_number": "SEATHALLD101",
+                "capacity": 10,
+            },
+        ).json()
+        hall2 = client.post(
+            "/api/v1/exam-halls",
+            json={
+                "building": "SEATHALL DbHall2",
+                "room_number": "SEATHALLD201",
+                "capacity": 10,
+            },
+        ).json()
+
+        create1 = client.post(
+            "/api/v1/seat-assignments",
+            json={
+                "exam_registration_id": test_registration["id"],
+                "exam_hall_id": hall1["id"],
+                "seat_number": "DBREG1",
+            },
+        )
+        assert create1.status_code == 201
+
+        db = SessionLocal()
+        try:
+            assignment2 = SeatAssignment(
+                exam_registration_id=test_registration["id"],
+                exam_hall_id=hall2["id"],
+                seat_number="DBREG2",
+                exam_id=test_registration["exam_id"],
+                student_id=test_registration["student_id"],
+                status="ASSIGNED",
+            )
+            db.add(assignment2)
+            db.commit()
+            assert False, "Should have raised IntegrityError"
+        except Exception:
+            db.rollback()
+        finally:
+            db.close()
+
+
+class TestSeatAssignmentRegressionConsistency:
+    """Issue 2 regression: materialized exam_id/student_id consistency."""
+
+    def test_exam_id_matches_registration(
+        self, client, test_registration, test_hall
+    ):
+        create = client.post(
+            "/api/v1/seat-assignments",
+            json={
+                "exam_registration_id": test_registration["id"],
+                "exam_hall_id": test_hall["id"],
+                "seat_number": "CON1",
+            },
+        )
+        assert create.status_code == 201
+        data = create.json()
+        assert data["exam_id"] == test_registration["exam_id"]
+
+    def test_student_id_matches_registration(
+        self, client, test_registration, test_hall
+    ):
+        create = client.post(
+            "/api/v1/seat-assignments",
+            json={
+                "exam_registration_id": test_registration["id"],
+                "exam_hall_id": test_hall["id"],
+                "seat_number": "CON2",
+            },
+        )
+        assert create.status_code == 201
+        data = create.json()
+        assert data["student_id"] == test_registration["student_id"]
+
+    def test_service_derives_exam_and_student_from_registration(
+        self, client, test_registration, test_hall
+    ):
+        create = client.post(
+            "/api/v1/seat-assignments",
+            json={
+                "exam_registration_id": test_registration["id"],
+                "exam_hall_id": test_hall["id"],
+                "seat_number": "DER1",
+            },
+        )
+        assert create.status_code == 201
+        data = create.json()
+        assert data["exam_id"] == test_registration["exam_id"]
+        assert data["student_id"] == test_registration["student_id"]
+
+    def test_direct_insert_with_mismatched_exam_id_rejected_by_fk(
+        self, client, test_registration, test_hall
+    ):
+        db = SessionLocal()
+        try:
+            assignment = SeatAssignment(
+                exam_registration_id=test_registration["id"],
+                exam_hall_id=test_hall["id"],
+                seat_number="FKM1",
+                exam_id=999999,
+                student_id=test_registration["student_id"],
+                status="ASSIGNED",
+            )
+            db.add(assignment)
+            db.commit()
+            assert False, "Should have raised FK violation"
+        except Exception:
+            db.rollback()
+        finally:
+            db.close()
+
+    def test_direct_insert_with_mismatched_student_id_rejected_by_fk(
+        self, client, test_registration, test_hall
+    ):
+        db = SessionLocal()
+        try:
+            assignment = SeatAssignment(
+                exam_registration_id=test_registration["id"],
+                exam_hall_id=test_hall["id"],
+                seat_number="FKM2",
+                exam_id=test_registration["exam_id"],
+                student_id=999999,
+                status="ASSIGNED",
+            )
+            db.add(assignment)
+            db.commit()
+            assert False, "Should have raised FK violation"
+        except Exception:
+            db.rollback()
+        finally:
+            db.close()
+
+
+class TestSeatAssignmentRegressionCapacityConcurrency:
+    """Issue 3 regression: capacity enforcement under concurrency."""
+
+    def test_capacity_hard_limit_enforced(
+        self, client, test_student, test_exam, test_hall
+    ):
+        students = []
+        for i in range(7):
+            resp = client.post(
+                "/api/v1/students",
+                json={"usn": f"SEATSTU{i+20:02d}", "name": f"Cap Student {i}"},
+            )
+            assert resp.status_code == 201
+            students.append(resp.json())
+
+        regs = []
+        for s in students:
+            resp = client.post(
+                "/api/v1/exam-registrations",
+                json={"student_id": s["id"], "exam_id": test_exam["id"]},
+            )
+            assert resp.status_code == 201
+            regs.append(resp.json())
+
+        for i, r in enumerate(regs):
+            resp = client.post(
+                "/api/v1/seat-assignments",
+                json={
+                    "exam_registration_id": r["id"],
+                    "exam_hall_id": test_hall["id"],
+                    "seat_number": f"CAP{i+1:02d}",
+                },
+            )
+            if i < 5:
+                assert resp.status_code == 201, f"Seat {i+1} should succeed"
+            else:
+                assert resp.status_code == 409, f"Seat {i+1} should fail at capacity"
+
+    def test_cancelled_seat_allows_new_assignment_within_capacity(
+        self, client, test_student, test_exam, test_hall
+    ):
+        s1 = client.post(
+            "/api/v1/students",
+            json={"usn": "SEATSTU30", "name": "Reassign Student 1"},
+        ).json()
+        s2 = client.post(
+            "/api/v1/students",
+            json={"usn": "SEATSTU31", "name": "Reassign Student 2"},
+        ).json()
+
+        r1 = client.post(
+            "/api/v1/exam-registrations",
+            json={"student_id": s1["id"], "exam_id": test_exam["id"]},
+        ).json()
+        r2 = client.post(
+            "/api/v1/exam-registrations",
+            json={"student_id": s2["id"], "exam_id": test_exam["id"]},
+        ).json()
+
+        create1 = client.post(
+            "/api/v1/seat-assignments",
+            json={
+                "exam_registration_id": r1["id"],
+                "exam_hall_id": test_hall["id"],
+                "seat_number": "REAS1",
+            },
+        )
+        assert create1.status_code == 201
+
+        cancel1 = client.delete(f"/api/v1/seat-assignments/{create1.json()['id']}")
+        assert cancel1.status_code == 200
+
+        create2 = client.post(
+            "/api/v1/seat-assignments",
+            json={
+                "exam_registration_id": r2["id"],
+                "exam_hall_id": test_hall["id"],
+                "seat_number": "REAS1",
+            },
+        )
+        assert create2.status_code == 201

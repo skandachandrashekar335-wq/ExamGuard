@@ -10,6 +10,8 @@ from app.core.config import get_settings
 from app.core.database import SessionLocal
 from app.main import app
 from app.models.document import Document
+from app.models.extraction import ExtractedField, ExtractionResult
+from app.models.hall_ticket_match import HallTicketMatchResult, HallTicketMatchSignal
 
 settings = get_settings()
 
@@ -26,6 +28,16 @@ def clean_test_uploads():
     """Clean test uploads and document records before each test."""
     db = SessionLocal()
     try:
+        all_match_results = db.query(HallTicketMatchResult.id).subquery()
+        db.execute(delete(HallTicketMatchSignal).where(
+            HallTicketMatchSignal.match_result_id.in_(db.query(all_match_results))
+        ))
+        db.execute(delete(HallTicketMatchResult))
+        all_extractions = db.query(ExtractionResult.id).subquery()
+        db.execute(delete(ExtractedField).where(
+            ExtractedField.extraction_result_id.in_(db.query(all_extractions))
+        ))
+        db.execute(delete(ExtractionResult))
         db.execute(delete(Document))
         db.commit()
     finally:
