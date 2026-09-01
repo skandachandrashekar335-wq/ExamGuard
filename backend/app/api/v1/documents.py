@@ -5,8 +5,16 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.schemas.document import DocumentListResponse, DocumentResponse
 from app.schemas.extraction import ExtractionResultResponse, ExtractedFieldResponse, ProcessDocumentResponse
+from app.schemas.extraction_review import (
+    CompleteReviewResponse,
+    ReviewDataResponse,
+    ReviewFieldRequest,
+    ReviewFieldResponse,
+    ReviewProgress,
+)
 from app.schemas.hall_ticket_match import HallTicketMatchResultResponse, HallTicketMatchSignalResponse
 from app.services import document as doc_service
+from app.services import extraction_review
 from app.services import hall_ticket_matching
 from app.services import processing
 
@@ -134,6 +142,106 @@ def get_extraction(document_id: int, db: Session = Depends(get_db)):
             )
             for f in fields
         ],
+    )
+
+
+@router.get(
+    "/{document_id}/review",
+    response_model=ReviewDataResponse,
+    summary="Get review data for a document's extraction",
+)
+def get_review(document_id: int, db: Session = Depends(get_db)):
+    try:
+        data = extraction_review.get_review_data(db, document_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    er = data["extraction_result"]
+    fields = data["fields"]
+    progress = data["progress"]
+
+    return ReviewDataResponse(
+        extraction_result_id=er.id,
+        document_id=er.document_id,
+        ocr_engine=er.ocr_engine,
+        ocr_avg_confidence=er.ocr_avg_confidence,
+        processing_time_ms=er.processing_time_ms,
+        extraction_status=er.status,
+        reviewed_by=er.reviewed_by,
+        reviewed_at=er.reviewed_at,
+        progress=ReviewProgress(**progress),
+        fields=[
+            ReviewFieldResponse(
+                id=f.id,
+                field_name=f.field_name,
+                extracted_value=f.extracted_value,
+                corrected_value=f.corrected_value,
+                ocr_confidence=f.ocr_confidence,
+                review_status=f.review_status,
+                extraction_method=f.extraction_method,
+                label_found=f.label_found,
+                pattern_match=f.pattern_match,
+            )
+            for f in fields
+        ],
+    )
+
+
+@router.patch(
+    "/{document_id}/review/fields/{field_id}",
+    response_model=ReviewFieldResponse,
+    summary="Correct a single extracted field value",
+)
+def correct_field(
+    document_id: int,
+    field_id: int,
+    body: ReviewFieldRequest,
+    db: Session = Depends(get_db),
+):
+    try:
+        field = extraction_review.correct_field(
+            db, document_id, field_id, body.corrected_value, body.review_status
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    return ReviewFieldResponse(
+        id=field.id,
+        field_name=field.field_name,
+        extracted_value=field.extracted_value,
+        corrected_value=field.corrected_value,
+        ocr_confidence=field.ocr_confidence,
+        review_status=field.review_status,
+        extraction_method=field.extraction_method,
+        label_found=field.label_found,
+        pattern_match=field.pattern_match,
+    )
+
+
+@router.post(
+    "/{document_id}/review/complete",
+    response_model=CompleteReviewResponse,
+    summary="Mark extraction as fully reviewed",
+)
+def complete_review(document_id: int, db: Session = Depends(get_db)):
+    try:
+        result = extraction_review.complete_review(db, document_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    from app.models.document import Document
+
+    doc = db.query(Document).filter(Document.id == document_id).first()
+
+    return CompleteReviewResponse(
+        extraction_result_id=result.id,
+        status=result.status,
+        reviewed_at=result.reviewed_at,
+        document_status=doc.status if doc else "UNKNOWN",
     )
 
 

@@ -75,6 +75,37 @@ interface MatchResult {
   signals: MatchSignal[];
 }
 
+interface ReviewField {
+  id: number;
+  field_name: string;
+  extracted_value: string | null;
+  corrected_value: string | null;
+  ocr_confidence: number | null;
+  review_status: string;
+  extraction_method: string | null;
+  label_found: boolean | null;
+  pattern_match: boolean | null;
+}
+
+interface ReviewProgress {
+  total_fields: number;
+  reviewed_count: number;
+  review_required_count: number;
+}
+
+interface ReviewData {
+  extraction_result_id: number;
+  document_id: number;
+  ocr_engine: string;
+  ocr_avg_confidence: number;
+  processing_time_ms: number | null;
+  extraction_status: string;
+  reviewed_by: number | null;
+  reviewed_at: string | null;
+  progress: ReviewProgress;
+  fields: ReviewField[];
+}
+
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function DocumentsPage() {
@@ -92,6 +123,12 @@ export default function DocumentsPage() {
   const [matchingId, setMatchingId] = useState<number | null>(null);
   const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
   const [showMatch, setShowMatch] = useState(false);
+  const [reviewData, setReviewData] = useState<ReviewData | null>(null);
+  const [showReview, setShowReview] = useState(false);
+  const [reviewingId, setReviewingId] = useState<number | null>(null);
+  const [editingFieldId, setEditingFieldId] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [completingReview, setCompletingReview] = useState(false);
 
   const fetchDocuments = async () => {
     const params = new URLSearchParams({
@@ -169,6 +206,92 @@ export default function DocumentsPage() {
     }
   };
 
+  const handleStartReview = async (docId: number) => {
+    setReviewingId(docId);
+    setMessage("");
+    setError("");
+
+    const res = await fetch(`${API}/api/v1/documents/${docId}/review`);
+
+    if (res.ok) {
+      const data: ReviewData = await res.json();
+      setReviewData(data);
+      setShowReview(true);
+    } else {
+      const err = await res.json();
+      setError(err.detail || "Failed to load review data");
+    }
+    setReviewingId(null);
+  };
+
+  const handleCorrectField = async (fieldId: number) => {
+    if (!reviewData || !editValue.trim()) return;
+
+    const res = await fetch(
+      `${API}/api/v1/documents/${reviewData.document_id}/review/fields/${fieldId}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          corrected_value: editValue.trim(),
+          review_status: "REVIEWED",
+        }),
+      }
+    );
+
+    if (res.ok) {
+      const updated: ReviewField = await res.json();
+      setReviewData((prev) => {
+        if (!prev) return prev;
+        const fields = prev.fields.map((f) => (f.id === fieldId ? updated : f));
+        const reviewed_count = fields.filter(
+          (f) => f.review_status === "REVIEWED"
+        ).length;
+        const review_required_count = fields.filter(
+          (f) => f.review_status === "REVIEW_REQUIRED"
+        ).length;
+        return {
+          ...prev,
+          fields,
+          progress: {
+            ...prev.progress,
+            reviewed_count,
+            review_required_count,
+          },
+        };
+      });
+      setEditingFieldId(null);
+      setEditValue("");
+      setMessage("Field corrected");
+    } else {
+      const err = await res.json();
+      setError(err.detail || "Failed to correct field");
+    }
+  };
+
+  const handleCompleteReview = async () => {
+    if (!reviewData) return;
+    setCompletingReview(true);
+    setMessage("");
+    setError("");
+
+    const res = await fetch(
+      `${API}/api/v1/documents/${reviewData.document_id}/review/complete`,
+      { method: "POST" }
+    );
+
+    if (res.ok) {
+      setMessage("Review completed successfully");
+      setShowReview(false);
+      setReviewData(null);
+      fetchDocuments();
+    } else {
+      const err = await res.json();
+      setError(err.detail || "Failed to complete review");
+    }
+    setCompletingReview(false);
+  };
+
   const handleMatch = async (docId: number) => {
     setMatchingId(docId);
     setMessage("");
@@ -197,6 +320,170 @@ export default function DocumentsPage() {
   };
 
   const totalPages = Math.ceil(total / 10);
+
+  if (showReview && reviewData) {
+    const allReviewed = reviewData.progress.review_required_count === 0;
+    return (
+      <div className="min-h-screen bg-[#050505] text-white p-8">
+        <div className="max-w-5xl mx-auto">
+          <button
+            onClick={() => {
+              setShowReview(false);
+              setReviewData(null);
+              setEditingFieldId(null);
+              setEditValue("");
+            }}
+            className="text-cyan-400 hover:text-cyan-300 mb-6 text-sm"
+          >
+            &larr; Back to Documents
+          </button>
+
+          <h1 className="text-3xl font-bold uppercase tracking-wider mb-2">
+            Extraction Review
+          </h1>
+          <p className="text-[#999] mb-8">
+            Document #{reviewData.document_id} &middot; {reviewData.ocr_engine} &middot;{" "}
+            {reviewData.ocr_avg_confidence.toFixed(1)}% confidence
+          </p>
+
+          <div className="bg-[#111] border border-white/10 rounded-lg p-4 mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-[#999]">Review Progress</span>
+              <span className="text-sm">
+                {reviewData.progress.reviewed_count}/{reviewData.progress.total_fields} reviewed
+              </span>
+            </div>
+            <div className="w-full bg-[#222] rounded-full h-2">
+              <div
+                className="bg-gradient-to-r from-cyan-500 to-emerald-500 h-2 rounded-full transition-all"
+                style={{
+                  width: `${
+                    reviewData.progress.total_fields > 0
+                      ? (reviewData.progress.reviewed_count / reviewData.progress.total_fields) * 100
+                      : 0
+                  }%`,
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="bg-[#111] border border-white/10 rounded-lg overflow-hidden mb-6">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/10 text-left text-sm text-[#999]">
+                  <th className="px-6 py-3">Field</th>
+                  <th className="px-6 py-3">OCR Value</th>
+                  <th className="px-6 py-3">Corrected</th>
+                  <th className="px-6 py-3">Confidence</th>
+                  <th className="px-6 py-3">Status</th>
+                  <th className="px-6 py-3">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reviewData.fields.map((f) => (
+                  <tr
+                    key={f.id}
+                    className="border-b border-white/5 hover:bg-white/[0.02]"
+                  >
+                    <td className="px-6 py-3 text-sm font-medium">
+                      {f.field_name.replace("_", " ")}
+                    </td>
+                    <td className="px-6 py-3 text-sm text-[#999]">
+                      {f.extracted_value || "—"}
+                    </td>
+                    <td className="px-6 py-3 text-sm">
+                      {editingFieldId === f.id ? (
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            className="bg-[#050505] border border-white/20 rounded px-3 py-1 text-sm text-white flex-1"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleCorrectField(f.id);
+                              if (e.key === "Escape") {
+                                setEditingFieldId(null);
+                                setEditValue("");
+                              }
+                            }}
+                          />
+                          <button
+                            onClick={() => handleCorrectField(f.id)}
+                            className="text-emerald-400 hover:text-emerald-300 text-xs"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingFieldId(null);
+                              setEditValue("");
+                            }}
+                            className="text-[#666] hover:text-[#999] text-xs"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <span
+                          className={
+                            f.corrected_value ? "text-emerald-400" : "text-[#666]"
+                          }
+                        >
+                          {f.corrected_value || "—"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-3 text-sm text-[#999]">
+                      {f.ocr_confidence != null
+                        ? `${f.ocr_confidence.toFixed(1)}%`
+                        : "—"}
+                    </td>
+                    <td className="px-6 py-3">
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full ${
+                          f.review_status === "REVIEWED"
+                            ? "bg-emerald-500/20 text-emerald-400"
+                            : f.review_status === "AUTO_APPROVED"
+                            ? "bg-cyan-500/20 text-cyan-400"
+                            : "bg-amber-500/20 text-amber-400"
+                        }`}
+                      >
+                        {f.review_status.replace("_", " ")}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3">
+                      {editingFieldId !== f.id && (
+                        <button
+                          onClick={() => {
+                            setEditingFieldId(f.id);
+                            setEditValue(f.corrected_value || f.extracted_value || "");
+                          }}
+                          className="text-cyan-400 hover:text-cyan-300 text-xs"
+                        >
+                          Correct
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              onClick={handleCompleteReview}
+              disabled={!allReviewed || completingReview}
+              className="bg-gradient-to-r from-cyan-500 to-emerald-500 px-6 py-2 rounded-lg font-medium hover:opacity-90 disabled:opacity-30"
+            >
+              {completingReview ? "Completing..." : "Complete Review"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (showMatch && matchResult) {
     return (
@@ -507,6 +794,15 @@ export default function DocumentsPage() {
                         >
                           View Extraction
                         </button>
+                        {d.status === "REVIEW_REQUIRED" && (
+                          <button
+                            onClick={() => handleStartReview(d.id)}
+                            disabled={reviewingId === d.id}
+                            className="text-amber-400 hover:text-amber-300 text-xs disabled:opacity-30"
+                          >
+                            {reviewingId === d.id ? "Loading..." : "Review"}
+                          </button>
+                        )}
                         <button
                           onClick={() => handleMatch(d.id)}
                           disabled={matchingId === d.id}
