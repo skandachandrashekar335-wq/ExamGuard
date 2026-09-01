@@ -70,6 +70,9 @@ class Exam(Base):
     registrations: Mapped[list["ExamRegistration"]] = relationship(  # noqa: F821
         back_populates="exam",
     )
+    seat_assignments: Mapped[list["SeatAssignment"]] = relationship(  # noqa: F821
+        back_populates="exam",
+    )
 
     def __repr__(self) -> str:
         return f"<Exam id={self.id} exam_name={self.exam_name!r} exam_date={self.exam_date!r}>"

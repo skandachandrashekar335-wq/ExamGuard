@@ -43,6 +43,9 @@ class Student(Base):
     registrations: Mapped[list["ExamRegistration"]] = relationship(  # noqa: F821
         back_populates="student",
     )
+    seat_assignments: Mapped[list["SeatAssignment"]] = relationship(  # noqa: F821
+        back_populates="student",
+    )
 
     def __repr__(self) -> str:
         return f"<Student id={self.id} usn={self.usn!r} name={self.name!r}>"
