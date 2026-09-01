@@ -12,7 +12,7 @@ def clean_test_subjects():
     """Remove test subjects before each test to avoid conflicts."""
     db = SessionLocal()
     try:
-        test_prefixes = ("SUB", "DUP", "FILT", "SRCH", "DEL", "UPD", "API")
+        test_prefixes = ("SUB", "GET", "DUP", "FILT", "SRCH", "DEL", "UPD", "API")
         for prefix in test_prefixes:
             db.execute(
                 delete(Subject).where(Subject.code.ilike(f"{prefix}%"))

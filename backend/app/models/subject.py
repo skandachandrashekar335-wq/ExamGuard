@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Integer, String, UniqueConstraint, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models import Base
 
@@ -56,6 +56,8 @@ class Subject(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+    exams: Mapped[list["Exam"]] = relationship(back_populates="subject")  # noqa: F821
 
     def __repr__(self) -> str:
         return f"<Subject id={self.id} code={self.code!r} name={self.name!r}>"
