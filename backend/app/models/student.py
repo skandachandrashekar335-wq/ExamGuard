@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, String, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models import Base
 
@@ -38,6 +38,10 @@ class Student(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+
+    registrations: Mapped[list["ExamRegistration"]] = relationship(  # noqa: F821
+        back_populates="student",
     )
 
     def __repr__(self) -> str:

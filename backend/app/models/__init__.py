@@ -11,3 +11,4 @@ from app.models.extraction import ExtractionResult, ExtractedField  # noqa: E402
 from app.models.subject import Subject  # noqa: E402, F401
 from app.models.exam import Exam  # noqa: E402, F401
 from app.models.exam_hall import ExamHall  # noqa: E402, F401
+from app.models.exam_registration import ExamRegistration  # noqa: E402, F401
