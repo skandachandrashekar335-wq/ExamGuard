@@ -119,7 +119,7 @@ Focus:
 
 ## Phase 6 — Hall-Ticket Lifecycle Management
 
-**Status: IN PROGRESS**
+**Status: COMPLETE**
 
 ### 6.1 Hall-Ticket Domain Model & Database Foundation
 **Status: COMPLETE**
@@ -132,25 +132,48 @@ Focus:
 - 46 comprehensive tests (model, service, API, lifecycle, regression)
 
 ### 6.2 Hall-Ticket Upload & Ingestion
-**Status: PLANNED**
+**Status: COMPLETE**
+- `link_document()` service: associates a HALL_TICKET document with an existing HallTicket
+- `on_extraction_complete()` hook: auto-transitions CREATED → EXTRACTED when OCR finishes
+- `on_match_complete()` hook: auto-transitions EXTRACTED → MATCHED when matching finishes
+- Both hooks integrated into `processing.py` and `hall_ticket_matching.py` pipelines
+- API: `POST /hall-tickets/{id}/link-document`
 
 ### 6.3 Hall-Ticket ↔ Student/Exam Linking
-**Status: PLANNED**
+**Status: COMPLETE**
+- `get_with_context()`: returns HallTicket with linked Student, Exam, ExamRegistration, Document
+- API: `GET /hall-tickets/{id}/detailed` — full context response
+- Schema: `HallTicketDetailedResponse`, `HallTicketStudentInfo`, `HallTicketExamInfo`, `HallTicketDocumentInfo`
 
 ### 6.4 Hall-Ticket Lifecycle & Status Management
-**Status: PLANNED**
+**Status: COMPLETE**
+- `_transition()` helper: validates and applies status transitions with timestamp update
+- `STATUS_TRANSITIONS` dict enforced on all status changes
+- Auto-transitions via hooks (extraction/matching) + manual via PATCH
 
 ### 6.5 Hall-Ticket Review/Approval Workflow
-**Status: PLANNED**
+**Status: COMPLETE**
+- `approve()`: moves MATCHED → VERIFIED, optionally links verification_outcome_id
+- `reject()`: moves MATCHED → REJECTED, stores rejection_reason, optionally links verification_outcome_id
+- API: `POST /hall-tickets/{id}/approve`, `POST /hall-tickets/{id}/reject`
 
 ### 6.6 Hall-Ticket Admin UI
-**Status: PLANNED**
+**Status: COMPLETE**
+- `/hall-tickets` — list page with status filter, USN search, pagination, status-colored badges
+- `/hall-tickets/[id]` — detail page with lifecycle progress, student/exam/document info, approve/reject actions
+- 17 frontend pages total, all building successfully
 
 ### 6.7 Hall-Ticket Search & Operations
-**Status: PLANNED**
+**Status: COMPLETE**
+- `search_hall_tickets()`: filter by USN (partial match), exam_id, status, subject_code
+- API: `GET /hall-tickets/search?usn=...&exam_id=...&status=...&subject_code=...`
 
 ### 6.8 Integration Tests + Phase 6 hardening
-**Status: PLANNED**
+**Status: COMPLETE**
+- 73 hall-ticket-specific tests: model, create, retrieve, update, list, link-document, approve, reject, context, search, API endpoints
+- Fixed FK cleanup ordering in `test_verification.py`, `test_batch_verification.py`, `test_dashboard.py` (HallTicket before ExamRegistration, ExtractedField before ExtractionResult)
+- 598 total backend tests passing
+- Frontend: 17 pages building successfully
 
 ---
 
@@ -547,8 +570,8 @@ Focus:
 
 ## Roadmap Rules
 
-1. Phases 0–4 are COMPLETE.
-2. Phases 5–23 are PLANNED.
+1. Phases 0–6 are COMPLETE.
+2. Phases 7–23 are PLANNED.
 3. Do not mark future phases complete.
 4. Do not implement future phases.
 5. Each future phase should eventually be broken into smaller implementation steps before coding begins.
@@ -566,10 +589,9 @@ Focus:
 
 ## Current Project State
 
-- **Current phase:** Phase 4 COMPLETE
-- **Current completed step:** Phase 4 Step 11 — Admin Management Pages
-- **Current tests:** 373 passing
-- **Latest commit:** f86e9d5
-- **Frontend pages:** `/`, `/students`, `/documents`, `/dashboard`, `/subjects`, `/exams`, `/exam-halls`
-- **Next phase:** Phase 5 — Examination Operations & Data Import
-- **Next action:** Before implementation, break Phase 5 into concrete steps and implement only Phase 5 Step 1.
+- **Current phase:** Phase 6 COMPLETE
+- **Current completed step:** Phase 6 Step 8 — Integration Tests + Phase 6 Hardening
+- **Current tests:** 598 passing
+- **Frontend pages:** 17 (`/`, `/students`, `/documents`, `/dashboard`, `/subjects`, `/exams`, `/exam-halls`, `/hall-tickets`, `/hall-tickets/[id]`, `/import`, `/import/history`, `/import/students`, `/import/subjects-exams`, `/import/registrations`, `/import/seat-assignments`)
+- **Next phase:** Phase 7 — Identity Verification Foundation
+- **Next action:** Before implementation, break Phase 7 into concrete steps and implement only Phase 7 Step 1.

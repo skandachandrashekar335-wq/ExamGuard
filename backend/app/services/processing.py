@@ -116,6 +116,10 @@ def process_document(db: Session, document_id: int) -> ExtractionResult:
 
     db.commit()
     db.refresh(extraction_result)
+
+    from app.services import hall_ticket as ht_service
+    ht_service.on_extraction_complete(db, document_id, extraction_result.id)
+
     return extraction_result
 
 

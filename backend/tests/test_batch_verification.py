@@ -4,7 +4,7 @@ from sqlalchemy import delete
 
 from app.core.database import SessionLocal
 from app.models.document import Document, DocumentStatus
-from app.models.extraction import ExtractionResult, ExtractionStatus
+from app.models.extraction import ExtractedField, ExtractionResult, ExtractionStatus
 from app.models.hall_ticket_match import HallTicketMatchResult, HallTicketMatchSignal
 from app.models.seat_assignment import SeatAssignment
 from app.models.student import Student
@@ -12,6 +12,7 @@ from app.models.subject import Subject
 from app.models.exam import Exam
 from app.models.exam_registration import ExamRegistration
 from app.models.verification import VerificationDecision, VerificationOutcome
+from app.models.hall_ticket import HallTicket
 from app.services import batch_verification
 
 
@@ -29,8 +30,10 @@ def cleanup():
             )
         )
         db.execute(delete(HallTicketMatchResult))
+        db.execute(delete(ExtractedField))
         db.execute(delete(ExtractionResult))
         db.execute(delete(SeatAssignment))
+        db.execute(delete(HallTicket))
         db.execute(delete(ExamRegistration))
         db.execute(delete(Exam))
         db.execute(delete(Subject))

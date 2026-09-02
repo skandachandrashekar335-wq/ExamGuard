@@ -18,6 +18,7 @@ from app.models.exam_hall import ExamHall
 from app.models.exam_registration import ExamRegistration, RegistrationStatus
 from app.models.seat_assignment import SeatAssignment, SeatAssignmentStatus
 from app.models.verification import VerificationDecision, VerificationOutcome
+from app.models.hall_ticket import HallTicket
 from app.services import verification
 
 
@@ -39,6 +40,7 @@ def cleanup():
         db.execute(delete(ExtractedField))
         db.execute(delete(ExtractionResult))
         db.execute(delete(SeatAssignment))
+        db.execute(delete(HallTicket))
         db.execute(delete(ExamRegistration))
         db.execute(delete(ExamHall))
         db.execute(delete(Exam))

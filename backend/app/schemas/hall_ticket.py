@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime, time
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -63,6 +63,45 @@ class HallTicketResponse(BaseModel):
     rejection_reason: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class HallTicketStudentInfo(BaseModel):
+    """Student summary for hall ticket context."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    usn: str
+    name: str
+
+
+class HallTicketExamInfo(BaseModel):
+    """Exam summary for hall ticket context."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    subject_id: int
+    exam_date: date
+    start_time: time
+    end_time: time
+
+
+class HallTicketDocumentInfo(BaseModel):
+    """Document summary for hall ticket context."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    original_filename: str
+    content_type: str
+    file_size: int
+    status: str
+
+
+class HallTicketDetailedResponse(BaseModel):
+    """Detailed hall ticket response with linked student, exam, and document info."""
+    hall_ticket: HallTicketResponse
+    student: HallTicketStudentInfo | None = None
+    exam: HallTicketExamInfo | None = None
+    document: HallTicketDocumentInfo | None = None
 
 
 class HallTicketListResponse(BaseModel):

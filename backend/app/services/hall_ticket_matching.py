@@ -544,6 +544,12 @@ def match_hall_ticket(
 
     db.commit()
     db.refresh(match_result)
+
+    from app.services import hall_ticket as ht_service
+    ht_service.on_match_complete(
+        db, document_id, match_result.id, overall_status
+    )
+
     return match_result
 
 
