@@ -10,25 +10,47 @@ export default function Home() {
         <p className="text-[#999] text-lg mb-8">
           AI-powered Examination Entry Verification Platform
         </p>
-        <div className="flex gap-4">
-          <Link
-            href="/dashboard"
-            className="inline-block bg-gradient-to-r from-cyan-500 to-emerald-500 px-8 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
-          >
-            Verification Dashboard
-          </Link>
-          <Link
-            href="/students"
-            className="inline-block border border-white/20 px-8 py-3 rounded-lg font-medium hover:bg-white/5 transition-colors"
-          >
-            Manage Students
-          </Link>
-          <Link
-            href="/documents"
-            className="inline-block border border-white/20 px-8 py-3 rounded-lg font-medium hover:bg-white/5 transition-colors"
-          >
-            Upload Documents
-          </Link>
+        <div className="flex flex-col gap-4 items-center">
+          <div className="flex gap-4">
+            <Link
+              href="/dashboard"
+              className="inline-block bg-gradient-to-r from-cyan-500 to-emerald-500 px-8 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
+            >
+              Verification Dashboard
+            </Link>
+            <Link
+              href="/documents"
+              className="inline-block border border-white/20 px-8 py-3 rounded-lg font-medium hover:bg-white/5 transition-colors"
+            >
+              Upload Documents
+            </Link>
+          </div>
+          <div className="flex gap-4">
+            <Link
+              href="/students"
+              className="inline-block border border-white/20 px-6 py-2 rounded-lg text-sm font-medium hover:bg-white/5 transition-colors"
+            >
+              Students
+            </Link>
+            <Link
+              href="/subjects"
+              className="inline-block border border-white/20 px-6 py-2 rounded-lg text-sm font-medium hover:bg-white/5 transition-colors"
+            >
+              Subjects
+            </Link>
+            <Link
+              href="/exams"
+              className="inline-block border border-white/20 px-6 py-2 rounded-lg text-sm font-medium hover:bg-white/5 transition-colors"
+            >
+              Exams
+            </Link>
+            <Link
+              href="/exam-halls"
+              className="inline-block border border-white/20 px-6 py-2 rounded-lg text-sm font-medium hover:bg-white/5 transition-colors"
+            >
+              Exam Halls
+            </Link>
+          </div>
         </div>
       </main>
     </div>
