@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.documents import router as documents_router
 from app.api.v1.exam_halls import router as exam_halls_router
 from app.api.v1.exam_registrations import router as exam_registrations_router
@@ -10,6 +11,7 @@ from app.api.v1.subjects import router as subjects_router
 
 router = APIRouter()
 
+router.include_router(dashboard_router)
 router.include_router(documents_router)
 router.include_router(exam_halls_router)
 router.include_router(exam_registrations_router)

@@ -12,8 +12,14 @@ export default function Home() {
         </p>
         <div className="flex gap-4">
           <Link
+            href="/dashboard"
+            className="inline-block bg-gradient-to-r from-cyan-500 to-emerald-500 px-8 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
+          >
+            Verification Dashboard
+          </Link>
+          <Link
             href="/students"
-            className="inline-block bg-gradient-to-r from-cyan-500 to-pink-500 px-8 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
+            className="inline-block border border-white/20 px-8 py-3 rounded-lg font-medium hover:bg-white/5 transition-colors"
           >
             Manage Students
           </Link>
