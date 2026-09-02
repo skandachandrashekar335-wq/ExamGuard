@@ -50,6 +50,12 @@ export default function Home() {
             >
               Exam Halls
             </Link>
+            <Link
+              href="/import"
+              className="inline-block border border-white/20 px-6 py-2 rounded-lg text-sm font-medium hover:bg-white/5 transition-colors"
+            >
+              Import
+            </Link>
           </div>
         </div>
       </main>
