@@ -49,3 +49,23 @@ def count_import_results(results: Sequence[Any]) -> dict[str, int]:
         status = result.status
         counts[status] = counts.get(status, 0) + 1
     return counts
+
+
+MAX_ERROR_SUMMARY_LENGTH = 2000
+MAX_ERROR_SAMPLES = 10
+
+
+def build_error_summary(results: Sequence[Any]) -> str | None:
+    """Build a bounded error summary string from per-row results.
+
+    Collects the first few error messages, truncated to
+    ``MAX_ERROR_SUMMARY_LENGTH`` characters total.
+    Returns None if no errors are present.
+    """
+    errors = [r.error for r in results if hasattr(r, "error") and r.error]
+    if not errors:
+        return None
+    samples = errors[:MAX_ERROR_SAMPLES]
+    suffix = f"\n... and {len(errors) - MAX_ERROR_SAMPLES} more errors" if len(errors) > MAX_ERROR_SAMPLES else ""
+    text = "; ".join(samples) + suffix
+    return text[:MAX_ERROR_SUMMARY_LENGTH] if len(text) > MAX_ERROR_SUMMARY_LENGTH else text

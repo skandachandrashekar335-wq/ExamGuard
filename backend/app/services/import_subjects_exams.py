@@ -5,13 +5,19 @@ from sqlalchemy.orm import Session
 
 from app.models.exam import Exam
 from app.models.subject import Subject
+from app.schemas.import_audit_log import ImportAuditLogCreate
 from app.schemas.import_subjects_exams import (
     ImportExamItem,
     ImportExamItemResult,
     ImportSubjectItem,
     ImportSubjectItemResult,
 )
-from app.services.import_common import count_import_results, process_import_items
+from app.services.import_audit_log import complete_audit_log, create_audit_log
+from app.services.import_common import (
+    build_error_summary,
+    count_import_results,
+    process_import_items,
+)
 
 
 def _normalize_code(code: str) -> str:
@@ -204,51 +210,82 @@ def import_subjects_exams(
     subject_items: list[ImportSubjectItem],
     exam_items: list[ImportExamItem],
 ) -> dict:
-    def _process_subject_item(
-        item: ImportSubjectItem,
-    ) -> ImportSubjectItemResult:
-        return _process_subject(db, item)
+    total = len(subject_items) + len(exam_items)
+    audit_log = create_audit_log(
+        db,
+        ImportAuditLogCreate(
+            import_type="subjects_exams",
+            operation="import",
+            total_rows=total,
+        ),
+    )
 
-    def _subject_error(
-        item: ImportSubjectItem,
-    ) -> ImportSubjectItemResult:
-        return ImportSubjectItemResult(
-            code=item.code.strip() if item.code else "",
-            department=item.department.strip() if item.department else "",
-            status="failed",
-            error="Unexpected error",
+    try:
+        def _process_subject_item(
+            item: ImportSubjectItem,
+        ) -> ImportSubjectItemResult:
+            return _process_subject(db, item)
+
+        def _subject_error(
+            item: ImportSubjectItem,
+        ) -> ImportSubjectItemResult:
+            return ImportSubjectItemResult(
+                code=item.code.strip() if item.code else "",
+                department=item.department.strip() if item.department else "",
+                status="failed",
+                error="Unexpected error",
+            )
+
+        def _process_exam_item(item: ImportExamItem) -> ImportExamItemResult:
+            return _process_exam(db, item)
+
+        def _exam_error(item: ImportExamItem) -> ImportExamItemResult:
+            return ImportExamItemResult(
+                subject_code=item.subject_code.strip() if item.subject_code else "",
+                exam_name=item.exam_name.strip() if item.exam_name else "",
+                status="failed",
+                error="Unexpected error",
+            )
+
+        subject_results = process_import_items(
+            subject_items, _process_subject_item, _subject_error
+        )
+        subject_counts = count_import_results(subject_results)
+
+        exam_results = process_import_items(
+            exam_items, _process_exam_item, _exam_error
+        )
+        exam_counts = count_import_results(exam_results)
+
+        all_results = subject_results + exam_results
+        response = {
+            "subject_total": len(subject_items),
+            "subject_created": subject_counts.get("created", 0),
+            "subject_skipped": subject_counts.get("skipped", 0),
+            "subject_failed": subject_counts.get("failed", 0),
+            "exam_total": len(exam_items),
+            "exam_created": exam_counts.get("created", 0),
+            "exam_skipped": exam_counts.get("skipped", 0),
+            "exam_failed": exam_counts.get("failed", 0),
+            "subject_results": subject_results,
+            "exam_results": exam_results,
+        }
+
+        total_successful = response["subject_created"] + response["exam_created"]
+        total_skipped = response["subject_skipped"] + response["exam_skipped"]
+        total_failed = response["subject_failed"] + response["exam_failed"]
+
+        complete_audit_log(
+            db,
+            audit_log.id,
+            successful=total_successful,
+            skipped=total_skipped,
+            failed=total_failed,
+            error_summary=build_error_summary(all_results),
         )
 
-    def _process_exam_item(item: ImportExamItem) -> ImportExamItemResult:
-        return _process_exam(db, item)
-
-    def _exam_error(item: ImportExamItem) -> ImportExamItemResult:
-        return ImportExamItemResult(
-            subject_code=item.subject_code.strip() if item.subject_code else "",
-            exam_name=item.exam_name.strip() if item.exam_name else "",
-            status="failed",
-            error="Unexpected error",
-        )
-
-    subject_results = process_import_items(
-        subject_items, _process_subject_item, _subject_error
-    )
-    subject_counts = count_import_results(subject_results)
-
-    exam_results = process_import_items(
-        exam_items, _process_exam_item, _exam_error
-    )
-    exam_counts = count_import_results(exam_results)
-
-    return {
-        "subject_total": len(subject_items),
-        "subject_created": subject_counts.get("created", 0),
-        "subject_skipped": subject_counts.get("skipped", 0),
-        "subject_failed": subject_counts.get("failed", 0),
-        "exam_total": len(exam_items),
-        "exam_created": exam_counts.get("created", 0),
-        "exam_skipped": exam_counts.get("skipped", 0),
-        "exam_failed": exam_counts.get("failed", 0),
-        "subject_results": subject_results,
-        "exam_results": exam_results,
-    }
+        return response
+    except Exception as exc:
+        from app.services.import_audit_log import fail_audit_log
+        fail_audit_log(db, audit_log.id, error_summary=str(exc)[:2000])
+        raise

@@ -4,11 +4,17 @@ from sqlalchemy.orm import Session
 from app.models.exam import Exam
 from app.models.exam_registration import ExamRegistration, RegistrationStatus
 from app.models.student import Student
+from app.schemas.import_audit_log import ImportAuditLogCreate
 from app.schemas.import_registrations import (
     BulkCancelItemResult,
     BulkRegistrationItemResult,
 )
-from app.services.import_common import count_import_results, process_import_items
+from app.services.import_audit_log import complete_audit_log, create_audit_log
+from app.services.import_common import (
+    build_error_summary,
+    count_import_results,
+    process_import_items,
+)
 
 
 def _process_single_registration(
@@ -99,26 +105,51 @@ def _process_single_registration(
 def bulk_register(
     db: Session, exam_id: int, student_ids: list[int]
 ) -> dict:
-    def _process(student_id: int) -> BulkRegistrationItemResult:
-        return _process_single_registration(db, exam_id, student_id)
+    audit_log = create_audit_log(
+        db,
+        ImportAuditLogCreate(
+            import_type="registrations",
+            operation="import",
+            total_rows=len(student_ids),
+        ),
+    )
 
-    def _error(student_id: int) -> BulkRegistrationItemResult:
-        return BulkRegistrationItemResult(
-            student_id=student_id,
-            status="failed",
-            error="Unexpected error",
+    try:
+        def _process(student_id: int) -> BulkRegistrationItemResult:
+            return _process_single_registration(db, exam_id, student_id)
+
+        def _error(student_id: int) -> BulkRegistrationItemResult:
+            return BulkRegistrationItemResult(
+                student_id=student_id,
+                status="failed",
+                error="Unexpected error",
+            )
+
+        results = process_import_items(student_ids, _process, _error)
+        counts = count_import_results(results)
+
+        response = {
+            "total": len(student_ids),
+            "created": counts.get("created", 0),
+            "skipped": counts.get("skipped", 0),
+            "failed": counts.get("failed", 0),
+            "results": results,
+        }
+
+        complete_audit_log(
+            db,
+            audit_log.id,
+            successful=response["created"],
+            skipped=response["skipped"],
+            failed=response["failed"],
+            error_summary=build_error_summary(results),
         )
 
-    results = process_import_items(student_ids, _process, _error)
-    counts = count_import_results(results)
-
-    return {
-        "total": len(student_ids),
-        "created": counts.get("created", 0),
-        "skipped": counts.get("skipped", 0),
-        "failed": counts.get("failed", 0),
-        "results": results,
-    }
+        return response
+    except Exception as exc:
+        from app.services.import_audit_log import fail_audit_log
+        fail_audit_log(db, audit_log.id, error_summary=str(exc)[:2000])
+        raise
 
 
 def _process_single_cancel(
@@ -165,23 +196,49 @@ def _process_single_cancel(
 def bulk_cancel(
     db: Session, registration_ids: list[int]
 ) -> dict:
-    def _process(registration_id: int) -> BulkCancelItemResult:
-        return _process_single_cancel(db, registration_id)
+    audit_log = create_audit_log(
+        db,
+        ImportAuditLogCreate(
+            import_type="registration_cancellations",
+            operation="cancellation",
+            total_rows=len(registration_ids),
+        ),
+    )
 
-    def _error(registration_id: int) -> BulkCancelItemResult:
-        return BulkCancelItemResult(
-            registration_id=registration_id,
-            status="failed",
-            error="Unexpected error",
+    try:
+        def _process(registration_id: int) -> BulkCancelItemResult:
+            return _process_single_cancel(db, registration_id)
+
+        def _error(registration_id: int) -> BulkCancelItemResult:
+            return BulkCancelItemResult(
+                registration_id=registration_id,
+                status="failed",
+                error="Unexpected error",
+            )
+
+        results = process_import_items(registration_ids, _process, _error)
+        counts = count_import_results(results)
+
+        cancelled = counts.get("cancelled", 0)
+        response = {
+            "total": len(registration_ids),
+            "cancelled": cancelled,
+            "skipped": counts.get("skipped", 0),
+            "failed": counts.get("failed", 0),
+            "results": results,
+        }
+
+        complete_audit_log(
+            db,
+            audit_log.id,
+            successful=cancelled,
+            skipped=response["skipped"],
+            failed=response["failed"],
+            error_summary=build_error_summary(results),
         )
 
-    results = process_import_items(registration_ids, _process, _error)
-    counts = count_import_results(results)
-
-    return {
-        "total": len(registration_ids),
-        "cancelled": counts.get("cancelled", 0),
-        "skipped": counts.get("skipped", 0),
-        "failed": counts.get("failed", 0),
-        "results": results,
-    }
+        return response
+    except Exception as exc:
+        from app.services.import_audit_log import fail_audit_log
+        fail_audit_log(db, audit_log.id, error_summary=str(exc)[:2000])
+        raise

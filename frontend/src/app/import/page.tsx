@@ -60,10 +60,16 @@ export default function ImportHubPage() {
           ))}
         </div>
 
-        <div className="mt-8">
+        <div className="mt-8 flex gap-4">
+          <Link
+            href="/import/history"
+            className="border border-white/20 rounded-lg px-4 py-2 text-sm text-[#999] hover:text-white hover:border-white/40 transition-colors"
+          >
+            View Import History
+          </Link>
           <Link
             href="/"
-            className="text-[#666] hover:text-white text-sm transition-colors"
+            className="text-[#666] hover:text-white text-sm transition-colors self-center"
           >
             &larr; Back to Home
           </Link>
