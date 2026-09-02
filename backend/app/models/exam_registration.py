@@ -54,6 +54,9 @@ class ExamRegistration(Base):
     seat_assignments: Mapped[list["SeatAssignment"]] = relationship(  # noqa: F821
         back_populates="registration",
     )
+    hall_ticket: Mapped["HallTicket | None"] = relationship(  # noqa: F821
+        back_populates="registration",
+    )
 
     def __repr__(self) -> str:
         return (

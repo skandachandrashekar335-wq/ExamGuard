@@ -119,23 +119,38 @@ Focus:
 
 ## Phase 6 — Hall-Ticket Lifecycle Management
 
+**Status: IN PROGRESS**
+
+### 6.1 Hall-Ticket Domain Model & Database Foundation
+**Status: COMPLETE**
+- `HallTicket` model with lifecycle statuses (CREATED → EXTRACTED → MATCHED → VERIFIED/REJECTED/CANCELLED)
+- Links exam_registration to document, extraction, match, and verification outcomes
+- Unique constraint on exam_registration_id prevents duplicate active tickets
+- Alembic migration 014
+- Service layer with status transition validation
+- REST API: create, get by ID, get by registration, list, update
+- 46 comprehensive tests (model, service, API, lifecycle, regression)
+
+### 6.2 Hall-Ticket Upload & Ingestion
 **Status: PLANNED**
 
-Focus:
-- Hall-ticket batches
-- Document lifecycle management
-- Reprocessing workflows
-- Review queues
-- Verification history
-- Operational document management
+### 6.3 Hall-Ticket ↔ Student/Exam Linking
+**Status: PLANNED**
 
-**Dependencies:** Phases 0–4 (document, extraction, matching, verification models must exist).
+### 6.4 Hall-Ticket Lifecycle & Status Management
+**Status: PLANNED**
 
-**New models/migrations likely required:** Possibly `HallTicketBatch` model for batch tracking. Document lifecycle status extensions.
+### 6.5 Hall-Ticket Review/Approval Workflow
+**Status: PLANNED**
 
-**Frontend work expected:** Batch management views, reprocessing UI, review queue pages.
+### 6.6 Hall-Ticket Admin UI
+**Status: PLANNED**
 
-**Testing requirements:** Unit tests for lifecycle transitions, batch processing. API tests for batch endpoints.
+### 6.7 Hall-Ticket Search & Operations
+**Status: PLANNED**
+
+### 6.8 Integration Tests + Phase 6 hardening
+**Status: PLANNED**
 
 ---
 

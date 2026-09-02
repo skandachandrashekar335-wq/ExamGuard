@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.batch_verification import router as batch_verification_router
+from app.api.v1.hall_tickets import router as hall_tickets_router
 from app.api.v1.import_audit_log import router as import_audit_log_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.documents import router as documents_router
@@ -19,6 +20,7 @@ from app.api.v1.subjects import router as subjects_router
 router = APIRouter()
 
 router.include_router(batch_verification_router)
+router.include_router(hall_tickets_router)
 router.include_router(import_audit_log_router)
 router.include_router(dashboard_router)
 router.include_router(documents_router)
