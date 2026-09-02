@@ -6,6 +6,7 @@ from app.api.v1.documents import router as documents_router
 from app.api.v1.exam_halls import router as exam_halls_router
 from app.api.v1.exam_registrations import router as exam_registrations_router
 from app.api.v1.exams import router as exams_router
+from app.api.v1.import_registrations import router as import_registrations_router
 from app.api.v1.import_students import router as import_students_router
 from app.api.v1.import_subjects_exams import router as import_subjects_exams_router
 from app.api.v1.seat_assignments import router as seat_assignments_router
@@ -20,6 +21,7 @@ router.include_router(documents_router)
 router.include_router(exam_halls_router)
 router.include_router(exam_registrations_router)
 router.include_router(exams_router)
+router.include_router(import_registrations_router)
 router.include_router(import_students_router)
 router.include_router(import_subjects_exams_router)
 router.include_router(seat_assignments_router)
