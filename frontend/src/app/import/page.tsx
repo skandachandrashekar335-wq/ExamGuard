@@ -4,7 +4,7 @@ const IMPORT_TYPES = [
   {
     title: "Students",
     href: "/import/students",
-    description: "Bulk import student records from a JSON file",
+    description: "Bulk import student records from Excel or CSV",
     limit: "Max 500 per batch",
     color: "from-cyan-500 to-blue-500",
   },
@@ -39,7 +39,7 @@ export default function ImportHubPage() {
           Data Import
         </h1>
         <p className="text-[#999] mb-8">
-          Bulk import data into the system
+          Upload Excel or CSV files to bulk import data
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
