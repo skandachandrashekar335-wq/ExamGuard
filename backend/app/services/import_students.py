@@ -1,5 +1,3 @@
-import logging
-
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -8,9 +6,8 @@ from app.schemas.import_students import (
     ImportStudentItem,
     ImportStudentItemResult,
 )
+from app.services.import_common import count_import_results, process_import_items
 from app.services.student import normalize_usn
-
-logger = logging.getLogger(__name__)
 
 
 def _process_single(db: Session, item: ImportStudentItem) -> ImportStudentItemResult:
@@ -45,34 +42,23 @@ def _process_single(db: Session, item: ImportStudentItem) -> ImportStudentItemRe
 def import_students(
     db: Session, items: list[ImportStudentItem]
 ) -> dict:
-    results: list[ImportStudentItemResult] = []
-    created = 0
-    skipped = 0
-    failed = 0
+    def _process(item: ImportStudentItem) -> ImportStudentItemResult:
+        return _process_single(db, item)
 
-    for item in items:
-        try:
-            result = _process_single(db, item)
-            results.append(result)
-            if result.status == "created":
-                created += 1
-            else:
-                skipped += 1
-        except Exception:
-            logger.exception("Unexpected error importing student USN=%s", item.usn)
-            failed += 1
-            results.append(
-                ImportStudentItemResult(
-                    usn=item.usn.strip() if item.usn else "",
-                    status="failed",
-                    error="Unexpected error",
-                )
-            )
+    def _error(item: ImportStudentItem) -> ImportStudentItemResult:
+        return ImportStudentItemResult(
+            usn=item.usn.strip() if item.usn else "",
+            status="failed",
+            error="Unexpected error",
+        )
+
+    results = process_import_items(items, _process, _error)
+    counts = count_import_results(results)
 
     return {
         "total": len(items),
-        "created": created,
-        "skipped": skipped,
-        "failed": failed,
+        "created": counts.get("created", 0),
+        "skipped": counts.get("skipped", 0),
+        "failed": counts.get("failed", 0),
         "results": results,
     }

@@ -1,5 +1,3 @@
-import logging
-
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -10,8 +8,7 @@ from app.schemas.import_seat_assignments import (
 )
 from app.schemas.seat_assignment import SeatAssignmentCreate
 from app.services import seat_assignment as seat_service
-
-logger = logging.getLogger(__name__)
+from app.services.import_common import count_import_results, process_import_items
 
 
 def _process_single_assignment(
@@ -53,41 +50,25 @@ def _process_single_assignment(
 def bulk_assign_seats(
     db: Session, exam_hall_id: int, items
 ) -> dict:
-    results: list[BulkSeatAssignmentItemResult] = []
-    assigned = 0
-    skipped = 0
-    failed = 0
+    def _process(item) -> BulkSeatAssignmentItemResult:
+        return _process_single_assignment(db, exam_hall_id, item)
 
-    for item in items:
-        try:
-            result = _process_single_assignment(db, exam_hall_id, item)
-            results.append(result)
-            if result.status == "assigned":
-                assigned += 1
-            elif result.status == "skipped":
-                skipped += 1
-            else:
-                failed += 1
-        except Exception:
-            logger.exception(
-                "Unexpected error assigning seat for registration %d",
-                item.exam_registration_id,
-            )
-            failed += 1
-            results.append(
-                BulkSeatAssignmentItemResult(
-                    exam_registration_id=item.exam_registration_id,
-                    seat_number=item.seat_number.strip() if item.seat_number else "",
-                    status="failed",
-                    error="Unexpected error",
-                )
-            )
+    def _error(item) -> BulkSeatAssignmentItemResult:
+        return BulkSeatAssignmentItemResult(
+            exam_registration_id=item.exam_registration_id,
+            seat_number=item.seat_number.strip() if item.seat_number else "",
+            status="failed",
+            error="Unexpected error",
+        )
+
+    results = process_import_items(items, _process, _error)
+    counts = count_import_results(results)
 
     return {
         "total": len(items),
-        "assigned": assigned,
-        "skipped": skipped,
-        "failed": failed,
+        "assigned": counts.get("assigned", 0),
+        "skipped": counts.get("skipped", 0),
+        "failed": counts.get("failed", 0),
         "results": results,
     }
 
@@ -134,36 +115,23 @@ def _process_single_cancel(
 def bulk_cancel_assignments(
     db: Session, assignment_ids: list[int]
 ) -> dict:
-    results: list[BulkCancelSeatItemResult] = []
-    cancelled = 0
-    skipped = 0
-    failed = 0
+    def _process(assignment_id: int) -> BulkCancelSeatItemResult:
+        return _process_single_cancel(db, assignment_id)
 
-    for aid in assignment_ids:
-        try:
-            result = _process_single_cancel(db, aid)
-            results.append(result)
-            if result.status == "cancelled":
-                cancelled += 1
-            elif result.status == "skipped":
-                skipped += 1
-            else:
-                failed += 1
-        except Exception:
-            logger.exception("Unexpected error cancelling assignment %d", aid)
-            failed += 1
-            results.append(
-                BulkCancelSeatItemResult(
-                    assignment_id=aid,
-                    status="failed",
-                    error="Unexpected error",
-                )
-            )
+    def _error(assignment_id: int) -> BulkCancelSeatItemResult:
+        return BulkCancelSeatItemResult(
+            assignment_id=assignment_id,
+            status="failed",
+            error="Unexpected error",
+        )
+
+    results = process_import_items(assignment_ids, _process, _error)
+    counts = count_import_results(results)
 
     return {
         "total": len(assignment_ids),
-        "cancelled": cancelled,
-        "skipped": skipped,
-        "failed": failed,
+        "cancelled": counts.get("cancelled", 0),
+        "skipped": counts.get("skipped", 0),
+        "failed": counts.get("failed", 0),
         "results": results,
     }

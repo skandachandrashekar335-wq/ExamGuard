@@ -1,5 +1,3 @@
-import logging
-
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -10,8 +8,7 @@ from app.schemas.import_registrations import (
     BulkCancelItemResult,
     BulkRegistrationItemResult,
 )
-
-logger = logging.getLogger(__name__)
+from app.services.import_common import count_import_results, process_import_items
 
 
 def _process_single_registration(
@@ -102,41 +99,24 @@ def _process_single_registration(
 def bulk_register(
     db: Session, exam_id: int, student_ids: list[int]
 ) -> dict:
-    results: list[BulkRegistrationItemResult] = []
-    created = 0
-    skipped = 0
-    failed = 0
+    def _process(student_id: int) -> BulkRegistrationItemResult:
+        return _process_single_registration(db, exam_id, student_id)
 
-    for student_id in student_ids:
-        try:
-            result = _process_single_registration(db, exam_id, student_id)
-            results.append(result)
-            if result.status == "created":
-                created += 1
-            elif result.status == "skipped":
-                skipped += 1
-            else:
-                failed += 1
-        except Exception:
-            logger.exception(
-                "Unexpected error registering student %d for exam %d",
-                student_id,
-                exam_id,
-            )
-            failed += 1
-            results.append(
-                BulkRegistrationItemResult(
-                    student_id=student_id,
-                    status="failed",
-                    error="Unexpected error",
-                )
-            )
+    def _error(student_id: int) -> BulkRegistrationItemResult:
+        return BulkRegistrationItemResult(
+            student_id=student_id,
+            status="failed",
+            error="Unexpected error",
+        )
+
+    results = process_import_items(student_ids, _process, _error)
+    counts = count_import_results(results)
 
     return {
         "total": len(student_ids),
-        "created": created,
-        "skipped": skipped,
-        "failed": failed,
+        "created": counts.get("created", 0),
+        "skipped": counts.get("skipped", 0),
+        "failed": counts.get("failed", 0),
         "results": results,
     }
 
@@ -185,36 +165,23 @@ def _process_single_cancel(
 def bulk_cancel(
     db: Session, registration_ids: list[int]
 ) -> dict:
-    results: list[BulkCancelItemResult] = []
-    cancelled = 0
-    skipped = 0
-    failed = 0
+    def _process(registration_id: int) -> BulkCancelItemResult:
+        return _process_single_cancel(db, registration_id)
 
-    for reg_id in registration_ids:
-        try:
-            result = _process_single_cancel(db, reg_id)
-            results.append(result)
-            if result.status == "cancelled":
-                cancelled += 1
-            elif result.status == "skipped":
-                skipped += 1
-            else:
-                failed += 1
-        except Exception:
-            logger.exception("Unexpected error cancelling registration %d", reg_id)
-            failed += 1
-            results.append(
-                BulkCancelItemResult(
-                    registration_id=reg_id,
-                    status="failed",
-                    error="Unexpected error",
-                )
-            )
+    def _error(registration_id: int) -> BulkCancelItemResult:
+        return BulkCancelItemResult(
+            registration_id=registration_id,
+            status="failed",
+            error="Unexpected error",
+        )
+
+    results = process_import_items(registration_ids, _process, _error)
+    counts = count_import_results(results)
 
     return {
         "total": len(registration_ids),
-        "cancelled": cancelled,
-        "skipped": skipped,
-        "failed": failed,
+        "cancelled": counts.get("cancelled", 0),
+        "skipped": counts.get("skipped", 0),
+        "failed": counts.get("failed", 0),
         "results": results,
     }

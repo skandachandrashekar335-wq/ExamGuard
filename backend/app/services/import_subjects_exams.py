@@ -1,4 +1,3 @@
-import logging
 from datetime import date, time
 
 from sqlalchemy.exc import IntegrityError
@@ -12,8 +11,7 @@ from app.schemas.import_subjects_exams import (
     ImportSubjectItem,
     ImportSubjectItemResult,
 )
-
-logger = logging.getLogger(__name__)
+from app.services.import_common import count_import_results, process_import_items
 
 
 def _normalize_code(code: str) -> str:
@@ -206,71 +204,51 @@ def import_subjects_exams(
     subject_items: list[ImportSubjectItem],
     exam_items: list[ImportExamItem],
 ) -> dict:
-    subject_results: list[ImportSubjectItemResult] = []
-    subject_created = 0
-    subject_skipped = 0
-    subject_failed = 0
+    def _process_subject_item(
+        item: ImportSubjectItem,
+    ) -> ImportSubjectItemResult:
+        return _process_subject(db, item)
 
-    for item in subject_items:
-        try:
-            result = _process_subject(db, item)
-            subject_results.append(result)
-            if result.status == "created":
-                subject_created += 1
-            elif result.status == "skipped":
-                subject_skipped += 1
-            else:
-                subject_failed += 1
-        except Exception:
-            logger.exception("Unexpected error importing subject code=%s", item.code)
-            subject_failed += 1
-            subject_results.append(
-                ImportSubjectItemResult(
-                    code=item.code.strip() if item.code else "",
-                    department=item.department.strip() if item.department else "",
-                    status="failed",
-                    error="Unexpected error",
-                )
-            )
+    def _subject_error(
+        item: ImportSubjectItem,
+    ) -> ImportSubjectItemResult:
+        return ImportSubjectItemResult(
+            code=item.code.strip() if item.code else "",
+            department=item.department.strip() if item.department else "",
+            status="failed",
+            error="Unexpected error",
+        )
 
-    exam_results: list[ImportExamItemResult] = []
-    exam_created = 0
-    exam_skipped = 0
-    exam_failed = 0
+    def _process_exam_item(item: ImportExamItem) -> ImportExamItemResult:
+        return _process_exam(db, item)
 
-    for item in exam_items:
-        try:
-            result = _process_exam(db, item)
-            exam_results.append(result)
-            if result.status == "created":
-                exam_created += 1
-            elif result.status == "skipped":
-                exam_skipped += 1
-            else:
-                exam_failed += 1
-        except Exception:
-            logger.exception(
-                "Unexpected error importing exam subject_code=%s", item.subject_code
-            )
-            exam_failed += 1
-            exam_results.append(
-                ImportExamItemResult(
-                    subject_code=item.subject_code.strip() if item.subject_code else "",
-                    exam_name=item.exam_name.strip() if item.exam_name else "",
-                    status="failed",
-                    error="Unexpected error",
-                )
-            )
+    def _exam_error(item: ImportExamItem) -> ImportExamItemResult:
+        return ImportExamItemResult(
+            subject_code=item.subject_code.strip() if item.subject_code else "",
+            exam_name=item.exam_name.strip() if item.exam_name else "",
+            status="failed",
+            error="Unexpected error",
+        )
+
+    subject_results = process_import_items(
+        subject_items, _process_subject_item, _subject_error
+    )
+    subject_counts = count_import_results(subject_results)
+
+    exam_results = process_import_items(
+        exam_items, _process_exam_item, _exam_error
+    )
+    exam_counts = count_import_results(exam_results)
 
     return {
         "subject_total": len(subject_items),
-        "subject_created": subject_created,
-        "subject_skipped": subject_skipped,
-        "subject_failed": subject_failed,
+        "subject_created": subject_counts.get("created", 0),
+        "subject_skipped": subject_counts.get("skipped", 0),
+        "subject_failed": subject_counts.get("failed", 0),
         "exam_total": len(exam_items),
-        "exam_created": exam_created,
-        "exam_skipped": exam_skipped,
-        "exam_failed": exam_failed,
+        "exam_created": exam_counts.get("created", 0),
+        "exam_skipped": exam_counts.get("skipped", 0),
+        "exam_failed": exam_counts.get("failed", 0),
         "subject_results": subject_results,
         "exam_results": exam_results,
     }

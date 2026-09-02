@@ -6,6 +6,7 @@ from app.core.database import SessionLocal
 from app.models.document import Document, DocumentStatus
 from app.models.extraction import ExtractionResult, ExtractionStatus
 from app.models.hall_ticket_match import HallTicketMatchResult, HallTicketMatchSignal
+from app.models.seat_assignment import SeatAssignment
 from app.models.student import Student
 from app.models.subject import Subject
 from app.models.exam import Exam
@@ -29,6 +30,7 @@ def cleanup():
         )
         db.execute(delete(HallTicketMatchResult))
         db.execute(delete(ExtractionResult))
+        db.execute(delete(SeatAssignment))
         db.execute(delete(ExamRegistration))
         db.execute(delete(Exam))
         db.execute(delete(Subject))
