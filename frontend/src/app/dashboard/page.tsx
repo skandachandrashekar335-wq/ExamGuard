@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 interface ExamListItem {
   id: number;
@@ -55,6 +55,21 @@ interface DashboardData {
   students: StudentRow[];
 }
 
+interface BatchResult {
+  total: number;
+  processed: number;
+  matched: number;
+  verified: number;
+  failed: number;
+  results: {
+    document_id: number;
+    step: string;
+    status: string;
+    error?: string;
+    decision?: string;
+  }[];
+}
+
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -80,15 +95,11 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [batchVerifying, setBatchVerifying] = useState(false);
+  const [batchResult, setBatchResult] = useState<BatchResult | null>(null);
+  const [selectedDocs, setSelectedDocs] = useState<Set<number>>(new Set());
 
-  useEffect(() => {
-    fetch(`${API}/api/v1/exams?page=1&page_size=100`)
-      .then((r) => r.json())
-      .then((data) => setExams(data.items || []))
-      .catch(() => setError("Failed to load exams"));
-  }, []);
-
-  useEffect(() => {
+  const fetchDashboard = useCallback(() => {
     if (!selectedExamId) {
       setDashboard(null);
       return;
@@ -110,6 +121,17 @@ export default function DashboardPage() {
       });
   }, [selectedExamId]);
 
+  useEffect(() => {
+    fetch(`${API}/api/v1/exams?page=1&page_size=100`)
+      .then((r) => r.json())
+      .then((data) => setExams(data.items || []))
+      .catch(() => setError("Failed to load exams"));
+  }, []);
+
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
+
   const filteredStudents =
     dashboard?.students.filter(
       (s) =>
@@ -117,6 +139,55 @@ export default function DashboardPage() {
         s.student_usn.toLowerCase().includes(search.toLowerCase()) ||
         s.student_name.toLowerCase().includes(search.toLowerCase())
     ) || [];
+
+  const handleSelectDoc = (docId: number) => {
+    setSelectedDocs((prev) => {
+      const next = new Set(prev);
+      if (next.has(docId)) {
+        next.delete(docId);
+      } else {
+        next.add(docId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    const docIds = filteredStudents
+      .filter((s) => s.document_id !== null)
+      .map((s) => s.document_id!);
+    setSelectedDocs((prev) => {
+      if (prev.size === docIds.length) {
+        return new Set();
+      }
+      return new Set(docIds);
+    });
+  };
+
+  const handleBatchVerify = async () => {
+    if (selectedDocs.size === 0) return;
+    setBatchVerifying(true);
+    setError("");
+    setBatchResult(null);
+
+    try {
+      const res = await fetch(`${API}/api/v1/documents/batch-verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ document_ids: Array.from(selectedDocs) }),
+      });
+
+      if (!res.ok) throw new Error("Batch verification failed");
+      const data: BatchResult = await res.json();
+      setBatchResult(data);
+      setSelectedDocs(new Set());
+      fetchDashboard();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBatchVerifying(false);
+    }
+  };
 
   const summary = dashboard?.summary;
 
@@ -136,6 +207,8 @@ export default function DashboardPage() {
             onChange={(e) => {
               const val = e.target.value;
               setSelectedExamId(val ? Number(val) : null);
+              setSelectedDocs(new Set());
+              setBatchResult(null);
             }}
             className="flex-1 bg-[#111] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
           >
@@ -154,6 +227,36 @@ export default function DashboardPage() {
 
         {loading && (
           <p className="text-[#666] text-sm mb-6">Loading dashboard...</p>
+        )}
+
+        {batchResult && (
+          <div className="bg-[#111] border border-emerald-500/30 rounded-lg p-4 mb-6">
+            <h3 className="text-sm font-semibold text-emerald-400 mb-2">
+              Batch Verification Complete
+            </h3>
+            <div className="grid grid-cols-5 gap-4 text-sm">
+              <div>
+                <span className="text-[#666]">Total:</span>{" "}
+                {batchResult.total}
+              </div>
+              <div>
+                <span className="text-[#666]">Processed:</span>{" "}
+                {batchResult.processed}
+              </div>
+              <div>
+                <span className="text-[#666]">Matched:</span>{" "}
+                {batchResult.matched}
+              </div>
+              <div>
+                <span className="text-emerald-400">Verified:</span>{" "}
+                {batchResult.verified}
+              </div>
+              <div>
+                <span className="text-pink-400">Failed:</span>{" "}
+                {batchResult.failed}
+              </div>
+            </div>
+          </div>
         )}
 
         {summary && (
@@ -219,12 +322,31 @@ export default function DashboardPage() {
                 onChange={(e) => setSearch(e.target.value)}
                 className="flex-1 bg-[#111] border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-[#666] focus:outline-none focus:border-cyan-500"
               />
+              <button
+                onClick={handleSelectAll}
+                className="border border-white/20 px-4 py-2 rounded-lg text-sm hover:bg-white/5"
+              >
+                {selectedDocs.size ===
+                filteredStudents.filter((s) => s.document_id).length
+                  ? "Deselect All"
+                  : "Select All"}
+              </button>
+              <button
+                onClick={handleBatchVerify}
+                disabled={selectedDocs.size === 0 || batchVerifying}
+                className="bg-gradient-to-r from-cyan-500 to-emerald-500 px-4 py-2 rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-30"
+              >
+                {batchVerifying
+                  ? "Verifying..."
+                  : `Batch Verify (${selectedDocs.size})`}
+              </button>
             </div>
 
             <div className="bg-[#111] border border-white/10 rounded-lg overflow-hidden">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-white/10 text-left text-sm text-[#999]">
+                    <th className="px-6 py-3 w-10"></th>
                     <th className="px-6 py-3">USN</th>
                     <th className="px-6 py-3">Name</th>
                     <th className="px-6 py-3">Seat</th>
@@ -241,6 +363,16 @@ export default function DashboardPage() {
                       key={s.student_id}
                       className="border-b border-white/5 hover:bg-white/[0.02]"
                     >
+                      <td className="px-6 py-3">
+                        {s.document_id && (
+                          <input
+                            type="checkbox"
+                            checked={selectedDocs.has(s.document_id)}
+                            onChange={() => handleSelectDoc(s.document_id!)}
+                            className="accent-cyan-500"
+                          />
+                        )}
+                      </td>
                       <td className="px-6 py-3 font-mono text-sm">
                         {s.student_usn}
                       </td>
@@ -282,7 +414,7 @@ export default function DashboardPage() {
                   {filteredStudents.length === 0 && (
                     <tr>
                       <td
-                        colSpan={8}
+                        colSpan={9}
                         className="px-6 py-8 text-center text-[#666]"
                       >
                         {search
