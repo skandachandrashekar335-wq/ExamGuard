@@ -334,7 +334,7 @@ Wire the face verification provider into the identity verification service.
 - API happy path (2 tests): returns 201, correct response fields
 - API errors (5 tests): invalid base64, not found, wrong status, wrong method, provider unavailable
 
-**Test count:** 750 passing (723 existing + 27 new)
+**Test count:** 832 passing (750 existing + 82 new)
 
 ### 8.3 UniFace Integration
 **Status: COMPLETE**
@@ -359,10 +359,48 @@ UniFace (yakhyo/uniface v4.0.0) for real face detection, recognition, and anti-s
 
 **Tests:** 27 tests (`test_uniface_provider.py`) with mocked UniFace — no model downloads required
 
-### 8.4 Face Verification UI (FUTURE)
-- Camera capture interface
-- Real-time verification status
-- Review workflow for failures
+### 8.4 Real Face Verification Pipeline
+**Status: COMPLETE**
+
+End-to-end face verification pipeline with robust input validation, real provider-derived evidence, and comprehensive privacy/security controls.
+
+**Input Validation (3-layer defense-in-depth):**
+1. Pydantic `model_validator` on `VerifyFaceRequest`: base64 validation, format validation
+2. API endpoint: strict `base64.b64decode(validate=True)`, image validation via `validate_image_bytes()`
+3. Service layer: defense-in-depth validation before provider call
+
+**Image Validation (`app/services/face_verification/validation.py`):**
+- Magic byte detection (JPEG `\xff\xd8\xff`, PNG `\x89PNG`)
+- Configurable size limits (default 5MB via `FACE_VERIFICATION_MAX_IMAGE_SIZE_MB`)
+- Dimension limits (min 16px, max 16384px per side)
+- Decompression bomb protection (max total pixels)
+- Corrupted image detection via OpenCV decode
+
+**Face Detection:**
+- 0 faces → `NO_FACE_DETECTED` error
+- 1 face → proceed
+- >1 faces → `MULTIPLE_FACES_DETECTED` error
+- Never silently selects first/largest face
+
+**Face Recognition:**
+- ArcFace embeddings → cosine similarity → `similarity_score` evidence
+- No composite confidence scores; independent signals preserved
+
+**Liveness/Anti-Spoofing:**
+- MiniFASNet single-image classification (real/fake + confidence)
+- Non-fatal: identity match still returned on anti-spoofing failure
+- When disabled: liveness signals are None (not fabricated)
+
+**Privacy:**
+- No raw images stored/logged/returned
+- No embeddings stored/logged/returned
+- Transient in-memory processing only
+- Provider errors sanitized at API boundary
+
+**Tests:** 82 tests (`test_face_verification_pipeline.py`) — image validation, API validation, service validation, detection, recognition, liveness, evidence mapping, privacy, lifecycle, provider abstraction, decision separation, error types
+
+### 8.5 Threshold + Decision Integration (FUTURE)
+- Wire decision engine thresholds with face verification evidence
 
 ---
 
@@ -714,7 +752,7 @@ Focus:
 ## Roadmap Rules
 
 1. Phases 0–7 are COMPLETE.
-2. Phase 8 is IN PROGRESS (8.1, 8.2, and 8.3 complete).
+2. Phase 8 is IN PROGRESS (8.1, 8.2, 8.3, and 8.4 complete).
 3. Phases 9–23 are PLANNED.
 4. Do not mark future phases complete.
 5. Do not implement future phases.

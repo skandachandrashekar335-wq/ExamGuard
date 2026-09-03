@@ -408,6 +408,20 @@ def verify_face(
     if not probe_image:
         raise ValueError("probe_image is required and must not be empty")
 
+    # 2b. Validate image integrity (defense-in-depth)
+    from app.services.face_verification.validation import (
+        ImageValidationError,
+        validate_image_bytes,
+    )
+    try:
+        validate_image_bytes(reference_image, field_name="reference_image")
+    except ImageValidationError as e:
+        raise ValueError(f"Invalid reference_image: {e.message}")
+    try:
+        validate_image_bytes(probe_image, field_name="probe_image")
+    except ImageValidationError as e:
+        raise ValueError(f"Invalid probe_image: {e.message}")
+
     # 3. Obtain provider
     provider = get_face_verification_provider()
 

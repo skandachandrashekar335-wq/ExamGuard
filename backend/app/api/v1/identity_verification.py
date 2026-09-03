@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -54,6 +54,38 @@ class VerifyFaceRequest(BaseModel):
         default="image/jpeg",
         description="MIME type of probe image",
     )
+
+    @model_validator(mode="after")
+    def validate_base64_and_format(self) -> "VerifyFaceRequest":
+        """Validate base64 encoding and format at the schema level."""
+        import base64 as b64mod
+
+        for field_name in ("reference_image", "probe_image"):
+            value = getattr(self, field_name)
+            try:
+                decoded = b64mod.b64decode(value, validate=True)
+            except Exception:
+                raise ValueError(
+                    f"Invalid base64 encoding in {field_name}"
+                )
+            if len(decoded) == 0:
+                raise ValueError(
+                    f"{field_name} decodes to empty bytes"
+                )
+
+        format_fields = {
+            "reference_image_format": self.reference_image_format,
+            "probe_image_format": self.probe_image_format,
+        }
+        allowed = ("image/jpeg", "image/png")
+        for fname, fmt in format_fields.items():
+            if fmt not in allowed:
+                raise ValueError(
+                    f"Unsupported {fname}: '{fmt}'. "
+                    f"Allowed: {', '.join(allowed)}"
+                )
+
+        return self
 
 
 @router.post(
@@ -216,17 +248,59 @@ def verify_face(
 
     The provider produces evidence. Authorization decisions are made
     separately via the evaluate endpoint.
+
+    Input validation:
+    - Base64 decoding with strict error handling
+    - Image format verification via magic bytes
+    - Image size limits (configurable via FACE_VERIFICATION_MAX_IMAGE_SIZE_MB)
+    - Image dimension limits (min 16px, max 16384px)
+    - Corrupted image detection
+    - Decompression bomb protection
     """
     import base64
 
+    from app.core.config import get_settings
+    from app.services.face_verification.validation import (
+        ImageValidationError,
+        validate_image_bytes,
+    )
+
+    settings = get_settings()
+    max_size_bytes = settings.FACE_VERIFICATION_MAX_IMAGE_SIZE_MB * 1024 * 1024
+
     try:
-        ref_bytes = base64.b64decode(body.reference_image)
-        probe_bytes = base64.b64decode(body.probe_image)
+        ref_bytes = base64.b64decode(body.reference_image, validate=True)
     except Exception:
         raise HTTPException(
             status_code=422,
-            detail="Invalid base64 encoding in reference_image or probe_image",
+            detail="Invalid base64 encoding in reference_image",
         )
+
+    try:
+        probe_bytes = base64.b64decode(body.probe_image, validate=True)
+    except Exception:
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid base64 encoding in probe_image",
+        )
+
+    try:
+        validate_image_bytes(
+            ref_bytes,
+            field_name="reference_image",
+            max_size_bytes=max_size_bytes,
+        )
+    except ImageValidationError as e:
+        raise HTTPException(status_code=422, detail=e.message)
+
+    try:
+        validate_image_bytes(
+            probe_bytes,
+            field_name="probe_image",
+            max_size_bytes=max_size_bytes,
+        )
+    except ImageValidationError as e:
+        raise HTTPException(status_code=422, detail=e.message)
 
     try:
         evidence_records = iv_service.verify_face(

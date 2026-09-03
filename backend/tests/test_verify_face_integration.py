@@ -14,6 +14,8 @@ import json
 import pytest
 from unittest.mock import patch
 
+import cv2
+import numpy as np
 from fastapi.testclient import TestClient
 from sqlalchemy import delete
 
@@ -219,8 +221,18 @@ def unavailable_provider():
     return DeterministicProvider(available=False)
 
 
-FAKE_REF_IMAGE = base64.b64encode(b"\xff\xd8\xff\xe0fake-jpeg-reference").decode()
-FAKE_PROBE_IMAGE = base64.b64encode(b"\xff\xd8\xff\xe0fake-jpeg-probe").decode()
+def _make_test_jpeg() -> bytes:
+    """Create a minimal valid JPEG for testing."""
+    img = np.zeros((100, 100, 3), dtype=np.uint8)
+    img[25:75, 25:75] = (200, 180, 160)
+    _, buf = cv2.imencode(".jpg", img)
+    return buf.tobytes()
+
+
+FAKE_REF_IMAGE_BYTES = _make_test_jpeg()
+FAKE_PROBE_IMAGE_BYTES = _make_test_jpeg()
+FAKE_REF_IMAGE = base64.b64encode(FAKE_REF_IMAGE_BYTES).decode()
+FAKE_PROBE_IMAGE = base64.b64encode(FAKE_PROBE_IMAGE_BYTES).decode()
 
 
 # ─── Service: Happy Path ────────────────────────────────────────────────
@@ -238,7 +250,7 @@ class TestVerifyFaceHappyPath:
         ):
             records = verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
         assert len(records) >= 1
         assert all(isinstance(r, IdentityVerificationEvidence) for r in records)
@@ -253,7 +265,7 @@ class TestVerifyFaceHappyPath:
         ):
             records = verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
         db_records = (
             db.query(IdentityVerificationEvidence)
@@ -272,7 +284,7 @@ class TestVerifyFaceHappyPath:
         ):
             verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
         attempt = get_attempt(db, face_attempt.id)
         assert attempt.status == IdentityVerificationStatus.IN_PROGRESS.value
@@ -287,7 +299,7 @@ class TestVerifyFaceHappyPath:
         ):
             records = verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
         for record in records:
             assert record.provider_name == "deterministic"
@@ -303,7 +315,7 @@ class TestVerifyFaceHappyPath:
         ):
             records = verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
         assert len(records) >= 1
 
@@ -323,7 +335,7 @@ class TestVerifyFaceEvidenceMapping:
         ):
             records = verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
         similarity = [r for r in records if r.signal_type == "similarity_score"]
         assert len(similarity) == 1
@@ -340,7 +352,7 @@ class TestVerifyFaceEvidenceMapping:
         ):
             records = verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
         liveness = [r for r in records if r.signal_type == "liveness_score"]
         assert len(liveness) == 1
@@ -356,7 +368,7 @@ class TestVerifyFaceEvidenceMapping:
         ):
             records = verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
         liveness = [r for r in records if r.signal_type == "liveness"]
         assert len(liveness) == 1
@@ -373,7 +385,7 @@ class TestVerifyFaceEvidenceMapping:
         ):
             records = verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
         liveness = [r for r in records if r.signal_type == "liveness"]
         assert len(liveness) == 1
@@ -390,7 +402,7 @@ class TestVerifyFaceEvidenceMapping:
         ):
             records = verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
         quality = [r for r in records if r.signal_type == "image_quality"]
         assert len(quality) == 1
@@ -407,7 +419,7 @@ class TestVerifyFaceEvidenceMapping:
         ):
             records = verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
         quality = [r for r in records if r.signal_type == "image_quality"]
         assert len(quality) == 1
@@ -429,7 +441,7 @@ class TestVerifyFaceEvidenceMapping:
         ):
             records = verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
         assert len(records) == 0
 
@@ -443,7 +455,7 @@ class TestVerifyFaceEvidenceMapping:
         ):
             records = verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
         for record in records:
             if record.details:
@@ -459,7 +471,7 @@ class TestVerifyFaceFailures:
 
     def test_attempt_not_found(self, db):
         with pytest.raises(LookupError, match="not found"):
-            verify_face(db, 99999, reference_image=b"ref", probe_image=b"probe")
+            verify_face(db, 99999, reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES)
 
     def test_wrong_status_completed(
         self, db, face_attempt, default_provider
@@ -469,7 +481,7 @@ class TestVerifyFaceFailures:
         with pytest.raises(ValueError, match="CREATED or IN_PROGRESS"):
             verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
 
     def test_wrong_status_failed(
@@ -480,7 +492,7 @@ class TestVerifyFaceFailures:
         with pytest.raises(ValueError, match="CREATED or IN_PROGRESS"):
             verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
 
     def test_wrong_status_cancelled(
@@ -491,7 +503,7 @@ class TestVerifyFaceFailures:
         with pytest.raises(ValueError, match="CREATED or IN_PROGRESS"):
             verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
 
     def test_wrong_method(
@@ -500,7 +512,7 @@ class TestVerifyFaceFailures:
         with pytest.raises(ValueError, match="FACE"):
             verify_face(
                 db, manual_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
 
     def test_empty_reference_image(
@@ -533,7 +545,7 @@ class TestVerifyFaceFailures:
             with pytest.raises(ValueError, match="unavailable"):
                 verify_face(
                     db, face_attempt.id,
-                    reference_image=b"ref", probe_image=b"probe",
+                    reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
                 )
         attempt = get_attempt(db, face_attempt.id)
         assert attempt.status == IdentityVerificationStatus.FAILED.value
@@ -555,7 +567,7 @@ class TestVerifyFaceFailures:
                 with pytest.raises(ValueError, match="Provider error"):
                     verify_face(
                         db, face_attempt.id,
-                        reference_image=b"ref", probe_image=b"probe",
+                        reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
                     )
         attempt = get_attempt(db, face_attempt.id)
         assert attempt.status == IdentityVerificationStatus.FAILED.value
@@ -576,7 +588,7 @@ class TestVerifyFaceSensitiveData:
         ):
             records = verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
         for record in records:
             assert record.details is None or len(record.details) < 10000
@@ -590,7 +602,7 @@ class TestVerifyFaceSensitiveData:
     ):
         """Provider result should never contain raw image bytes."""
         request = FaceVerificationRequest(
-            reference_image=b"ref", probe_image=b"probe",
+            reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
         )
         result = default_provider.verify(request)
         result_dict = vars(result)
@@ -615,7 +627,7 @@ class TestVerifyFaceEvidenceNotDecision:
         ):
             verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
         attempt = get_attempt(db, face_attempt.id)
         assert attempt.decision == IdentityVerificationDecision.PENDING.value
@@ -630,7 +642,7 @@ class TestVerifyFaceEvidenceNotDecision:
         ):
             records = verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
         for record in records:
             if record.confidence is not None:
@@ -649,7 +661,7 @@ class TestVerifyFaceEvidenceNotDecision:
         ):
             verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref", probe_image=b"probe",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
         evidence = (
             db.query(IdentityVerificationEvidence)
@@ -676,11 +688,11 @@ class TestVerifyFaceMultipleCalls:
         ):
             records1 = verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref1", probe_image=b"probe1",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
             records2 = verify_face(
                 db, face_attempt.id,
-                reference_image=b"ref2", probe_image=b"probe2",
+                reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
             )
         total = (
             db.query(IdentityVerificationEvidence)

@@ -4,8 +4,8 @@ AI-powered Examination Entry Verification, Anti-Proxy, Security, and Attendance 
 
 ## Project Status
 
-- **Phase:** 8 IN PROGRESS (8.1, 8.2, and 8.3 complete)
-- **Backend:** 750 tests passing (0 failures, 0 errors)
+- **Phase:** 8 IN PROGRESS (8.1, 8.2, 8.3, and 8.4 complete)
+- **Backend:** 832 tests passing (0 failures, 0 errors)
 - **Frontend:** 20 pages (Next.js 16.3.3, React 19, TypeScript, Tailwind v4)
 - **Tech stack:** FastAPI + SQLAlchemy + PostgreSQL (backend), Next.js + TypeScript + Tailwind (frontend)
 
@@ -14,7 +14,8 @@ AI-powered Examination Entry Verification, Anti-Proxy, Security, and Attendance 
 - **8.1** Provider abstraction: `FaceVerificationProvider` Protocol, `DeterministicProvider`, factory
 - **8.2** Service integration: `verify_face()` wires provider into identity verification service, `POST /{attempt_id}/verify-face` API endpoint
 - **8.3** UniFace integration: Real face detection (RetinaFace), recognition (ArcFace), anti-spoofing (MiniFASNet) via ONNX Runtime
-- **8.4** Camera capture UI (future)
+- **8.4** Real pipeline: Robust input validation (base64, format, size, corruption, dimensions), image validation helpers, defense-in-depth at API/service layers, 82 comprehensive tests
+- **8.5** Threshold + decision integration (future)
 
 ## Development
 

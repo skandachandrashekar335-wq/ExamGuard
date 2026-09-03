@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 IN PROGRESS (8.1, 8.2, 8.3 complete, 8.4 future)
-- **Tests:** 750 passing, 0 failures, 0 errors
+- **Phase:** 8 IN PROGRESS (8.1, 8.2, 8.3, 8.4 complete, 8.5 future)
+- **Tests:** 832 passing, 0 failures, 0 errors
 - **Frontend:** 20 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -171,9 +171,126 @@ FaceVerificationResult (evidence signals)
 
 ---
 
+## Phase 8.4 — Real Face Verification Pipeline
+
+**Status: COMPLETE**
+
+### Implementation
+
+End-to-end face verification pipeline with robust input validation, real provider-derived evidence, and comprehensive privacy/security controls.
+
+**Input Validation (defense-in-depth at 3 layers):**
+
+1. **Pydantic schema** (`VerifyFaceRequest`):
+   - `model_validator` enforces valid base64 encoding at schema level
+   - Validates decoded bytes are non-empty
+   - Validates format fields against allowed values (image/jpeg, image/png)
+
+2. **API endpoint** (`POST /{attempt_id}/verify-face`):
+   - `base64.b64decode(..., validate=True)` for strict base64 validation
+   - Separate validation for reference and probe images (clear error messages)
+   - Image validation via `validate_image_bytes()` before calling service
+
+3. **Service layer** (`verify_face()`):
+   - Defense-in-depth: validates image bytes even though API already validated
+   - Catches `ImageValidationError` and wraps in `ValueError`
+
+**Image Validation Helpers** (`app/services/face_verification/validation.py`):
+- `validate_image_bytes()`: Full validation pipeline
+- `detect_image_format()`: Magic byte detection (JPEG/PNG)
+- `decode_image_safely()`: Validated decode with dimension checks
+- Magic bytes: JPEG (`\xff\xd8\xff`), PNG (`\x89PNG`)
+- Size limits: configurable via `FACE_VERIFICATION_MAX_IMAGE_SIZE_MB` (default 5MB)
+- Dimension limits: min 16px, max 16384px per side
+- Decompression bomb protection: max total pixels
+- Corrupted image detection via OpenCV decode
+
+**Face Detection Behavior:**
+- 0 faces → `NO_FACE_DETECTED` (typed error, provider fails)
+- 1 face → proceed with recognition
+- >1 faces → `MULTIPLE_FACES_DETECTED` (typed error, provider fails)
+- Never silently selects first/ largest face
+- Ambiguity remains explicit
+
+**Face Recognition Behavior:**
+- ArcFace embeddings via UniFace
+- Cosine similarity computed from L2-normalized embeddings
+- Result mapped to `similarity_score` evidence signal
+- No composite confidence scores
+- Independent signals preserved
+
+**Liveness/Anti-Spoofing Behavior:**
+- MiniFASNet anti-spoofing on probe image
+- Single-image classification (real/fake + confidence)
+- Failure is non-fatal: identity match still returned
+- When disabled: liveness signals are None (not fabricated)
+- Limitation: single-image anti-spoofing is not true liveness detection
+
+**Privacy Decisions:**
+- `FACE_VERIFICATION_IMAGE_RETENTION_DAYS = 0` (default)
+- No raw images stored, logged, or returned
+- No embeddings stored, logged, or returned
+- No biometric data in evidence metadata
+- Transient in-memory processing only
+- Provider errors sanitized at API boundary
+
+**Security Decisions:**
+- Typed error categories (no raw exception leakage to API)
+- Image size limits enforced (configurable)
+- Decompression bomb protection (max dimensions/pixels)
+- Corrupted image detection (OpenCV decode validation)
+- No model weights committed to Git
+- No secrets in code
+
+**Resource/Model Handling:**
+- UniFace models lazily initialized on first `verify()` call
+- Models cached in provider instance (not per-request)
+- Initialization failure captured and re-raised
+- No unbounded caches
+- CPU-only operation (no CUDA dependency)
+
+**Reference/Probe Semantics:**
+- Reference image = enrolled/reference identity (provided by caller)
+- Probe image = current verification input (provided by caller)
+- Both images validated independently
+- Provider compares reference vs probe explicitly
+
+### Files Changed in Phase 8.4
+
+| File | Change |
+|---|---|
+| `backend/app/services/face_verification/validation.py` | New image validation helpers (magic bytes, size, dimensions, corruption) |
+| `backend/app/api/v1/identity_verification.py` | Strengthened verify-face endpoint (Pydantic validator, base64 validation, image validation) |
+| `backend/app/services/identity_verification.py` | Added defense-in-depth image validation in verify_face() |
+| `backend/tests/test_face_verification_pipeline.py` | 82 new comprehensive pipeline tests |
+| `backend/tests/test_verify_face_integration.py` | Updated test images to valid JPEGs |
+| `docs/progress.md` | Updated |
+
+### Tests
+
+82 tests (`test_face_verification_pipeline.py`):
+- Image validation helpers (15): valid JPEG/PNG, empty, oversized, custom size, unsupported format, corrupted, too small, format detection, decode safety
+- API input validation (20): missing fields, invalid base64, empty base64, corrupted, oversized, unsupported format, wrong status, wrong method, valid JPEG/PNG
+- Service-level validation (9): empty images, corrupted, wrong status, wrong method
+- Face detection (5): no face reference/probe, multiple faces reference/probe, exactly one face
+- Face recognition (3): cosine similarity, recognition failure, exception sanitization
+- Liveness (4): anti-spoofing, spoof detected, disabled, failure non-fatal
+- Evidence mapping (7): similarity_score, liveness_score, liveness PASS/FAIL, none scores, independent signals, no composite
+- Privacy (5): no raw images, no embeddings, provider result safe, error safe, metadata safe
+- Lifecycle (4): does not complete attempt, multiple calls accumulate, provider failure, provider error
+- Provider abstraction (4): deterministic works, uniface selected, deterministic default, capabilities
+- Decision separation (3): no decision field, decision engine processes evidence, continuous signals
+- Error types (3): all types exist, frozen, wrapping
+- API happy path (2): returns 201, correct fields
+
+---
+
 ## Remaining Phase 8 Work
 
-- **8.4 Face Verification UI** (FUTURE): Camera capture interface, real-time verification status, review workflow
+- **8.5 Threshold + decision integration** (FUTURE): Wire decision engine thresholds with face verification evidence
+- **8.6 Failure/security/review hardening** (FUTURE): Security audit, failure modes, human review
+- **8.7 Admin UI** (FUTURE): Camera capture interface, real-time verification status, review workflow
+- **8.8 Integration testing/hardening** (FUTURE): End-to-end testing, production readiness
 
 ## Files Changed in Phase 8.2
 
