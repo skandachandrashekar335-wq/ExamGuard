@@ -236,7 +236,7 @@ Focus:
 
 ## Phase 8 — Face Verification / UniFace Integration
 
-**Status: IN PROGRESS (Phase 8.1 and 8.2 complete)**
+**Status: IN PROGRESS (Phase 8.1, 8.2, and 8.3 complete)**
 
 ### 8.1 Face Verification Architecture & Provider Abstraction
 **Status: COMPLETE**
@@ -334,12 +334,30 @@ Wire the face verification provider into the identity verification service.
 - API happy path (2 tests): returns 201, correct response fields
 - API errors (5 tests): invalid base64, not found, wrong status, wrong method, provider unavailable
 
-**Test count:** 723 passing (688 existing + 35 new)
+**Test count:** 750 passing (723 existing + 27 new)
 
-### 8.3 UniFace Integration (FUTURE)
-- Implement UniFace provider
-- Real face recognition
-- Real liveness detection
+### 8.3 UniFace Integration
+**Status: COMPLETE**
+
+UniFace (yakhyo/uniface v4.0.0) for real face detection, recognition, and anti-spoofing via ONNX Runtime — fully local, no external API calls.
+
+**Provider (`app/services/face_verification/providers/uniface_provider.py`):**
+- `UniFaceProvider` implementing `FaceVerificationProvider` Protocol
+- Lazy initialization: models downloaded on first `verify()` call (~30 MB total)
+- `_load_uniface_modules()` method for clean testability
+- Pipeline: decode → RetinaFace detection → ArcFace recognition → MiniFASNet anti-spoof → evidence
+- Anti-spoofing failure is non-fatal: identity match still returned
+- Models: RetinaFace, ArcFace, MiniFASNet — all via ONNX Runtime
+
+**Config:**
+- `FACE_VERIFICATION_PROVIDER="uniface"` activates the real provider
+- Default remains `"deterministic"` for development/testing
+
+**Dependency:**
+- `uniface[cpu]>=4.0.0` added as optional dependency in `pyproject.toml`
+- Onnxruntime 1.29.0 with cp314 wheels for Python 3.14 on Windows x86-64
+
+**Tests:** 27 tests (`test_uniface_provider.py`) with mocked UniFace — no model downloads required
 
 ### 8.4 Face Verification UI (FUTURE)
 - Camera capture interface
@@ -696,7 +714,7 @@ Focus:
 ## Roadmap Rules
 
 1. Phases 0–7 are COMPLETE.
-2. Phase 8 is IN PROGRESS (8.1 and 8.2 complete).
+2. Phase 8 is IN PROGRESS (8.1, 8.2, and 8.3 complete).
 3. Phases 9–23 are PLANNED.
 4. Do not mark future phases complete.
 5. Do not implement future phases.

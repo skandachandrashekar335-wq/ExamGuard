@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 IN PROGRESS (8.1 and 8.2 complete, 8.3/8.4 future)
-- **Tests:** 723 passing, 0 failures, 0 errors
+- **Phase:** 8 IN PROGRESS (8.1, 8.2, 8.3 complete, 8.4 future)
+- **Tests:** 750 passing, 0 failures, 0 errors
 - **Frontend:** 20 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -98,13 +98,81 @@ Added `IdentityVerificationEvidence` and `IdentityVerificationAttempt` cleanup *
 
 ### Result
 
-723 passed, 0 failures, 0 errors (full backend suite).
+750 passed, 0 failures, 0 errors (full backend suite).
+
+---
+
+## Phase 8.3 — UniFace Provider Integration
+
+**Status: COMPLETE**
+
+### Implementation
+
+UniFace (yakhyo/uniface v4.0.0) provides real face detection, recognition, and anti-spoofing via ONNX Runtime — fully local, no external API calls.
+
+**Provider** (`backend/app/services/face_verification/providers/uniface_provider.py`):
+- `UniFaceProvider` class implementing `FaceVerificationProvider` Protocol
+- Lazy initialization: models downloaded on first `verify()` call (~30 MB total)
+- `_load_uniface_modules()` method for clean testability
+- Pipeline: decode → detect (RetinaFace) → recognize (ArcFace) → anti-spoof (MiniFASNet) → evidence
+- Anti-spoofing failure is non-fatal: identity match still returned
+- Models: RetinaFace detection, ArcFace recognition, MiniFASNet anti-spoofing
+- All processing local via ONNX Runtime
+
+**Config**:
+- `FACE_VERIFICATION_PROVIDER="uniface"` activates the real provider
+- Default remains `"deterministic"` for development/testing
+
+**Dependency**:
+- `uniface[cpu]>=4.0.0` added as optional dependency in `pyproject.toml`
+- Onnxruntime 1.29.0 with cp314 wheels for Python 3.14 on Windows x86-64
+
+### Architecture
+
+```
+FaceVerificationRequest (image bytes)
+    ↓
+UniFaceProvider._load_uniface_modules() → RetinaFace, ArcFace, MiniFASNet
+    ↓
+RetinaFace.detect() → face bounding boxes
+    ↓
+ArcFace.get_normalized_embedding() → L2-normalized embeddings
+    ↓
+np.dot(ref_emb, probe_emb) → identity_match_score
+    ↓
+MiniFASNet.predict() → liveness evidence
+    ↓
+FaceVerificationResult (evidence signals)
+```
+
+### Tests
+
+27 tests (`test_uniface_provider.py`):
+- Provider instantiation (3): import, capabilities, anti_spoofing disabled
+- Verification happy path (6): evidence result, cosine similarity, liveness, spoof detection, disabled anti-spoofing, metadata
+- Detection errors (4): no face in reference/probe, multiple faces in reference/probe
+- Invalid input (2): invalid reference/probe images
+- Privacy (3): no raw images in result/error, no embeddings in metadata
+- No decisions (2): no decision field, continuous scores
+- Health check (2): unavailable without init, success
+- Factory selection (2): creates uniface, still creates deterministic
+- Deterministic backward compat (2): configured scores, capabilities
+- Anti-spoofing non-fatal (1): exception still returns identity match
+
+### Files Changed in Phase 8.3
+
+| File | Change |
+|---|---|
+| `backend/app/services/face_verification/providers/uniface_provider.py` | New UniFace provider implementation |
+| `backend/app/services/face_verification/factory.py` | Added "uniface" case to factory |
+| `backend/pyproject.toml` | Added `uniface[cpu]>=4.0.0` optional dependency |
+| `backend/tests/test_uniface_provider.py` | 27 new tests with mocked UniFace |
+| `docs/progress.md` | Updated |
 
 ---
 
 ## Remaining Phase 8 Work
 
-- **8.3 UniFace Integration** (FUTURE): Implement UniFace provider with real face recognition and liveness detection
 - **8.4 Face Verification UI** (FUTURE): Camera capture interface, real-time verification status, review workflow
 
 ## Files Changed in Phase 8.2

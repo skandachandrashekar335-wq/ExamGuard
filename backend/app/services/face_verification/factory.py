@@ -32,15 +32,16 @@ def get_face_verification_provider() -> FaceVerificationProvider:
     if provider_name == "deterministic":
         return DeterministicProvider()
 
+    if provider_name == "uniface":
+        from app.services.face_verification.providers.uniface_provider import (
+            UniFaceProvider,
+        )
+        return UniFaceProvider()
+
     if provider_name == "none" or provider_name == "":
         return DeterministicProvider(available=False)
 
-    # Future providers will be added here:
-    # elif provider_name == "uniface":
-    #     from app.services.face_verification.providers.uniface import UnifaceProvider
-    #     return UnifaceProvider(...)
-
     raise ValueError(
         f"Unknown face verification provider: {provider_name!r}. "
-        f"Configured providers: deterministic, none"
+        f"Configured providers: deterministic, uniface, none"
     )
