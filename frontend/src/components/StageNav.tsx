@@ -18,59 +18,66 @@ export default function StageNav({ stage, onStageClick }: StageNavProps) {
   const currentIdx = STAGE_ORDER.indexOf(stage);
 
   return (
-    <nav className="flex items-center gap-0.5 sm:gap-1" role="navigation" aria-label="Verification stages">
+    <nav className="flex items-center gap-0" role="navigation" aria-label="Verification stages">
       {STAGES.map((s, i) => {
         const sIdx = STAGE_ORDER.indexOf(s.id);
         const isActive = s.id === stage;
         const isPast = currentIdx > sIdx;
-        const isNext = currentIdx === sIdx - 1;
 
         return (
-          <button
-            key={s.id}
-            onClick={() => onStageClick(s.id)}
-            className={`eg-focusable relative flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[0.65rem] sm:text-xs font-mono transition-all duration-300 ${
-              isActive
-                ? "bg-[rgba(0,229,255,0.08)] text-[var(--accent-cyan)] border border-[rgba(0,229,255,0.25)]"
-                : isPast
-                ? "text-[var(--accent-emerald)] border border-transparent hover:bg-white/[0.03]"
-                : isNext
-                ? "text-[var(--text-tertiary)] border border-transparent hover:bg-white/[0.03] hover:text-[var(--text-secondary)]"
-                : "text-[var(--text-tertiary)] border border-transparent opacity-40 hover:opacity-60"
-            }`}
-            aria-current={isActive ? "step" : undefined}
-          >
-            {/* Status dot */}
-            <span className="relative flex-shrink-0">
-              <span
-                className={`block w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${
-                  isActive
-                    ? "bg-[var(--accent-cyan)]"
-                    : isPast
-                    ? "bg-[var(--accent-emerald)]"
-                    : "bg-[var(--text-tertiary)]"
-                }`}
-              />
-              {isActive && (
-                <span className="absolute inset-0 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[var(--accent-cyan)] animate-ping opacity-40" />
-              )}
-            </span>
-
-            {/* Number */}
-            <span className={`text-[0.55rem] sm:text-[0.6rem] ${isActive ? "text-[var(--accent-cyan)]" : isPast ? "text-[var(--accent-emerald)]" : ""}`}>
-              {s.num}
-            </span>
-
-            {/* Label — hidden on very small screens */}
-            <span className="hidden sm:inline tracking-wider">{s.label}</span>
-
-            {/* Connector */}
-            {i < STAGES.length - 1 && (
-              <span className={`ml-0.5 ${isPast ? "text-[var(--accent-emerald)] opacity-60" : "text-[var(--text-tertiary)] opacity-30"}`}>
-                —
+          <div key={s.id} className="flex items-center">
+            <button
+              onClick={() => onStageClick(s.id)}
+              className={`eg-focusable relative flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[0.6rem] sm:text-[0.65rem] font-mono transition-all duration-300 ${
+                isActive
+                  ? "bg-[rgba(0,229,255,0.06)] text-[var(--accent-cyan)]"
+                  : isPast
+                  ? "text-[var(--accent-emerald)] hover:bg-white/[0.02]"
+                  : "text-[var(--text-tertiary)] opacity-40 hover:opacity-60"
+              }`}
+              aria-current={isActive ? "step" : undefined}
+            >
+              {/* Status dot */}
+              <span className="relative flex-shrink-0">
+                <span
+                  className={`block w-1.5 h-1.5 sm:w-[5px] sm:h-[5px] rounded-full transition-colors duration-300 ${
+                    isActive
+                      ? "bg-[var(--accent-cyan)]"
+                      : isPast
+                      ? "bg-[var(--accent-emerald)]"
+                      : "bg-[var(--text-tertiary)]"
+                  }`}
+                />
+                {isActive && (
+                  <span className="absolute inset-0 w-1.5 h-1.5 sm:w-[5px] sm:h-[5px] rounded-full bg-[var(--accent-cyan)] animate-ping opacity-30" />
+                )}
               </span>
+
+              {/* Number */}
+              <span className={`text-[0.5rem] sm:text-[0.55rem] tabular-nums ${isActive ? "text-[var(--accent-cyan)]" : isPast ? "text-[var(--accent-emerald)]" : ""}`}>
+                {s.num}
+              </span>
+
+              {/* Label — hidden on very small screens */}
+              <span className="hidden md:inline tracking-wider">{s.label}</span>
+            </button>
+
+            {/* Connector with progress line */}
+            {i < STAGES.length - 1 && (
+              <div className="relative w-5 sm:w-8 h-px mx-0.5">
+                <div className="absolute inset-0 bg-[var(--text-tertiary)] opacity-15" />
+                {isPast && (
+                  <div className="absolute inset-0 bg-[var(--accent-emerald)] opacity-50 origin-left" />
+                )}
+                {isActive && (
+                  <div
+                    className="absolute inset-0 bg-[var(--accent-cyan)] opacity-40 origin-left"
+                    style={{ transform: `scaleX(${currentIdx === sIdx ? 0.5 : 0})` }}
+                  />
+                )}
+              </div>
             )}
-          </button>
+          </div>
         );
       })}
     </nav>

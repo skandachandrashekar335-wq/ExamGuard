@@ -1,130 +1,111 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 
 interface SystemTerminalProps {
   stage: "ready" | "detect" | "verify" | "decide" | "authorize";
   subProgress: number;
 }
 
-interface TerminalLine {
+interface LogLine {
   text: string;
-  type: "system" | "info" | "status" | "warn";
+  type: "system" | "success" | "warning" | "info" | "data" | "error";
+  stage: string;
 }
 
-const STAGE_ENTRIES: Record<string, TerminalLine[]> = {
+const STAGE_LINES: Record<string, LogLine[]> = {
   ready: [
-    { text: "EXAMGUARD v1.0 — EXAMINATION SECURITY", type: "system" },
-    { text: "System initialized", type: "status" },
-    { text: "Awaiting interaction", type: "info" },
+    { text: "examguard v0.7.0 — identity verification", type: "system", stage: "ready" },
+    { text: "waiting for scroll input...", type: "info", stage: "ready" },
   ],
   detect: [
-    { text: "DETECTION MODULE", type: "system" },
-    { text: "Scanner frame active", type: "status" },
-    { text: "Geometry visualization engaged", type: "info" },
+    { text: "[detect] liveness check initiated", type: "system", stage: "detect" },
+    { text: "analyzing facial depth map", type: "info", stage: "detect" },
+    { text: "blink detection: active", type: "info", stage: "detect" },
+    { text: "texture analysis: processing", type: "info", stage: "detect" },
+    { text: "3d structure validation: active", type: "info", stage: "detect" },
   ],
   verify: [
-    { text: "IDENTITY CONTEXT", type: "system" },
-    { text: "Awaiting verification input", type: "info" },
-    { text: "Hall ticket + identity linkage prepared", type: "status" },
+    { text: "[verify] 1:N identity matching started", type: "system", stage: "verify" },
+    { text: "loading enrollment templates", type: "info", stage: "verify" },
+    { text: "computing similarity scores", type: "info", stage: "verify" },
+    { text: "top match confidence: 0.94", type: "data", stage: "verify" },
+    { text: "threshold: 0.85", type: "data", stage: "verify" },
   ],
   decide: [
-    { text: "DECISION LAYER", type: "system" },
-    { text: "Evidence signals collected", type: "status" },
-    { text: "Awaiting evidence", type: "info" },
+    { text: "[decide] evaluating evidence", type: "system", stage: "decide" },
+    { text: "liveness: PASS", type: "success", stage: "decide" },
+    { text: "identity match: PASS", type: "success", stage: "decide" },
+    { text: "confidence: 0.94 > 0.85", type: "data", stage: "decide" },
+    { text: "decision: ALLOW", type: "success", stage: "decide" },
   ],
   authorize: [
-    { text: "AUTHORIZATION", type: "system" },
-    { text: "Awaiting authoritative decision", type: "info" },
-    { text: "No entry authorized without decision", type: "warn" },
+    { text: "[authorize] entry verification complete", type: "system", stage: "authorize" },
+    { text: "status: VERIFIED", type: "success", stage: "authorize" },
   ],
 };
 
 export default function SystemTerminal({ stage, subProgress }: SystemTerminalProps) {
-  const [lines, setLines] = useState<TerminalLine[]>([]);
-  const [currentLine, setCurrentLine] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const stageRef = useRef(stage);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const linesRef = useRef<LogLine[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const prevStageRef = useRef<string>("");
+  const lineIndexRef = useRef(0);
 
   useEffect(() => {
-    if (stage === stageRef.current) return;
-    stageRef.current = stage;
+    if (stage !== prevStageRef.current) {
+      prevStageRef.current = stage;
+      lineIndexRef.current = 0;
 
-    const entries = STAGE_ENTRIES[stage] || [];
-    setLines([]);
-    setCurrentLine("");
-    setIsTyping(true);
-
-    let lineIdx = 0;
-    let charIdx = 0;
-
-    const typeInterval = setInterval(() => {
-      if (lineIdx >= entries.length) {
-        clearInterval(typeInterval);
-        setIsTyping(false);
-        return;
-      }
-
-      const line = entries[lineIdx];
-      if (charIdx <= line.text.length) {
-        setCurrentLine(line.text.slice(0, charIdx));
-        charIdx++;
-      } else {
-        setLines((prev) => [...prev, line]);
-        setCurrentLine("");
-        lineIdx++;
-        charIdx = 0;
-      }
-    }, 25);
-
-    return () => clearInterval(typeInterval);
+      const newLines = STAGE_LINES[stage] || [];
+      linesRef.current = [...linesRef.current, ...newLines];
+    }
   }, [stage]);
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [lines, currentLine]);
+  const visibleCount = Math.min(
+    linesRef.current.length,
+    Math.floor(subProgress * linesRef.current.length * 1.2) + 1
+  );
+  const visibleLines = linesRef.current.slice(0, visibleCount);
 
-  const getTypeColor = (type: TerminalLine["type"]) => {
-    switch (type) {
-      case "system": return "text-[var(--accent-cyan)]";
-      case "status": return "text-[var(--accent-emerald)]";
-      case "info": return "text-[var(--text-secondary)]";
-      case "warn": return "text-[var(--accent-amber)]";
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
+  }, [visibleLines.length]);
+
+  const typeColor: Record<string, string> = {
+    system: "var(--accent-cyan)",
+    success: "var(--accent-emerald)",
+    warning: "var(--accent-amber)",
+    error: "var(--accent-rose)",
+    info: "var(--text-tertiary)",
+    data: "var(--text-secondary)",
   };
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden font-mono text-xs">
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-[var(--border)]">
-        <div className="w-2 h-2 rounded-full bg-[var(--accent-cyan)] opacity-60" />
-        <div className="w-2 h-2 rounded-full bg-[var(--accent-amber)] opacity-60" />
-        <div className="w-2 h-2 rounded-full bg-[var(--text-tertiary)] opacity-60" />
-        <span className="eg-label ml-2">SYSTEM TERMINAL</span>
-        <span className="ml-auto eg-label text-[0.5rem] opacity-40">{stage.toUpperCase()}</span>
+    <div className="font-mono text-[0.55rem] sm:text-[0.6rem] leading-relaxed">
+      {/* Terminal chrome */}
+      <div className="flex items-center gap-1.5 mb-1.5 px-1">
+        <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-cyan)] opacity-40" />
+        <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-emerald)] opacity-40" />
+        <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-amber)] opacity-40" />
+        <span className="ml-2 text-[0.5rem] text-[var(--text-tertiary)] opacity-30 tracking-wider">examguard</span>
       </div>
-      <div ref={scrollRef} className="p-4 min-h-[100px] max-h-[160px] overflow-y-auto">
-        {lines.map((line, i) => (
-          <div key={i} className={`${getTypeColor(line.type)}`}>
-            <span className="text-[var(--text-tertiary)] opacity-40">&gt;</span>{" "}
-            {line.text}
+
+      {/* Lines */}
+      <div ref={containerRef} className="max-h-[160px] overflow-hidden pr-1 space-y-0.5">
+        {visibleLines.map((line, i) => (
+          <div
+            key={`${line.stage}-${i}`}
+            className="flex gap-2 opacity-0 animate-[eg-line-in_0.2s_ease-out_forwards]"
+            style={{ animationDelay: `${Math.min(i * 40, 200)}ms` }}
+          >
+            <span className="text-[var(--text-tertiary)] opacity-20 select-none flex-shrink-0">
+              {String(i + 1).padStart(2, "0")}
+            </span>
+            <span style={{ color: typeColor[line.type] }}>{line.text}</span>
           </div>
         ))}
-        {currentLine && (
-          <div className="text-[var(--text-secondary)]">
-            <span className="text-[var(--text-tertiary)] opacity-40">&gt;</span>{" "}
-            {currentLine}
-            <span className="eg-cursor inline-block w-[6px] h-[12px] bg-[var(--accent-cyan)] ml-[2px] align-middle opacity-70" />
-          </div>
-        )}
-        {!isTyping && lines.length > 0 && (
-          <div className="text-[var(--text-tertiary)] mt-1 opacity-30">
-            <span>&gt;</span>{" "}
-            <span className="eg-cursor inline-block w-[6px] h-[12px] bg-[var(--accent-cyan)] ml-[2px] align-middle" />
-          </div>
-        )}
       </div>
     </div>
   );

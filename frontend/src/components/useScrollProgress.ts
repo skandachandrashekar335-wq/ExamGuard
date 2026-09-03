@@ -87,3 +87,57 @@ export function useScrollProgress(ref: React.RefObject<HTMLElement | null>) {
 
   return { subscribe, getState: () => stateRef.current };
 }
+
+/**
+ * CSS-variable based mouse tracking.
+ * Updates --mouse-x / --mouse-y on document root via RAF.
+ * Components read CSS variables — zero React re-renders.
+ */
+export function useMouseCSS() {
+  const targetRef = useRef({ x: 0, y: 0 });
+  const currentRef = useRef({ x: 0, y: 0 });
+  const rafRef = useRef<number>(0);
+  const activeRef = useRef(false);
+
+  const tick = useCallback(() => {
+    const dx = targetRef.current.x - currentRef.current.x;
+    const dy = targetRef.current.y - currentRef.current.y;
+    currentRef.current.x += dx * 0.08;
+    currentRef.current.y += dy * 0.08;
+
+    if (Math.abs(dx) < 0.0001 && Math.abs(dy) < 0.0001) {
+      currentRef.current.x = targetRef.current.x;
+      currentRef.current.y = targetRef.current.y;
+    }
+
+    const root = document.documentElement;
+    root.style.setProperty("--mouse-x", String(currentRef.current.x));
+    root.style.setProperty("--mouse-y", String(currentRef.current.y));
+
+    rafRef.current = requestAnimationFrame(tick);
+  }, []);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      targetRef.current.x = (e.clientX / window.innerWidth - 0.5) * 2;
+      targetRef.current.y = (e.clientY / window.innerHeight - 0.5) * 2;
+      if (!activeRef.current) {
+        activeRef.current = true;
+        rafRef.current = requestAnimationFrame(tick);
+      }
+    };
+
+    const onLeave = () => {
+      targetRef.current.x = 0;
+      targetRef.current.y = 0;
+    };
+
+    window.addEventListener("mousemove", onMove, { passive: true });
+    window.addEventListener("mouseleave", onLeave);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseleave", onLeave);
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [tick]);
+}

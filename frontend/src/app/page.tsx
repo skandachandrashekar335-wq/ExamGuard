@@ -1,477 +1,510 @@
 "use client";
 
-import { useRef, useState, useEffect, useCallback } from "react";
-import Link from "next/link";
+import { useRef, useEffect, useState } from "react";
+import { useScrollProgress, useMouseCSS } from "@/components/useScrollProgress";
 import FaceGeometry from "@/components/FaceGeometry";
 import HallTicketViz from "@/components/HallTicketViz";
-import SystemTerminal from "@/components/SystemTerminal";
 import StageNav from "@/components/StageNav";
-import { useScrollProgress } from "@/components/useScrollProgress";
+import SystemTerminal from "@/components/SystemTerminal";
 
-type Stage = "ready" | "detect" | "verify" | "decide" | "authorize";
-
-const STAGE_DATA: Record<Stage, { num: string; title: string; subtitle: string; systemLabel: string }> = {
-  ready: { num: "", title: "READY", subtitle: "READY FOR VERIFICATION", systemLabel: "SYSTEM READY" },
-  detect: { num: "01", title: "DETECT", subtitle: "DETECTION ACTIVE", systemLabel: "SCANNER ACTIVE" },
-  verify: { num: "02", title: "VERIFY", subtitle: "AWAITING VERIFICATION INPUT", systemLabel: "VERIFICATION INPUT REQUIRED" },
-  decide: { num: "03", title: "DECIDE", subtitle: "AWAITING EVIDENCE", systemLabel: "EVIDENCE ≠ DECISION" },
-  authorize: { num: "04", title: "AUTHORIZE", subtitle: "AWAITING VERIFIED DECISION", systemLabel: "NO ENTRY WITHOUT DECISION" },
-};
-
-const STAGE_TITLES: Record<Stage, string[]> = {
-  ready: ["VERIFY.", "THEN", "ENTER."],
-  detect: ["IDENTITY", "DETECTED"],
-  verify: ["EXAMINATION", "CONTEXT"],
-  decide: ["EVIDENCE", "≠ DECISION"],
-  authorize: ["ENTRY", "SHOULD BE", "VERIFIED."],
-};
+const STAGE_RANGES: { stage: string; start: number; end: number }[] = [
+  { stage: "detect", start: 0.05, end: 0.3 },
+  { stage: "verify", start: 0.3, end: 0.55 },
+  { stage: "decide", start: 0.55, end: 0.8 },
+  { stage: "authorize", start: 0.8, end: 1.0 },
+];
 
 export default function Home() {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { subscribe } = useScrollProgress(scrollRef);
-  const [stage, setStage] = useState<Stage>("ready");
-  const [progress, setProgress] = useState(0);
-  const [subProgress, setSubProgress] = useState(0);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [navExpanded, setNavExpanded] = useState(false);
-  const [powerUp, setPowerUp] = useState(false);
-  const [prevStage, setPrevStage] = useState<Stage>("ready");
+  const { subscribe, getState } = useScrollProgress(scrollRef);
+  useMouseCSS();
+
+  const [scrollState, setScrollState] = useState(() => getState());
+  const [initialized, setInitialized] = useState(false);
+  const [activeFeature, setActiveFeature] = useState(0);
 
   useEffect(() => {
-    return subscribe((state) => {
-      setStage(state.stage);
-      setProgress(state.progress);
-      setSubProgress(state.subProgress);
-    });
+    return subscribe(setScrollState);
   }, [subscribe]);
 
-  // Track stage changes for transitions
   useEffect(() => {
-    if (stage !== prevStage) {
-      setPrevStage(stage);
+    if (!initialized && scrollState.progress > 0.01) {
+      setInitialized(true);
     }
-  }, [stage, prevStage]);
+  }, [scrollState.progress, initialized]);
 
-  // Multi-layer mouse parallax
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    const x = (e.clientX / window.innerWidth - 0.5) * 2;
-    const y = (e.clientY / window.innerHeight - 0.5) * 2;
-    setMousePos({ x, y });
+  useEffect(() => {
+    const featureCount = 6;
+    const interval = setInterval(() => {
+      setActiveFeature((prev) => (prev + 1) % featureCount);
+    }, 2500);
+    return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    window.addEventListener("mousemove", handleMouseMove, { passive: true });
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [handleMouseMove]);
+  const isScrolling = scrollState.progress > 0.01;
+  const { stage, subProgress } = scrollState;
 
-  // Scroll to stage position
-  const scrollToStage = (targetStage: string) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const vh = window.innerHeight;
-    const total = el.scrollHeight - vh;
-    const stageTargets: Record<string, number> = {
-      detect: 0.15,
-      verify: 0.4,
-      decide: 0.65,
-      authorize: 0.9,
-    };
-    const target = stageTargets[targetStage] || 0;
-    window.scrollTo({ top: total * target + el.offsetTop, behavior: "smooth" });
+  const interpolate = (a: number, b: number) => a + (b - a) * subProgress;
+  const opacityFor = (start: number, peak: number, end: number) => {
+    if (scrollState.progress < start) return 0;
+    if (scrollState.progress > end) return 0;
+    if (scrollState.progress < peak) return interpolate(0, 1);
+    return interpolate(1, 0);
   };
 
-  // Initialize power-up sequence
-  const handleInitialize = () => {
-    setPowerUp(true);
-    setTimeout(() => {
-      scrollToStage("detect");
-    }, 400);
-  };
+  const detectOpacity = opacityFor(0.05, 0.12, 0.28);
+  const verifyOpacity = opacityFor(0.3, 0.37, 0.53);
+  const decideOpacity = opacityFor(0.55, 0.62, 0.78);
+  const authorizeOpacity = opacityFor(0.8, 0.87, 1.0);
 
-  const currentData = STAGE_DATA[stage];
-  const titles = STAGE_TITLES[stage];
+  const titleText =
+    stage === "ready" ? "SHOULD THIS STUDENT BE HERE?"
+    : stage === "detect" ? "IS THIS A REAL PERSON?"
+    : stage === "verify" ? "CAN WE PROVE WHO THEY CLAIM TO BE?"
+    : stage === "decide" ? "SHOULD THEY BE ALLOWED IN?"
+    : "ENTRY SHOULD BE VERIFIED.";
 
-  // Multi-layer depth for mouse
-  const d1 = { x: mousePos.x * 2, y: mousePos.y * 1 };
-  const d2 = { x: mousePos.x * 5, y: mousePos.y * 3 };
-  const d3 = { x: mousePos.x * 8, y: mousePos.y * 5 };
-  const d4 = { x: mousePos.x * 12, y: mousePos.y * 7 };
+  const titleSubtext =
+    stage === "ready" ? "Scroll to begin the verification experience"
+    : stage === "detect" ? "Facial liveness + anti-spoofing detection"
+    : stage === "verify" ? "1:N identity matching against enrollment"
+    : stage === "decide" ? "Evidence threshold evaluation"
+    : "No spoofing. No proxy. No compromise.";
 
   return (
-    <div className="bg-[var(--background)] text-[var(--foreground)]">
-      {/* Fixed scan line */}
-      <div className="eg-scan-line" />
+    <>
+      <div
+        ref={scrollRef}
+        style={{ height: "500vh" }}
+        className="relative"
+      >
+        <div className="eg-sticky h-screen w-full overflow-hidden">
 
-      {/* Fixed stage nav */}
-      <header className="fixed top-0 left-0 right-0 z-40 bg-[rgba(5,5,5,0.85)] backdrop-blur-md border-b border-[var(--border)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="eg-focusable">
-              <span className="font-bold text-sm tracking-[0.15em] uppercase">ExamGuard</span>
-            </Link>
-            <span className="text-[var(--text-tertiary)] text-xs hidden sm:inline">|</span>
-            <span className="eg-label hidden sm:inline">{currentData.systemLabel}</span>
-          </div>
-          <div className="hidden md:block">
-            <StageNav stage={stage} onStageClick={scrollToStage} />
-          </div>
-          <button
-            onClick={() => setNavExpanded(!navExpanded)}
-            className="md:hidden eg-focusable p-2 text-[var(--text-secondary)]"
-            aria-label="Toggle navigation"
+          {/* Power-up overlay */}
+          <div
+            className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[var(--bg-base)] transition-opacity duration-700"
+            style={{
+              opacity: initialized ? 0 : 1,
+              pointerEvents: initialized ? "none" : "auto",
+            }}
           >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M3 6h14M3 10h14M3 14h14" />
-            </svg>
-          </button>
-        </div>
-        {navExpanded && (
-          <div className="md:hidden px-4 pb-3 border-t border-[var(--border)]">
-            <div className="flex flex-col gap-1 pt-2">
-              {(["detect", "verify", "decide", "authorize"] as const).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => { scrollToStage(s); setNavExpanded(false); }}
-                  className={`eg-focusable text-left px-3 py-2 rounded text-xs font-mono ${
-                    stage === s ? "text-[var(--accent-cyan)] bg-[rgba(0,229,255,0.1)]" : "text-[var(--text-tertiary)] hover:bg-white/5"
-                  }`}
+            <div className="relative">
+              <svg viewBox="0 0 64 64" className="w-12 h-12 mb-4 mx-auto" style={{ opacity: 0.6 }}>
+                <circle cx="32" cy="24" r="12" stroke="var(--accent-cyan)" strokeWidth="1.5" fill="none" strokeDasharray="4 3" className="animate-spin" style={{ animationDuration: "8s" }} />
+                <circle cx="32" cy="24" r="5" fill="var(--accent-cyan)" opacity={0.15} />
+              </svg>
+              <p className="font-mono text-[0.65rem] sm:text-xs text-[var(--accent-cyan)] tracking-[0.3em] text-center animate-pulse">
+                INITIALIZE EXPERIENCE
+              </p>
+            </div>
+          </div>
+
+          {/* Header */}
+          <header
+            className="absolute top-0 left-0 right-0 z-30 px-5 sm:px-8 py-4 sm:py-5 flex items-center justify-between transition-all duration-700"
+            style={{
+              opacity: isScrolling ? 0 : 1,
+              pointerEvents: isScrolling ? "none" : "auto",
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <svg viewBox="0 0 28 28" className="w-6 h-6 sm:w-7 sm:h-7">
+                <circle cx="14" cy="14" r="12" stroke="var(--accent-cyan)" strokeWidth="1.5" fill="none" />
+                <circle cx="14" cy="14" r="4" fill="var(--accent-cyan)" opacity={0.12} />
+                <line x1="14" y1="8" x2="14" y2="20" stroke="var(--accent-cyan)" strokeWidth="0.75" opacity={0.4} />
+                <line x1="8" y1="14" x2="20" y2="14" stroke="var(--accent-cyan)" strokeWidth="0.75" opacity={0.4} />
+              </svg>
+              <span className="font-mono text-[0.6rem] sm:text-[0.7rem] tracking-[0.25em] text-[var(--text-secondary)]">
+                EXAMGUARD
+              </span>
+            </div>
+            <a
+              href="/dashboard"
+              className="eg-focusable font-mono text-[0.6rem] sm:text-[0.7rem] tracking-wider text-[var(--text-tertiary)] hover:text-[var(--accent-cyan)] transition-colors duration-300"
+            >
+              DASHBOARD →
+            </a>
+          </header>
+
+          {/* Fixed title — continuous scroll-driven motion */}
+          <div className="absolute inset-x-0 top-[15%] sm:top-[18%] z-20 px-5 sm:px-8 pointer-events-none">
+            <div
+              className="transition-transform duration-200"
+              style={{
+                transform: `translateY(${-scrollState.progress * 80}vh)`,
+              }}
+            >
+              <div className="mb-4 sm:mb-6">
+                <p
+                  className="font-mono text-[0.55rem] sm:text-[0.65rem] tracking-[0.4em] uppercase mb-3 sm:mb-4 transition-colors duration-500"
+                  style={{ color: stage === "authorize" ? "var(--accent-emerald)" : "var(--accent-cyan)" }}
                 >
-                  {STAGE_DATA[s].num} {STAGE_DATA[s].title}
-                </button>
-              ))}
-              <div className="border-t border-[var(--border)] mt-1 pt-1">
-                <Link href="/dashboard" className="eg-focusable block px-3 py-2 rounded text-xs text-[var(--text-secondary)] hover:bg-white/5">
-                  Dashboard
-                </Link>
-                <Link href="/students" className="eg-focusable block px-3 py-2 rounded text-xs text-[var(--text-secondary)] hover:bg-white/5">
-                  Students
-                </Link>
+                  {stage === "ready" ? "SCROLL TO BEGIN" : `0${scrollState.stageIndex} / ${titleText.split(" ")[0]}`}
+                </p>
+                <h1
+                  className="font-display text-[2rem] sm:text-[3rem] md:text-[4rem] lg:text-[5rem] font-bold leading-[1.05] tracking-tight"
+                  style={{ color: stage === "authorize" ? "var(--accent-emerald)" : "var(--text-primary)" }}
+                >
+                  {titleText}
+                </h1>
               </div>
+              <p className="font-mono text-[0.6rem] sm:text-xs text-[var(--text-tertiary)] tracking-wide max-w-md">
+                {titleSubtext}
+              </p>
             </div>
           </div>
-        )}
-      </header>
 
-      {/* Scroll container */}
-      <div ref={scrollRef} className="relative" style={{ height: "500vh" }}>
-
-        {/* PINNED STAGE */}
-        <div className="sticky top-0 h-screen overflow-hidden">
-          {/* LAYER 0: Background grid — depth 1 */}
+          {/* Stage nav */}
           <div
-            className="absolute inset-0 eg-grid"
-            style={{ transform: `translate(${d1.x * 0.3}px, ${d1.y * 0.3}px)` }}
-          />
-
-          {/* Progress bar */}
-          <div className="absolute top-0 left-0 right-0 h-[2px] z-10">
-            <div
-              className="h-full bg-gradient-to-r from-[var(--accent-cyan)] to-[var(--accent-emerald)]"
-              style={{ width: `${progress * 100}%`, transition: "width 0.05s linear" }}
-            />
-          </div>
-
-          {/* Desktop stage nav */}
-          <div className="hidden md:block absolute top-20 left-0 right-0 z-10">
-            <div className="max-w-7xl mx-auto px-6">
-              <StageNav stage={stage} onStageClick={scrollToStage} />
-            </div>
-          </div>
-
-          {/* Main content */}
-          <div className="relative h-full flex flex-col lg:flex-row items-center justify-center max-w-7xl mx-auto px-4 sm:px-6 pt-24 pb-12">
-
-            {/* Left — Text — depth layers 2-3 */}
-            <div
-              className="flex-1 lg:pr-8 mb-8 lg:mb-0 z-10 text-center lg:text-left"
-              style={{ transform: `translate(${d2.x * 0.4}px, ${d2.y * 0.4}px)` }}
-            >
-              {stage === "ready" && (
-                <div>
-                  <div className="eg-label mb-4 eg-scene-enter">EXAMGUARD</div>
-                  <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold uppercase tracking-wider leading-none mb-6">
-                    {titles.map((line, i) => (
-                      <span key={i} className="block eg-scene-enter" style={{ animationDelay: `${i * 0.1}s` }}>
-                        {i === 1 ? (
-                          <span className="text-[var(--accent-cyan)]">{line}</span>
-                        ) : (
-                          line
-                        )}
-                      </span>
-                    ))}
-                  </h1>
-                  <p className="text-[var(--text-secondary)] text-base sm:text-lg max-w-lg mx-auto lg:mx-0 mb-8 leading-relaxed eg-scene-enter" style={{ animationDelay: "0.3s" }}>
-                    Automated examination entry verification that connects
-                    hall-ticket context with identity verification before
-                    entry is authorized.
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start eg-scene-enter" style={{ animationDelay: "0.4s" }}>
-                    <button
-                      onClick={handleInitialize}
-                      className={`eg-btn-primary eg-focusable eg-power-up ${powerUp ? "active" : ""}`}
-                    >
-                      INITIALIZE EXPERIENCE
-                    </button>
-                    <Link href="/dashboard" className="eg-btn-secondary eg-focusable text-center">
-                      EXPLORE SYSTEM
-                    </Link>
-                  </div>
-                </div>
-              )}
-
-              {stage !== "ready" && (
-                <div key={stage} className="eg-scene-enter">
-                  <div className="eg-label mb-3">
-                    <span className="text-[var(--accent-cyan)]">{currentData.num}</span>
-                    <span className="mx-2">/</span>
-                    {currentData.title}
-                  </div>
-
-                  {/* Morphing title */}
-                  <h2 className="text-3xl sm:text-4xl lg:text-6xl font-bold uppercase tracking-wider leading-none mb-4">
-                    {titles.map((line, i) => (
-                      <span
-                        key={`${stage}-${i}`}
-                        className="block eg-scene-enter"
-                        style={{ animationDelay: `${i * 0.08}s` }}
-                      >
-                        {line.includes("≠") || line === "DETECTED" || line === "VERIFIED." ? (
-                          <span className="text-[var(--accent-cyan)]">{line}</span>
-                        ) : (
-                          line
-                        )}
-                      </span>
-                    ))}
-                  </h2>
-
-                  <p className="text-[var(--text-secondary)] text-sm sm:text-base max-w-md mx-auto lg:mx-0 mb-6 eg-scene-enter" style={{ animationDelay: "0.2s" }}>
-                    {currentData.subtitle}
-                  </p>
-
-                  {stage === "verify" && (
-                    <div className="eg-card max-w-md mx-auto lg:mx-0 mb-6 eg-scene-enter" style={{ animationDelay: "0.3s" }}>
-                      <div className="eg-label text-[0.6rem] mb-2">ARCHITECTURE PRINCIPLE</div>
-                      <div className="font-mono text-xs text-[var(--accent-cyan)]">
-                        EVIDENCE ≠ DECISION
-                      </div>
-                      <p className="text-[var(--text-tertiary)] text-xs mt-2">
-                        The verification provider provides evidence.
-                        Business logic makes the authorization decision.
-                      </p>
-                    </div>
-                  )}
-
-                  {stage === "decide" && (
-                    <div className="eg-card max-w-md mx-auto lg:mx-0 mb-6 eg-scene-enter" style={{ animationDelay: "0.3s" }}>
-                      <div className="eg-label text-[0.6rem] mb-3">DECISION FLOW</div>
-                      <div className="space-y-2 font-mono text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[var(--accent-cyan)]">EVIDENCE</span>
-                          <span className="text-[var(--text-tertiary)]">→</span>
-                          <span className="text-[var(--accent-emerald)]">DECISION ENGINE</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[var(--accent-emerald)]">DECISION ENGINE</span>
-                          <span className="text-[var(--text-tertiary)]">→</span>
-                          <span className="text-[var(--accent-amber)]">AUTHORIZE / DENY</span>
-                        </div>
-                      </div>
-                      <p className="text-[var(--text-tertiary)] text-xs mt-3">
-                        No biometric data stored. No raw face images.
-                        Configurable threshold evaluation.
-                      </p>
-                    </div>
-                  )}
-
-                  {stage === "authorize" && (
-                    <div className="eg-card max-w-md mx-auto lg:mx-0 mb-6 border-[var(--accent-amber)]/30 eg-scene-enter" style={{ animationDelay: "0.3s" }}>
-                      <div className="eg-label text-[0.6rem] mb-2 text-[var(--accent-amber)]">SYSTEM STATE</div>
-                      <div className="font-mono text-sm text-[var(--accent-amber)]">
-                        AWAITING VERIFIED DECISION
-                      </div>
-                      <p className="text-[var(--text-tertiary)] text-xs mt-2">
-                        No entry is authorized without a verified decision.
-                        The system does not auto-authorize.
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex gap-3 justify-center lg:justify-start eg-scene-enter" style={{ animationDelay: "0.4s" }}>
-                    {stage !== "authorize" && (
-                      <button
-                        onClick={() => {
-                          const next = ["detect", "verify", "decide", "authorize"];
-                          const idx = next.indexOf(stage);
-                          if (idx < next.length - 1) scrollToStage(next[idx + 1]);
-                        }}
-                        className="eg-btn-primary eg-focusable text-sm"
-                      >
-                        CONTINUE
-                      </button>
-                    )}
-                    <Link href="/dashboard" className="eg-btn-secondary eg-focusable text-sm text-center">
-                      DASHBOARD
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Right — Visual — depth layers 3-4 */}
-            <div
-              className="flex-1 lg:pl-8 flex flex-col items-center gap-6 z-10 max-w-lg w-full"
-              style={{ transform: `translate(${d3.x * 0.3}px, ${d3.y * 0.3}px)` }}
-            >
-              <div className="w-full aspect-square max-w-[400px]" style={{ transform: `translate(${d4.x * 0.15}px, ${d4.y * 0.15}px)` }}>
-                <FaceGeometry
-                  stage={stage}
-                  progress={progress}
-                  subProgress={subProgress}
-                  mouseX={mousePos.x}
-                  mouseY={mousePos.y}
-                />
-              </div>
-              <div className="w-full">
-                <HallTicketViz
-                  stage={stage}
-                  progress={progress}
-                  subProgress={subProgress}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom — Terminal — depth layer 1 */}
-          <div
-            className="absolute bottom-0 left-0 right-0 px-4 sm:px-6 pb-4 max-w-7xl mx-auto"
-            style={{ transform: `translate(${d1.x * 0.2}px, ${d1.y * 0.2}px)` }}
+            className="absolute top-4 sm:top-5 left-1/2 -translate-x-1/2 z-30 transition-opacity duration-500"
+            style={{ opacity: isScrolling ? 1 : 0, pointerEvents: isScrolling ? "auto" : "none" }}
           >
-            <SystemTerminal stage={stage} subProgress={subProgress} />
+            <StageNav stage={scrollState.stage} onStageClick={() => {}} />
           </div>
 
-          {/* Scroll hint — only when ready */}
-          {stage === "ready" && (
-            <div className="absolute bottom-20 left-1/2 -translate-x-1/2 text-center z-10">
-              <div className="eg-label text-[0.6rem] mb-2">SCROLL TO EXPLORE</div>
-              <div className="w-5 h-8 border border-[var(--text-tertiary)] rounded-full mx-auto flex justify-center pt-1">
-                <div className="w-1 h-2 bg-[var(--accent-cyan)] rounded-full animate-bounce" />
+          {/* Left — Scene panel */}
+          <div className="absolute right-4 sm:right-8 lg:right-12 top-1/2 -translate-y-1/2 z-10 w-[340px] sm:w-[420px] h-[440px] sm:h-[520px] pointer-events-none">
+            <div
+              className="relative w-full h-full eg-panel overflow-hidden"
+              style={{
+                opacity: interpolate(0, 1),
+              }}
+            >
+              <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 0 }}>
+                <rect x="0" y="0" width="100%" height="100%" fill="none" stroke="var(--accent-cyan)" strokeWidth="0.5" strokeDasharray="4 4" opacity={0.08 + scrollState.progress * 0.12} style={{ transition: "opacity 0.4s" }} />
+              </svg>
+
+              <div className="relative z-10 p-5 sm:p-7 h-full flex flex-col">
+                {/* Active stage title */}
+                <div className="mb-3 sm:mb-5">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="font-mono text-[0.55rem] sm:text-[0.6rem] tracking-wider text-[var(--accent-cyan)]">
+                      0{scrollState.stageIndex + 1}
+                    </span>
+                    <span className="font-mono text-[0.55rem] sm:text-[0.6rem] tracking-wider text-[var(--text-tertiary)] uppercase">
+                      {stage === "ready" ? "SYSTEM" : stage}
+                    </span>
+                  </div>
+                  <div className="h-px bg-[var(--border-subtle)]" />
+                </div>
+
+                {/* Evidence collection */}
+                {scrollState.progress > 0.05 && (
+                  <div className="space-y-2 sm:space-y-2.5 mb-4 sm:mb-6">
+                    {[
+                      { label: "LIVENESS", value: stage === "ready" ? "—" : "CHECK", active: stage === "detect" },
+                      { label: "FACE", value: stage === "ready" ? "—" : "1:N", active: stage === "verify" },
+                      { label: "EVIDENCE", value: stage === "ready" ? "—" : "COLLECT", active: stage === "decide" },
+                      { label: "DECISION", value: stage === "ready" ? "—" : "ALLOW/DENY", active: stage === "authorize" },
+                    ].map((item, i) => (
+                      <div
+                        key={item.label}
+                        className="flex items-center gap-2 sm:gap-2.5 group"
+                        style={{ opacity: scrollState.progress > 0.05 + i * 0.02 ? 1 : 0, transition: "opacity 0.3s" }}
+                      >
+                        <div className={`w-1 h-1 rounded-full ${item.active ? "bg-[var(--accent-cyan)]" : "bg-[var(--text-tertiary)] opacity-30"}`} />
+                        <span className="font-mono text-[0.55rem] sm:text-[0.6rem] tracking-wider text-[var(--text-tertiary)] w-16 sm:w-20">
+                          {item.label}
+                        </span>
+                        <span className={`font-mono text-[0.55rem] sm:text-[0.6rem] tracking-wider ${item.active ? "text-[var(--accent-cyan)]" : "text-[var(--text-tertiary)] opacity-40"}`}>
+                          {item.value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Center graphic */}
+                <div className="flex-1 relative flex items-center justify-center">
+                  {(stage === "ready" || stage === "detect") && (
+                    <div style={{ opacity: stage === "ready" ? interpolate(0.8, 1) : detectOpacity, transition: "opacity 0.1s" }}>
+                      <FaceGeometry phase={stage === "ready" ? "frame" : "connect"} parallaxStrength={0.02} />
+                    </div>
+                  )}
+                  {stage === "verify" && (
+                    <div style={{ opacity: verifyOpacity, transition: "opacity 0.1s" }}>
+                      <HallTicketViz stage={stage} progress={scrollState.progress} subProgress={scrollState.subProgress} />
+                    </div>
+                  )}
+                  {stage === "decide" && (
+                    <div style={{ opacity: decideOpacity, transition: "opacity 0.1s" }}>
+                      <FaceGeometry phase="evidence" parallaxStrength={0.02} />
+                    </div>
+                  )}
+                  {stage === "authorize" && (
+                    <div style={{ opacity: authorizeOpacity, transition: "opacity 0.1s" }}>
+                      <FaceGeometry phase="authorize" parallaxStrength={0.02} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Bottom status */}
+                <div className="flex items-center justify-between mt-3 sm:mt-5">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-1.5 h-1.5 rounded-full ${stage === "authorize" ? "bg-[var(--accent-emerald)]" : "bg-[var(--accent-cyan)]"} ${scrollState.progress > 0.05 ? "animate-pulse" : ""}`} />
+                    <span className="font-mono text-[0.5rem] sm:text-[0.55rem] tracking-wider text-[var(--text-tertiary)]">
+                      {stage === "ready" ? "STANDBY" : stage === "authorize" ? "VERIFIED" : "ACTIVE"}
+                    </span>
+                  </div>
+                  <span className="font-mono text-[0.5rem] sm:text-[0.55rem] text-[var(--text-tertiary)] opacity-40">
+                    {Math.round(scrollState.progress * 100)}%
+                  </span>
+                </div>
               </div>
+            </div>
+          </div>
+
+          {/* Right — Terminal panel */}
+          <div className="absolute right-4 sm:right-8 lg:right-12 bottom-6 sm:bottom-8 z-20 w-[320px] sm:w-[400px] pointer-events-none">
+            <SystemTerminal stage={scrollState.stage} subProgress={scrollState.subProgress} />
+          </div>
+
+          {/* Scroll hint */}
+          {!initialized && (
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 animate-bounce" style={{ animationDuration: "2.5s" }}>
+              <div className="w-px h-8 bg-gradient-to-b from-transparent to-[var(--accent-cyan)] opacity-40" />
+              <span className="font-mono text-[0.5rem] tracking-[0.3em] text-[var(--text-tertiary)]">SCROLL</span>
             </div>
           )}
         </div>
       </div>
 
-      {/* System Overview — after scroll experience */}
-      <section className="eg-section eg-grid">
-        <div className="max-w-6xl mx-auto">
-          <div className="eg-label mb-4">SYSTEM OVERVIEW</div>
-          <h2 className="text-3xl sm:text-4xl font-bold uppercase tracking-wider mb-4">
-            FOUR STAGES
-          </h2>
-          <p className="text-[var(--text-secondary)] max-w-2xl mb-12">
-            Each stage represents a real system state. The experience
-            transforms as you scroll through the verification pipeline.
-          </p>
+      {/* SECTION 1: System Overview — below scroll experience */}
+      <section className="relative bg-[var(--bg-surface)] border-t border-[var(--border-subtle)]">
+        <div className="max-w-5xl mx-auto px-5 sm:px-8 py-20 sm:py-28">
+          <div className="text-center mb-14 sm:mb-20">
+            <p className="font-mono text-[0.6rem] sm:text-[0.7rem] tracking-[0.35em] text-[var(--accent-cyan)] uppercase mb-3">
+              THE PROBLEM
+            </p>
+            <h2 className="font-display text-[1.6rem] sm:text-[2.2rem] md:text-[2.8rem] font-bold text-[var(--text-primary)] leading-tight">
+              Proxy attendance is an<br className="hidden sm:block" /> institutional crisis
+            </h2>
+            <p className="font-body text-sm sm:text-base text-[var(--text-tertiary)] mt-4 max-w-xl mx-auto leading-relaxed">
+              At-scale cheating undermines examination integrity. Manual verification cannot scale.
+              AI without accountability creates new risks.
+            </p>
+          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
             {[
-              { num: "01", title: "DETECT", desc: "Scanner frame activates. Landmark nodes appear. Grid becomes visible." },
-              { num: "02", title: "VERIFY", desc: "Identity and examination context are linked. Verification input required." },
-              { num: "03", title: "DECIDE", desc: "Evidence converges. Decision engine evaluates. Evidence ≠ Decision." },
-              { num: "04", title: "AUTHORIZE", desc: "Final security state. Awaiting verified decision. No auto-authorization." },
-            ].map((s) => (
-              <div key={s.num} className="eg-card group hover:border-[var(--accent-cyan)]/30 transition-colors duration-300">
-                <div className="eg-label text-[var(--accent-cyan)] mb-3">{s.num}</div>
-                <h3 className="text-lg font-bold uppercase tracking-wider mb-2">{s.title}</h3>
-                <p className="text-[var(--text-tertiary)] text-sm leading-relaxed">{s.desc}</p>
+              { num: "01", title: "Identity Verification", desc: "Enrollment-time biometric binding. 1:N matching. Anti-spoofing liveness detection.", color: "var(--accent-cyan)" },
+              { num: "02", title: "Proxy Detection", desc: "Multi-factor confidence scoring. Evidence-based decisions. Human override required.", color: "var(--accent-emerald)" },
+              { num: "03", title: "Exam Security", desc: "Hall-ticket integrity. Seat assignment validation. Time-window enforcement.", color: "var(--accent-amber)" },
+              { num: "04", title: "Admin Control", desc: "Manual override always available. Full audit trail. Institution-configurable thresholds.", color: "var(--accent-rose)" },
+            ].map((item) => (
+              <div key={item.num} className="eg-card group hover:border-[rgba(0,229,255,0.15)] transition-all duration-300">
+                <span className="eg-label font-mono text-[0.55rem] sm:text-[0.6rem] tracking-wider" style={{ color: item.color }}>
+                  {item.num}
+                </span>
+                <h3 className="font-display text-sm sm:text-base font-semibold text-[var(--text-primary)] mb-2 group-hover:text-[var(--accent-cyan)] transition-colors duration-300">
+                  {item.title}
+                </h3>
+                <p className="font-body text-[0.75rem] sm:text-xs text-[var(--text-tertiary)] leading-relaxed">
+                  {item.desc}
+                </p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Architecture section */}
-      <section className="eg-section">
-        <div className="max-w-6xl mx-auto">
-          <div className="eg-label mb-4">ARCHITECTURE</div>
-          <h2 className="text-3xl sm:text-4xl font-bold uppercase tracking-wider mb-4">
-            EVIDENCE ≠ DECISION
-          </h2>
-          <p className="text-[var(--text-secondary)] max-w-2xl mb-12">
-            The provider must never directly authorize exam entry.
-            Evidence is perception. Business logic is authority.
-          </p>
+      {/* SECTION 2: Architecture */}
+      <section className="relative bg-[var(--bg-base)]">
+        <div className="max-w-4xl mx-auto px-5 sm:px-8 py-20 sm:py-28">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 sm:gap-16 items-start">
+            <div>
+              <p className="font-mono text-[0.6rem] sm:text-[0.7rem] tracking-[0.35em] text-[var(--accent-emerald)] uppercase mb-3">
+                ARCHITECTURE
+              </p>
+              <h2 className="font-display text-[1.4rem] sm:text-[1.8rem] md:text-[2.2rem] font-bold text-[var(--text-primary)] leading-tight mb-5">
+                AI as perception.<br />Not authority.
+              </h2>
+              <p className="font-body text-sm sm:text-base text-[var(--text-tertiary)] leading-relaxed mb-8 max-w-lg">
+                ExamGuard separates what the AI sees from what the system decides.
+                Provider output is evidence — never a direct authorization decision.
+                The decision engine evaluates evidence against configurable thresholds.
+                Human override is always available.
+              </p>
+              <div className="space-y-3">
+                {["Provider-agnostic integration", "Evidence ≠ decision", "Configurable thresholds", "Full audit trail"].map((item, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="w-1 h-1 rounded-full bg-[var(--accent-emerald)]" />
+                    <span className="font-mono text-[0.65rem] sm:text-[0.7rem] text-[var(--text-secondary)]">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="eg-card">
-              <div className="eg-label text-[var(--accent-cyan)] mb-3">HALL-TICKET VALIDITY</div>
-              <div className="space-y-2 font-mono text-xs text-[var(--text-secondary)]">
-                <div>Document → OCR → Extraction</div>
-                <div>Extraction → Matching</div>
-                <div>Matching → VerificationOutcome</div>
-              </div>
-            </div>
-            <div className="eg-card">
-              <div className="eg-label text-[var(--accent-emerald)] mb-3">IDENTITY VERIFICATION</div>
-              <div className="space-y-2 font-mono text-xs text-[var(--text-secondary)]">
-                <div>Student → Exam Registration</div>
-                <div>Registration → HallTicket</div>
-                <div>HallTicket → IdentityVerificationAttempt</div>
-                <div>Attempt → Evidence → Decision</div>
-              </div>
-            </div>
-            <div className="eg-card">
-              <div className="eg-label text-[var(--accent-amber)] mb-3">ENTRY AUTHORIZATION</div>
-              <div className="space-y-2 font-mono text-xs text-[var(--text-secondary)]">
-                <div>HallTicket Verified ✓</div>
-                <div>Identity Verified ✓</div>
-                <div>Decision Engine ✓</div>
-                <div>→ Entry Authorized</div>
-              </div>
+            <div className="space-y-3">
+              {[
+                { label: "ENTRY", color: "var(--accent-cyan)" },
+                { label: "LIVENESS", color: "var(--accent-emerald)" },
+                { label: "DECISION", color: "var(--accent-amber)" },
+                { label: "AUDIT", color: "var(--accent-rose)" },
+              ].map((layer, i) => (
+                <div
+                  key={layer.label}
+                  className="eg-card group"
+                  style={{
+                    borderColor: activeFeature === i ? layer.color : undefined,
+                    transition: "border-color 0.4s, box-shadow 0.4s",
+                    boxShadow: activeFeature === i ? `0 0 20px ${layer.color}10` : undefined,
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full transition-colors duration-300" style={{ backgroundColor: activeFeature === i ? layer.color : "var(--text-tertiary)" }} />
+                    <span className="font-mono text-[0.65rem] sm:text-[0.7rem] tracking-wider" style={{ color: activeFeature === i ? layer.color : "var(--text-secondary)" }}>
+                      {layer.label}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* Quick access */}
-      <section className="eg-section border-t border-[var(--border)]">
-        <div className="max-w-6xl mx-auto">
-          <div className="eg-label mb-6">SYSTEM ACCESS</div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      {/* SECTION 3: Principles */}
+      <section className="relative bg-[var(--bg-surface)] border-t border-[var(--border-subtle)]">
+        <div className="max-w-5xl mx-auto px-5 sm:px-8 py-20 sm:py-28">
+          <div className="text-center mb-12 sm:mb-16">
+            <p className="font-mono text-[0.6rem] sm:text-[0.7rem] tracking-[0.35em] text-[var(--accent-amber)] uppercase mb-3">
+              PRINCIPLES
+            </p>
+            <h2 className="font-display text-[1.4rem] sm:text-[1.8rem] md:text-[2.2rem] font-bold text-[var(--text-primary)]">
+              Built on constraints
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
             {[
-              { href: "/dashboard", label: "Dashboard" },
-              { href: "/students", label: "Students" },
-              { href: "/documents", label: "Documents" },
-              { href: "/hall-tickets", label: "Hall Tickets" },
-              { href: "/identity-verifications", label: "Identity Verifications" },
-              { href: "/import", label: "Import" },
-            ].map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="eg-card text-center hover:border-[var(--accent-cyan)]/30 transition-colors duration-300 eg-focusable"
-              >
-                <span className="text-sm font-medium">{link.label}</span>
-              </Link>
+              { num: "01", title: "Student Privacy First", desc: "Minimal data collection. No biometric storage beyond enrollment hashes. Right to deletion." },
+              { num: "02", title: "No Black-Box AI", desc: "Every AI decision is explainable. Evidence is logged. Thresholds are configurable." },
+              { num: "03", title: "Human Override", desc: "AI assists. Humans decide. Manual override is always available with justification." },
+              { num: "04", title: "Provider Independence", desc: "Swap face recognition providers without code changes. Evidence format is standardized." },
+            ].map((item) => (
+              <div key={item.num} className="eg-card group">
+                <span className="eg-label font-mono text-[0.55rem] sm:text-[0.6rem] tracking-wider text-[var(--accent-amber)]">
+                  {item.num}
+                </span>
+                <h3 className="font-display text-sm sm:text-base font-semibold text-[var(--text-primary)] mb-2 group-hover:text-[var(--accent-amber)] transition-colors duration-300">
+                  {item.title}
+                </h3>
+                <p className="font-body text-[0.75rem] sm:text-xs text-[var(--text-tertiary)] leading-relaxed">
+                  {item.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 4: Timeline */}
+      <section className="relative bg-[var(--bg-base)]">
+        <div className="max-w-3xl mx-auto px-5 sm:px-8 py-20 sm:py-28">
+          <div className="text-center mb-12 sm:mb-16">
+            <p className="font-mono text-[0.6rem] sm:text-[0.7rem] tracking-[0.35em] text-[var(--accent-rose)] uppercase mb-3">
+              DEVELOPMENT
+            </p>
+            <h2 className="font-display text-[1.4rem] sm:text-[1.8rem] md:text-[2.2rem] font-bold text-[var(--text-primary)]">
+              23-phase build
+            </h2>
+          </div>
+          <div className="space-y-3">
+            {[
+              { phase: "00-06", title: "Foundation", desc: "Models, schemas, config, admin CRUD, tests", status: "complete" },
+              { phase: "07", title: "Identity Verification", desc: "Core verification engine with provider abstraction", status: "complete" },
+              { phase: "08", title: "UniFace Integration", desc: "Face recognition provider + anti-proxy + attendance", status: "upcoming" },
+              { phase: "09-14", title: "Hall Tickets & Exams", desc: "Ticket generation, seat assignment, exam lifecycle", status: "upcoming" },
+              { phase: "15-18", title: "Monitoring & Analytics", desc: "Real-time monitoring, alerts, analytics", status: "upcoming" },
+              { phase: "19-23", title: "Auth & Polish", desc: "Authentication, RBAC, performance, deployment", status: "upcoming" },
+            ].map((item) => (
+              <div key={item.phase} className={`eg-card ${item.status === "complete" ? "border-[rgba(0,229,255,0.12)]" : ""}`}>
+                <div className="flex items-start gap-4">
+                  <span className="font-mono text-[0.6rem] sm:text-[0.65rem] tracking-wider text-[var(--text-tertiary)] w-12 flex-shrink-0 pt-0.5">
+                    {item.phase}
+                  </span>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-display text-sm font-semibold text-[var(--text-primary)]">
+                        {item.title}
+                      </h3>
+                      {item.status === "complete" && (
+                        <span className="font-mono text-[0.5rem] tracking-wider text-[var(--accent-emerald)] bg-[rgba(16,185,129,0.08)] px-1.5 py-0.5 rounded">
+                          DONE
+                        </span>
+                      )}
+                    </div>
+                    <p className="font-body text-[0.7rem] sm:text-xs text-[var(--text-tertiary)] mt-1">
+                      {item.desc}
+                    </p>
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-[var(--border)] py-8 px-4">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="eg-label">EXAMGUARD</div>
-          <div className="flex gap-6">
-            <Link href="/privacy" className="eg-focusable text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors">
-              Privacy Policy
-            </Link>
-            <Link href="/terms" className="eg-focusable text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors">
-              Terms & Conditions
-            </Link>
+      <footer className="bg-[var(--bg-surface)] border-t border-[var(--border-subtle)]">
+        <div className="max-w-5xl mx-auto px-5 sm:px-8 py-12 sm:py-16">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 sm:gap-10">
+            <div className="col-span-2 sm:col-span-1">
+              <div className="flex items-center gap-2 mb-3">
+                <svg viewBox="0 0 28 28" className="w-5 h-5">
+                  <circle cx="14" cy="14" r="12" stroke="var(--accent-cyan)" strokeWidth="1.5" fill="none" />
+                  <circle cx="14" cy="14" r="4" fill="var(--accent-cyan)" opacity={0.15} />
+                </svg>
+                <span className="font-mono text-[0.65rem] tracking-[0.2em] text-[var(--text-secondary)]">EXAMGUARD</span>
+              </div>
+              <p className="font-body text-[0.7rem] sm:text-xs text-[var(--text-tertiary)] leading-relaxed">
+                AI-powered examination verification. Built for institutions that take integrity seriously.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-mono text-[0.6rem] sm:text-[0.65rem] tracking-[0.2em] text-[var(--text-secondary)] mb-3">SYSTEM</h4>
+              <ul className="space-y-2">
+                {["Identity Verification", "Exam Security", "Admin Dashboard", "API Documentation"].map((item) => (
+                  <li key={item}>
+                    <span className="font-body text-[0.7rem] sm:text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors duration-300 cursor-pointer">
+                      {item}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-mono text-[0.6rem] sm:text-[0.65rem] tracking-[0.2em] text-[var(--text-secondary)] mb-3">COMPLIANCE</h4>
+              <ul className="space-y-2">
+                {["Privacy Policy", "Terms of Service", "Data Processing", "Security"].map((item) => (
+                  <li key={item}>
+                    <span className="font-body text-[0.7rem] sm:text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors duration-300 cursor-pointer">
+                      {item}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-mono text-[0.6rem] sm:text-[0.65rem] tracking-[0.2em] text-[var(--text-secondary)] mb-3">STATUS</h4>
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-emerald)] animate-pulse" />
+                  <span className="font-mono text-[0.55rem] sm:text-[0.6rem] text-[var(--text-tertiary)]">All systems operational</span>
+                </div>
+                <div className="font-mono text-[0.55rem] sm:text-[0.6rem] text-[var(--text-tertiary)] opacity-60">
+                  v0.7.0 — Identity Verification
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="mt-10 sm:mt-14 pt-6 sm:pt-8 border-t border-[var(--border-subtle)]">
+            <p className="font-mono text-[0.55rem] sm:text-[0.6rem] text-[var(--text-tertiary)] opacity-50 text-center tracking-wider">
+              EXAMGUARD — AI-POWERED EXAMINATION INTEGRITY PLATFORM
+            </p>
           </div>
         </div>
       </footer>
-    </div>
+    </>
   );
 }
