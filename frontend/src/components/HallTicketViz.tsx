@@ -1,189 +1,90 @@
 "use client";
 
+import React from "react";
+
 interface HallTicketVizProps {
-  stage: "ready" | "detect" | "verify" | "decide" | "authorize";
   progress: number;
   subProgress: number;
 }
 
-function mapRange(value: number, inMin: number, inMax: number, outMin: number, outMax: number) {
-  return Math.max(Math.min(outMin, outMax), Math.min(Math.max(outMin, outMax), outMin + ((value - inMin) / (inMax - inMin)) * (outMax - outMin)));
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * Math.max(0, Math.min(1, t));
 }
 
-interface FieldRow {
-  label: string;
-  value: string;
-  revealAt: number;
+function clamp(v: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, v));
 }
 
-const STUDENT_FIELDS: FieldRow[] = [
-  { label: "STUDENT", value: "NOT CONNECTED", revealAt: 0.35 },
-  { label: "REGISTRATION", value: "AWAITING DATA", revealAt: 0.40 },
-];
+function HallTicketVizInner({ progress, subProgress }: HallTicketVizProps) {
+  const scanY = lerp(20, 200, subProgress * 0.8);
+  const scanOpacity = subProgress < 0.05 ? 0 : subProgress > 0.9 ? 0 : 0.3;
 
-const EXAM_FIELDS: FieldRow[] = [
-  { label: "EXAM", value: "AWAITING DATA", revealAt: 0.42 },
-  { label: "HALL TICKET", value: "NOT LOADED", revealAt: 0.45 },
-];
-
-const PIPELINE_STEPS = [
-  { label: "HALL TICKET", revealAt: 0.30 },
-  { label: "IDENTITY", revealAt: 0.38 },
-  { label: "VERIFICATION", revealAt: 0.48 },
-  { label: "DECISION", revealAt: 0.58 },
-];
-
-export default function HallTicketViz({ stage, progress, subProgress }: HallTicketVizProps) {
-  const p = progress;
-
-  // Document scan line position (sweeps during detect 10%-30%)
-  const scanProgress = mapRange(p, 0.10, 0.30, 0, 1);
-  const showScan = p > 0.08 && p < 0.35;
-
-  // Document frame opacity
-  const frameOpacity = mapRange(p, 0.05, 0.12, 0, 1);
-
-  // Processing pulse
-  const pulseOpacity = (p > 0.15 && p < 0.55) ? mapRange(p, 0.15, 0.25, 0, 0.5) * mapRange(p, 0.5, 0.55, 0.5, 0) : 0;
+  const fieldReveal = (index: number) => {
+    const threshold = index * 0.2;
+    return clamp((subProgress - threshold) * 3, 0, 1);
+  };
 
   return (
-    <div className="relative overflow-hidden" style={{ opacity: frameOpacity }}>
-      {/* Document frame */}
-      <div className="relative border border-[var(--border)] rounded-lg bg-[var(--surface)] overflow-hidden"
-        style={{ boxShadow: p > 0.1 ? "0 0 30px rgba(0, 229, 255, 0.05)" : "none" }}>
+    <div className="relative w-full max-w-[280px] mx-auto">
+      <svg viewBox="0 0 260 200" className="w-full" fill="none">
+        {/* Document outline */}
+        <rect x="20" y="10" width="220" height="180" stroke="var(--white)" strokeWidth="0.5" opacity={0.2} />
 
-        {/* Corner marks — technical document feel */}
-        <div className="absolute top-0 left-0 w-4 h-4 border-t border-l border-[var(--accent-cyan)] opacity-30" />
-        <div className="absolute top-0 right-0 w-4 h-4 border-t border-r border-[var(--accent-cyan)] opacity-30" />
-        <div className="absolute bottom-0 left-0 w-4 h-4 border-b border-l border-[var(--accent-cyan)] opacity-30" />
-        <div className="absolute bottom-0 right-0 w-4 h-4 border-b border-r border-[var(--accent-cyan)] opacity-30" />
+        {/* Corner marks */}
+        <polyline points="20,30 20,10 40,10" stroke="var(--white)" strokeWidth="0.8" opacity={0.3} />
+        <polyline points="220,10 240,10 240,30" stroke="var(--white)" strokeWidth="0.8" opacity={0.3} />
+        <polyline points="240,170 240,190 220,190" stroke="var(--white)" strokeWidth="0.8" opacity={0.3} />
+        <polyline points="40,190 20,190 20,170" stroke="var(--white)" strokeWidth="0.8" opacity={0.3} />
 
-        {/* Document header */}
-        <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className={`w-1.5 h-1.5 rounded-full ${p > 0.2 ? "bg-[var(--accent-cyan)]" : "bg-[var(--text-tertiary)]"}`} style={{ transition: "background 0.5s" }} />
-            <span className="eg-label text-[0.6rem]">HALL TICKET CONTEXT</span>
-          </div>
-          <span className="eg-label text-[0.5rem] opacity-50">
-            {p < 0.15 ? "STANDBY" : p < 0.55 ? "PROCESSING" : "AWAITING DATA"}
-          </span>
-        </div>
+        {/* Header line */}
+        <line x1="20" y1="40" x2="240" y2="40" stroke="var(--white)" strokeWidth="0.3" opacity={0.15} />
 
-        {/* Scan line overlay */}
-        {showScan && (
-          <div
-            className="absolute left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[var(--accent-cyan)] to-transparent z-10 pointer-events-none"
-            style={{
-              top: `${scanProgress * 100}%`,
-              opacity: 0.6,
-              boxShadow: "0 0 8px var(--accent-cyan)",
-            }}
-          />
-        )}
+        {/* Scan line */}
+        <line x1="20" y1={scanY} x2="240" y2={scanY} stroke="var(--white)" strokeWidth="0.5" opacity={scanOpacity} />
 
-        {/* Processing pulse */}
-        {pulseOpacity > 0.01 && (
-          <div className="absolute inset-0 pointer-events-none" style={{
-            background: "radial-gradient(ellipse at center, rgba(0,229,255,0.05) 0%, transparent 70%)",
-            opacity: pulseOpacity,
-          }} />
-        )}
+        {/* Fields — truthful empty states */}
+        {[
+          { label: "STUDENT", value: "NOT CONNECTED", y: 55 },
+          { label: "REGISTRATION", value: "AWAITING DATA", y: 80 },
+          { label: "EXAM", value: "AWAITING DATA", y: 105 },
+          { label: "HALL TICKET", value: "NOT LOADED", y: 130 },
+        ].map((field, i) => (
+          <g key={field.label} opacity={fieldReveal(i)}>
+            <text x="30" y={field.y} fill="var(--white)" fontSize="5" fontFamily="var(--font-mono)" letterSpacing="0.1em" opacity={0.4}>
+              {field.label}
+            </text>
+            <text x="30" y={field.y + 10} fill="var(--white)" fontSize="7" fontFamily="var(--font-mono)" letterSpacing="0.05em" opacity={0.7}>
+              {field.value}
+            </text>
+          </g>
+        ))}
 
-        {/* Field grid */}
-        <div className="relative p-4">
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-            {/* Student fields */}
-            <div>
-              {STUDENT_FIELDS.map((f) => {
-                const fieldOpacity = mapRange(p, f.revealAt - 0.05, f.revealAt + 0.05, 0, 1);
-                return (
-                  <div key={f.label} className="mb-3" style={{ opacity: fieldOpacity }}>
-                    <div className="eg-label text-[0.55rem] mb-0.5 flex items-center gap-1">
-                      <span className="inline-block w-1 h-1 rounded-full bg-[var(--accent-cyan)]" style={{ opacity: fieldOpacity }} />
-                      {f.label}
-                    </div>
-                    <div className="font-mono text-xs text-[var(--text-tertiary)]" style={{ transition: "color 0.5s" }}>
-                      {f.value}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+        {/* Pipeline diagram */}
+        <g opacity={clamp((subProgress - 0.6) * 4, 0, 0.4)}>
+          <line x1="30" y1="155" x2="230" y2="155" stroke="var(--white)" strokeWidth="0.3" strokeDasharray="2 3" />
+          {["TICKET", "STUDENT", "EXAM", "VERIFY"].map((step, i) => (
+            <g key={step}>
+              <circle cx={60 + i * 55} cy={155} r={3} stroke="var(--white)" strokeWidth="0.4" fill="none" />
+              <text x={60 + i * 55} y={168} fill="var(--white)" fontSize="4" fontFamily="var(--font-mono)" textAnchor="middle" letterSpacing="0.05em" opacity={0.5}>
+                {step}
+              </text>
+            </g>
+          ))}
+          {/* Arrows */}
+          {[0, 1, 2].map((i) => (
+            <line key={`a-${i}`} x1={73 + i * 55} y1={155} x2={92 + i * 55} y2={155} stroke="var(--white)" strokeWidth="0.3" markerEnd="url(#arrow)" />
+          ))}
+        </g>
 
-            {/* Exam fields */}
-            <div>
-              {EXAM_FIELDS.map((f) => {
-                const fieldOpacity = mapRange(p, f.revealAt - 0.05, f.revealAt + 0.05, 0, 1);
-                return (
-                  <div key={f.label} className="mb-3" style={{ opacity: fieldOpacity }}>
-                    <div className="eg-label text-[0.55rem] mb-0.5 flex items-center gap-1">
-                      <span className="inline-block w-1 h-1 rounded-full bg-[var(--accent-emerald)]" style={{ opacity: fieldOpacity }} />
-                      {f.label}
-                    </div>
-                    <div className="font-mono text-xs text-[var(--text-tertiary)]" style={{ transition: "color 0.5s" }}>
-                      {f.value}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Processing pipeline */}
-          <div className="mt-4 pt-3 border-t border-[var(--border)]">
-            <div className="flex items-center justify-between gap-1">
-              {PIPELINE_STEPS.map((step, i) => {
-                const stepOpacity = mapRange(p, step.revealAt - 0.03, step.revealAt + 0.05, 0, 1);
-                const isCurrentStage = (stage === "verify" && i === 1) || (stage === "decide" && i === 3);
-                return (
-                  <div key={step.label} className="flex items-center gap-1 flex-1">
-                    <div className="flex flex-col items-center flex-1">
-                      <div
-                        className={`w-full h-[2px] rounded-full mb-1 ${
-                          stepOpacity > 0.7
-                            ? isCurrentStage
-                              ? "bg-[var(--accent-cyan)]"
-                              : "bg-[var(--accent-emerald)]"
-                            : "bg-[var(--text-tertiary)]"
-                        }`}
-                        style={{ opacity: Math.max(0.15, stepOpacity) }}
-                      />
-                      <span
-                        className="eg-label text-center"
-                        style={{
-                          fontSize: "0.5rem",
-                          color: stepOpacity > 0.7 ? "var(--text-secondary)" : "var(--text-tertiary)",
-                          opacity: Math.max(0.3, stepOpacity),
-                        }}
-                      >
-                        {step.label}
-                      </span>
-                    </div>
-                    {i < PIPELINE_STEPS.length - 1 && (
-                      <span className="text-[var(--text-tertiary)] text-[0.5rem] mt-[-8px]" style={{ opacity: stepOpacity > 0.5 ? 0.5 : 0.15 }}>
-                        →
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Bottom status */}
-          <div className="mt-3 text-center">
-            <span className="eg-label text-[0.5rem]" style={{
-              color: stage === "authorize" ? "var(--accent-amber)" : stage === "decide" ? "var(--accent-emerald)" : "var(--text-tertiary)",
-            }}>
-              {stage === "ready" && "AWAITING SCANNING"}
-              {stage === "detect" && "SCANNING DOCUMENT"}
-              {stage === "verify" && "AWAITING VERIFICATION INPUT"}
-              {stage === "decide" && "EVIDENCE ≠ DECISION"}
-              {stage === "authorize" && "AWAITING VERIFIED DECISION"}
-            </span>
-          </div>
-        </div>
-      </div>
+        <defs>
+          <marker id="arrow" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
+            <path d="M0,0 L6,3 L0,6 Z" fill="var(--white)" opacity={0.4} />
+          </marker>
+        </defs>
+      </svg>
     </div>
   );
 }
+
+const HallTicketViz = React.memo(HallTicketVizInner);
+export default HallTicketViz;

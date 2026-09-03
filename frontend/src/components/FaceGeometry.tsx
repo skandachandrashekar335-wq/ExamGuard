@@ -1,216 +1,133 @@
 "use client";
 
+import React from "react";
+
 interface FaceGeometryProps {
-  phase?: "frame" | "connect" | "nodes" | "scan" | "evidence" | "authorize" | "deconstruct";
-  parallaxStrength?: number;
+  phase: "frame" | "scan" | "evidence" | "authorize";
+  className?: string;
 }
 
 const NODES: [number, number][] = [
-  [150, 75],
-  [210, 120],
-  [150, 165],
-  [90, 120],
-  [120, 95],
-  [180, 95],
+  [150, 65],
+  [200, 105],
+  [200, 155],
+  [150, 195],
+  [100, 155],
+  [100, 105],
+  [130, 90],
+  [170, 90],
   [150, 130],
-  [135, 110],
-  [165, 110],
-  [150, 100],
+  [130, 145],
+  [170, 145],
 ];
 
-const CONNECTIONS: [number, number][] = [
-  [0, 1], [1, 2], [2, 3], [3, 0],
-  [4, 8], [5, 7], [4, 7], [5, 8],
-  [9, 6], [6, 0], [6, 2],
+const EDGES: [number, number][] = [
+  [0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 0],
+  [6, 7], [8, 9], [8, 10],
+  [0, 6], [0, 7], [3, 9], [3, 10],
 ];
 
-export default function FaceGeometry({ phase = "frame", parallaxStrength = 0.02 }: FaceGeometryProps) {
-  const showFrame = phase !== "authorize";
-  const showNodes = phase === "nodes" || phase === "connect" || phase === "scan" || phase === "evidence" || phase === "authorize";
-  const showConnections = phase === "connect" || phase === "scan" || phase === "evidence" || phase === "authorize";
+function FaceGeometryInner({ phase, className = "" }: FaceGeometryProps) {
+  const showFrame = phase === "frame" || phase === "scan" || phase === "evidence" || phase === "authorize";
   const showScan = phase === "scan" || phase === "evidence" || phase === "authorize";
-  const showEyes = phase === "evidence" || phase === "authorize";
+  const showEvidence = phase === "evidence";
   const isAuthorize = phase === "authorize";
 
-  const parallaxMultiplier = parallaxStrength * 1000;
-
   return (
-    <div className="relative w-[200px] h-[200px] sm:w-[240px] sm:h-[240px]">
-      <svg
-        viewBox="0 0 300 240"
-        className="w-full h-full"
-        style={{
-          transform: `translate(calc(var(--mouse-x, 0) * ${parallaxMultiplier}px), calc(var(--mouse-y, 0) * ${parallaxMultiplier}px))`,
-          transition: "transform 0.1s ease-out",
-        }}
-      >
-        {/* Outer frame — hexagon approximation */}
+    <div
+      className={`relative ${className}`}
+      style={{
+        transform: "translate(calc(var(--mouse-x, 0) * 6px), calc(var(--mouse-y, 0) * 6px))",
+        transition: "transform 0.15s ease-out",
+      }}
+    >
+      <svg viewBox="0 0 300 260" className="w-full h-full" fill="none">
+        {/* Outer registration frame */}
         {showFrame && (
-          <g opacity={isAuthorize ? 0.15 : 0.25}>
+          <g opacity={0.3}>
+            {/* Hexagonal boundary */}
             <polygon
-              points="150,20 230,60 230,180 150,220 70,180 70,60"
-              fill="none"
-              stroke="var(--accent-cyan)"
-              strokeWidth="1"
-              strokeDasharray={isAuthorize ? "none" : "6 4"}
-              style={{ transition: "all 0.6s ease-out" }}
-            />
-            {/* Inner hexagon */}
-            <polygon
-              points="150,40 210,70 210,170 150,200 90,170 90,70"
-              fill="none"
-              stroke="var(--accent-cyan)"
+              points="150,15 240,60 240,200 150,245 60,200 60,60"
+              stroke="var(--white)"
               strokeWidth="0.5"
-              strokeDasharray="3 3"
-              opacity={0.15}
+              strokeDasharray={isAuthorize ? "none" : "4 3"}
+              style={{ transition: "all 0.5s ease-out" }}
             />
-            {/* Dimensional lines */}
-            <line x1="70" y1="120" x2="230" y2="120" stroke="var(--accent-cyan)" strokeWidth="0.3" opacity={0.1} strokeDasharray="2 4" />
-            <line x1="150" y1="20" x2="150" y2="220" stroke="var(--accent-cyan)" strokeWidth="0.3" opacity={0.1} strokeDasharray="2 4" />
+            {/* Inner boundary */}
+            <polygon
+              points="150,35 220,70 220,190 150,225 80,190 80,70"
+              stroke="var(--white)"
+              strokeWidth="0.3"
+              strokeDasharray="2 4"
+              opacity={0.2}
+            />
+            {/* Cross-hairs */}
+            <line x1="60" y1="130" x2="240" y2="130" stroke="var(--white)" strokeWidth="0.2" opacity={0.1} strokeDasharray="1 3" />
+            <line x1="150" y1="15" x2="150" y2="245" stroke="var(--white)" strokeWidth="0.2" opacity={0.1} strokeDasharray="1 3" />
           </g>
         )}
 
-        {/* Scan line — CSS animation */}
+        {/* Scan line — CSS animated */}
         {showScan && (
-          <rect
-            x="60"
-            y="30"
-            width="180"
-            height="3"
-            rx="1.5"
-            fill="var(--accent-cyan)"
-            opacity={0.6}
-            className={isAuthorize ? "" : "eg-scan-line"}
-            style={isAuthorize ? {
-              y: 120,
-              opacity: 0.2,
-              transition: "all 0.8s ease-out",
-            } : {}}
-          />
-        )}
-
-        {/* Evidence particles */}
-        {phase === "evidence" && (
-          <g>
-            {[...Array(12)].map((_, i) => {
-              const angle = (i / 12) * Math.PI * 2;
-              const r = 55 + Math.sin(i * 1.7) * 15;
-              const px = 150 + Math.cos(angle) * r;
-              const py = 120 + Math.sin(angle) * r;
-              return (
-                <circle
-                  key={i}
-                  cx={px}
-                  cy={py}
-                  r={1.5}
-                  fill="var(--accent-amber)"
-                  opacity={0.4 + (i % 3) * 0.15}
-                  className="eg-evidence-particle"
-                  style={{ animationDelay: `${i * 0.12}s` }}
-                />
-              );
-            })}
-            {/* Converging lines */}
-            {[...Array(6)].map((_, i) => {
-              const angle = (i / 6) * Math.PI * 2;
-              const r = 60;
-              const px = 150 + Math.cos(angle) * r;
-              const py = 120 + Math.sin(angle) * r;
-              return (
-                <line
-                  key={`line-${i}`}
-                  x1={px}
-                  y1={py}
-                  x2="150"
-                  y2="120"
-                  stroke="var(--accent-amber)"
-                  strokeWidth="0.4"
-                  opacity={0.15}
-                  strokeDasharray="2 3"
-                />
-              );
-            })}
+          <g className={isAuthorize ? "" : "eg-scan-line"}>
+            <line x1="70" y1="0" x2="230" y2="0" stroke="var(--white)" strokeWidth="0.5" opacity={0.5} />
+            <line x1="90" y1="0" x2="210" y2="0" stroke="var(--white)" strokeWidth="1.5" opacity={0.15} />
           </g>
         )}
 
-        {/* Connections */}
-        {showConnections && (
-          <g>
-            {CONNECTIONS.map(([a, b], i) => (
-              <line
-                key={`conn-${i}`}
-                x1={NODES[a][0]}
-                y1={NODES[a][1]}
-                x2={NODES[b][0]}
-                y2={NODES[b][1]}
-                stroke={isAuthorize ? "var(--accent-emerald)" : "var(--accent-cyan)"}
-                strokeWidth="0.8"
-                opacity={0.3}
-                strokeDasharray={isAuthorize ? "none" : "3 2"}
-                style={{ transition: "stroke 0.4s, opacity 0.4s" }}
-              />
-            ))}
-          </g>
-        )}
+        {/* Edges */}
+        <g opacity={0.2}>
+          {EDGES.map(([a, b], i) => (
+            <line
+              key={`e-${i}`}
+              x1={NODES[a][0]} y1={NODES[a][1]}
+              x2={NODES[b][0]} y2={NODES[b][1]}
+              stroke="var(--white)"
+              strokeWidth="0.5"
+              strokeDasharray={isAuthorize ? "none" : "2 2"}
+            />
+          ))}
+        </g>
 
         {/* Nodes */}
-        {showNodes && (
+        <g>
+          {NODES.map(([x, y], i) => (
+            <g key={`n-${i}`}>
+              <circle cx={x} cy={y} r={3.5} stroke="var(--white)" strokeWidth="0.5" fill="none" opacity={0.4} />
+              <circle cx={x} cy={y} r={1.2} fill="var(--white)" opacity={0.7} />
+            </g>
+          ))}
+        </g>
+
+        {/* Evidence particles */}
+        {showEvidence && (
           <g>
-            {NODES.map(([x, y], i) => (
-              <g key={`node-${i}`} className="eg-face-node" style={{ animationDelay: `${i * 0.06}s` }}>
-                {/* Outer ring */}
-                <circle
-                  cx={x}
-                  cy={y}
-                  r={4.5}
-                  fill="none"
-                  stroke={isAuthorize ? "var(--accent-emerald)" : "var(--accent-cyan)"}
-                  strokeWidth="0.6"
-                  opacity={0.4}
-                  style={{ transition: "stroke 0.4s" }}
-                />
-                {/* Core */}
-                <circle
-                  cx={x}
-                  cy={y}
-                  r={1.8}
-                  fill={isAuthorize ? "var(--accent-emerald)" : "var(--accent-cyan)"}
-                  opacity={0.8}
-                  style={{ transition: "fill 0.4s" }}
-                />
-                {/* Glow */}
-                <circle
-                  cx={x}
-                  cy={y}
-                  r={8}
-                  fill={isAuthorize ? "var(--accent-emerald)" : "var(--accent-cyan)"}
-                  opacity={0.04}
-                />
-              </g>
-            ))}
+            {[...Array(8)].map((_, i) => {
+              const angle = (i / 8) * Math.PI * 2;
+              const r = 50 + (i % 3) * 8;
+              const px = 150 + Math.cos(angle) * r;
+              const py = 130 + Math.sin(angle) * r;
+              return (
+                <g key={`p-${i}`}>
+                  <circle cx={px} cy={py} r={1.5} fill="var(--white)" opacity={0.3} className="eg-evidence-particle" style={{ animationDelay: `${i * 0.2}s` }} />
+                  <line x1={px} y1={py} x2="150" y2="130" stroke="var(--white)" strokeWidth="0.2" opacity={0.1} strokeDasharray="1 3" />
+                </g>
+              );
+            })}
           </g>
         )}
 
-        {/* Eye indicators */}
-        {showEyes && (
-          <g>
-            <circle cx="120" cy="95" r="12" fill="none" stroke="var(--accent-cyan)" strokeWidth="0.6" opacity={0.25} strokeDasharray="2 2" />
-            <circle cx="180" cy="95" r="12" fill="none" stroke="var(--accent-cyan)" strokeWidth="0.6" opacity={0.25} strokeDasharray="2 2" />
-            <circle cx="120" cy="95" r="4" fill="var(--accent-cyan)" opacity={0.06} />
-            <circle cx="180" cy="95" r="4" fill="var(--accent-cyan)" opacity={0.06} />
-          </g>
-        )}
-
-        {/* Authorize state — minimal + emerald */}
+        {/* Authorize — checkmark */}
         {isAuthorize && (
-          <g>
-            {/* Central diamond */}
-            <rect x="143" y="113" width="14" height="14" rx="2" fill="none" stroke="var(--accent-emerald)" strokeWidth="1.2" opacity={0.5} transform="rotate(45, 150, 120)" />
-            {/* Check mark */}
-            <path d="M145 120 L149 124 L156 116" stroke="var(--accent-emerald)" strokeWidth="1.5" fill="none" opacity={0.6} strokeLinecap="round" strokeLinejoin="round" />
+          <g opacity={0.5}>
+            <rect x="140" y="118" width="20" height="20" stroke="var(--white)" strokeWidth="1" fill="none" />
+            <polyline points="144,130 148,134 156,124" stroke="var(--white)" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
           </g>
         )}
       </svg>
     </div>
   );
 }
+
+const FaceGeometry = React.memo(FaceGeometryInner);
+export default FaceGeometry;
