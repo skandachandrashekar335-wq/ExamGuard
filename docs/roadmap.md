@@ -179,7 +179,7 @@ Focus:
 
 ## Phase 7 — Identity Verification Foundation
 
-**Status: IN PROGRESS**
+**Status: COMPLETE**
 
 ### 7.1 Identity Verification Domain Model & Database Foundation
 **Status: COMPLETE**
@@ -236,24 +236,86 @@ Focus:
 
 ## Phase 8 — Face Verification / UniFace Integration
 
-**Status: PLANNED**
+**Status: IN PROGRESS (Phase 8.1 complete)**
 
-Focus:
-- Face detection abstraction
-- Face verification interface
-- UniFace integration behind an abstraction
-- Face evidence storage
-- Configurable verification thresholds
-- Failure and review states
-- Security/privacy controls
+### 8.1 Face Verification Architecture & Provider Abstraction
+**Status: COMPLETE**
 
-**Dependencies:** Phase 7 (identity verification abstractions must exist).
+Core architectural principle:
+> AI/perception = evidence. Business logic = authority.
 
-**New models/migrations likely required:** `FaceVerification` evidence model, face embedding storage. `backend/app/ai/face.py` implementation.
+Face verification providers produce evidence signals. The decision engine
+evaluates that evidence. Providers NEVER directly authorize or deny exam entry.
 
-**Frontend work expected:** Face verification status views, review workflow for failures.
+**Provider contract:**
+- `FaceVerificationProvider` Protocol with `verify()`, `health_check()`, `get_capabilities()`
+- `FaceVerificationRequest`: reference_image + probe_image bytes + context
+- `FaceVerificationResult`: identity_match_score, liveness_score, liveness_passed, image_quality_score, evidence_metadata
+- `FaceVerificationError`: typed error categories (PROVIDER_UNAVAILABLE, TIMEOUT, INVALID_INPUT, etc.)
+- `ProviderCapabilities` and `ProviderStatus`: describe provider features and health
+- All dataclasses are frozen (immutable)
 
-**Testing requirements:** Unit tests for face abstraction, threshold logic, failure states. Integration tests with mock face data.
+**Provider abstraction location:** `app/services/face_verification/`
+
+**Files created:**
+- `app/services/face_verification/__init__.py` — public API
+- `app/services/face_verification/types.py` — all data types
+- `app/services/face_verification/protocol.py` — FaceVerificationProvider Protocol
+- `app/services/face_verification/factory.py` — provider factory from config
+- `app/services/face_verification/providers/__init__.py`
+- `app/services/face_verification/providers/deterministic.py` — test provider
+
+**Configuration added to `app/core/config.py`:**
+- `FACE_VERIFICATION_PROVIDER: str = "deterministic"` — provider selection
+- `FACE_VERIFICATION_PROVIDER_URL: str | None = None` — future provider URL
+- `FACE_VERIFICATION_PROVIDER_API_KEY: str | None = None` — future API key
+- `FACE_VERIFICATION_MAX_IMAGE_SIZE_MB: int = 5` — image size limit
+- `FACE_VERIFICATION_IMAGE_RETENTION_DAYS: int = 0` — 0 = never store images
+
+**Privacy decisions:**
+- Raw images are NEVER stored by ExamGuard (retention_days = 0 by default)
+- Biometric templates are managed by the provider, not ExamGuard
+- Provider credentials are never exposed in API responses
+- Evidence metadata must not contain raw images or biometric templates
+- Provider errors are NOT logged with image content
+
+**Security decisions:**
+- All dataclasses are frozen to prevent accidental mutation
+- Provider errors are typed (FaceVerificationErrorType) — not generic strings
+- Provider availability is checked before verification attempts
+- Image size limits enforced via configuration
+
+**Tests added:** 28 tests
+- Protocol conformance (4 tests)
+- DeterministicProvider behavior (8 tests)
+- Provider failure handling (3 tests)
+- Sensitive data leakage prevention (3 tests)
+- Evidence ≠ Decision separation (3 tests)
+- Factory behavior (2 tests)
+- Immutability verification (5 tests)
+
+**Test count:** 688 passing (660 existing + 28 new)
+
+**Frontend changes:**
+- `privacy/page.tsx`: Fixed monochrome violations (replaced accent-cyan/emerald/amber/pink with monochrome tokens)
+- `terms/page.tsx`: Fixed monochrome violations (same treatment)
+- No camera UI, no fake face-match percentages, no fake liveness PASS
+
+### 8.2 Face Verification Provider Integration (NEXT)
+- Wire provider into identity verification service
+- Add evidence recording from provider results
+- Add provider error handling in service layer
+- Add API endpoint for face verification trigger
+
+### 8.3 UniFace Integration (FUTURE)
+- Implement UniFace provider
+- Real face recognition
+- Real liveness detection
+
+### 8.4 Face Verification UI (FUTURE)
+- Camera capture interface
+- Real-time verification status
+- Review workflow for failures
 
 ---
 
@@ -605,28 +667,29 @@ Focus:
 ## Roadmap Rules
 
 1. Phases 0–7 are COMPLETE.
-2. Phases 8–23 are PLANNED.
-3. Do not mark future phases complete.
-4. Do not implement future phases.
-5. Each future phase should eventually be broken into smaller implementation steps before coding begins.
-6. Future implementation must proceed sequentially unless the architecture explicitly justifies another order.
-7. AI systems provide evidence/perception; business logic makes authorization and operational decisions.
-8. Never hard-code production data or thresholds.
-9. Database changes require Alembic migrations.
-10. Preserve auditability and security throughout the project.
-11. Do not introduce paid/cloud AI services unless explicitly planned and approved.
-12. Face/biometric functionality must have privacy, security, fallback, and human-review considerations.
-13. Never destructively reset production-style databases.
-14. Never weaken or delete tests to make a feature pass.
+2. Phase 8 is IN PROGRESS (8.1 complete).
+3. Phases 9–23 are PLANNED.
+4. Do not mark future phases complete.
+5. Do not implement future phases.
+6. Each future phase should eventually be broken into smaller implementation steps before coding begins.
+7. Future implementation must proceed sequentially unless the architecture explicitly justifies another order.
+8. AI systems provide evidence/perception; business logic makes authorization and operational decisions.
+9. Never hard-code production data or thresholds.
+10. Database changes require Alembic migrations.
+11. Preserve auditability and security throughout the project.
+12. Do not introduce paid/cloud AI services unless explicitly planned and approved.
+13. Face/biometric functionality must have privacy, security, fallback, and human-review considerations.
+14. Never destructively reset production-style databases.
+15. Never weaken or delete tests to make a feature pass.
 
 ---
 
 ## Current Project State
 
-- **Current phase:** Phase 7 COMPLETE
-- **Current completed step:** Phase 7 Step 6 — Identity Verification Tests + UI/UX Redesign
-- **Current tests:** 660 passing
-- **Frontend pages:** 20 (`/`, `/students`, `/documents`, `/dashboard`, `/subjects`, `/exams`, `/exam-halls`, `/hall-tickets`, `/hall-tickets/[id]`, `/identity-verifications`, `/identity-verifications/[id]`, `/import`, `/import/history`, `/import/students`, `/import/subjects-exams`, `/import/registrations`, `/import/seat-assignments`, `/privacy`, `/terms`)
+- **Current phase:** Phase 8 IN PROGRESS (8.1 complete)
+- **Current completed step:** Phase 8.1 — Face Verification Architecture & Provider Abstraction
+- **Current tests:** 688 passing (660 existing + 28 new)
+- **Frontend pages:** 20 (all building successfully)
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono), zero border-radius, no neon colors
-- **Next phase:** Phase 8 — Face Verification / UniFace Integration
-- **Next action:** Proceed to Phase 8
+- **Next step:** Phase 8.2 — Wire provider into identity verification service
+- **Provider architecture:** `app/services/face_verification/` with Protocol, DeterministicProvider, factory

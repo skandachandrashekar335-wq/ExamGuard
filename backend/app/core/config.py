@@ -45,6 +45,17 @@ class Settings(BaseSettings):
     # Identity verification settings
     IDENTITY_VERIFICATION_MATCH_THRESHOLD: float = 0.85
 
+    # Face verification provider settings
+    # Provider name: "deterministic" (test), "none" (disabled), or future "uniface", etc.
+    FACE_VERIFICATION_PROVIDER: str = "deterministic"
+    # Provider-specific settings (future use)
+    FACE_VERIFICATION_PROVIDER_URL: str | None = None
+    FACE_VERIFICATION_PROVIDER_API_KEY: str | None = None
+    # Image constraints
+    FACE_VERIFICATION_MAX_IMAGE_SIZE_MB: int = 5
+    # Retention: how long to keep raw verification images (days). 0 = never store.
+    FACE_VERIFICATION_IMAGE_RETENTION_DAYS: int = 0
+
 
 @lru_cache
 def get_settings() -> Settings:
