@@ -13,6 +13,7 @@ from app.schemas.identity_verification import (
     IdentityVerificationListResponse,
     IdentityVerificationResponse,
     IdentityVerificationStudentInfo,
+    VerifyFaceResponse,
 )
 from app.services import identity_verification as iv_service
 from app.services import identity_verification_decision as iv_decision
@@ -33,6 +34,26 @@ class FailRequest(BaseModel):
 
 class CancelRequest(BaseModel):
     reason: str | None = Field(default=None, description="Cancellation reason")
+
+
+class VerifyFaceRequest(BaseModel):
+    """Request to run face verification on an attempt."""
+    reference_image: str = Field(
+        ..., min_length=1,
+        description="Base64-encoded reference/enrollment image",
+    )
+    probe_image: str = Field(
+        ..., min_length=1,
+        description="Base64-encoded probe/capture image",
+    )
+    reference_image_format: str = Field(
+        default="image/jpeg",
+        description="MIME type of reference image",
+    )
+    probe_image_format: str = Field(
+        default="image/jpeg",
+        description="MIME type of probe image",
+    )
 
 
 @router.post(
@@ -178,6 +199,56 @@ def record_evidence(
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.post(
+    "/{attempt_id}/verify-face",
+    response_model=VerifyFaceResponse,
+    status_code=201,
+    summary="Run face verification provider and record evidence",
+)
+def verify_face(
+    attempt_id: int,
+    body: VerifyFaceRequest,
+    db: Session = Depends(get_db),
+):
+    """Run face verification and persist evidence signals.
+
+    The provider produces evidence. Authorization decisions are made
+    separately via the evaluate endpoint.
+    """
+    import base64
+
+    try:
+        ref_bytes = base64.b64decode(body.reference_image)
+        probe_bytes = base64.b64decode(body.probe_image)
+    except Exception:
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid base64 encoding in reference_image or probe_image",
+        )
+
+    try:
+        evidence_records = iv_service.verify_face(
+            db,
+            attempt_id,
+            reference_image=ref_bytes,
+            probe_image=probe_bytes,
+            reference_image_format=body.reference_image_format,
+            probe_image_format=body.probe_image_format,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    return VerifyFaceResponse(
+        attempt_id=attempt_id,
+        evidence=[
+            IdentityVerificationEvidenceResponse.model_validate(e)
+            for e in evidence_records
+        ],
+    )
 
 
 @router.post(

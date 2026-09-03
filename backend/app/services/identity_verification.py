@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import datetime, timezone
 
@@ -337,3 +338,177 @@ def get_attempt_with_context(db: Session, attempt_id: int) -> dict | None:
         "exam": exam,
         "hall_ticket": hall_ticket,
     }
+
+
+def verify_face(
+    db: Session,
+    attempt_id: int,
+    reference_image: bytes,
+    probe_image: bytes,
+    reference_image_format: str = "image/jpeg",
+    probe_image_format: str = "image/jpeg",
+) -> list[IdentityVerificationEvidence]:
+    """Run face verification on an attempt and persist evidence.
+
+    This function:
+    1. Validates the attempt is eligible for face verification
+    2. Obtains the configured face verification provider
+    3. Calls provider.verify() to get evidence signals
+    4. Converts provider result into IdentityVerificationEvidence records
+    5. Persists evidence using the existing Phase 7 mechanism
+
+    The provider produces evidence. This function does NOT make
+    authorization decisions. The decision engine evaluates evidence
+    separately via evaluate_evidence().
+
+    Args:
+        db: Database session.
+        attempt_id: ID of the identity verification attempt.
+        reference_image: Reference/enrollment image bytes.
+        probe_image: Probe/capture image bytes.
+        reference_image_format: MIME type of reference image.
+        probe_image_format: MIME type of probe image.
+
+    Returns:
+        List of persisted IdentityVerificationEvidence records.
+
+    Raises:
+        LookupError: If attempt not found.
+        ValueError: If attempt is not eligible for face verification.
+    """
+    from app.services.face_verification import (
+        FaceVerificationRequest,
+        ProviderUnavailableError,
+        get_face_verification_provider,
+    )
+
+    # 1. Validate attempt eligibility
+    attempt = get_attempt(db, attempt_id)
+    if not attempt:
+        raise LookupError(f"Identity verification attempt {attempt_id} not found")
+
+    if attempt.status not in (
+        IdentityVerificationStatus.CREATED.value,
+        IdentityVerificationStatus.IN_PROGRESS.value,
+    ):
+        raise ValueError(
+            f"Cannot verify face on attempt in status '{attempt.status}'. "
+            f"Attempt must be CREATED or IN_PROGRESS."
+        )
+
+    if attempt.verification_method != IdentityVerificationMethod.FACE.value:
+        raise ValueError(
+            f"Attempt verification_method is '{attempt.verification_method}', "
+            f"not 'FACE'. Face verification requires FACE method."
+        )
+
+    # 2. Validate input presence
+    if not reference_image:
+        raise ValueError("reference_image is required and must not be empty")
+    if not probe_image:
+        raise ValueError("probe_image is required and must not be empty")
+
+    # 3. Obtain provider
+    provider = get_face_verification_provider()
+
+    # 4. Check provider availability
+    health = provider.health_check()
+    if not health.available:
+        fail_attempt(
+            db, attempt_id,
+            reason=f"Face verification provider unavailable: {health.message}",
+        )
+        raise ValueError(
+            f"Face verification provider unavailable: {health.message}"
+        )
+
+    # 5. Build request and call provider
+    request = FaceVerificationRequest(
+        reference_image=reference_image,
+        probe_image=probe_image,
+        reference_image_format=reference_image_format,
+        probe_image_format=probe_image_format,
+        context={
+            "attempt_id": attempt_id,
+            "student_id": attempt.student_id,
+        },
+    )
+
+    try:
+        result = provider.verify(request)
+    except ProviderUnavailableError as e:
+        fail_attempt(db, attempt_id, reason=f"Provider error: {e.error.message}")
+        raise ValueError(f"Provider error: {e.error.message}") from e
+
+    # 6. Convert result → evidence records
+    evidence_records = []
+
+    # identity_match_score → similarity_score signal
+    if result.identity_match_score is not None:
+        data = IdentityVerificationEvidenceCreate(
+            signal_type="similarity_score",
+            signal_value=str(result.identity_match_score),
+            provider_name=result.provider_name,
+            provider_version=result.provider_version,
+            confidence=result.identity_match_score,
+            details=json.dumps({
+                "source": "face_verification_provider",
+                "signal": "identity_match_score",
+            }),
+        )
+        evidence_records.append(record_evidence(db, attempt_id, data))
+
+    # liveness_score → liveness_score signal
+    if result.liveness_score is not None:
+        data = IdentityVerificationEvidenceCreate(
+            signal_type="liveness_score",
+            signal_value=str(result.liveness_score),
+            provider_name=result.provider_name,
+            provider_version=result.provider_version,
+            confidence=result.liveness_score,
+            details=json.dumps({
+                "source": "face_verification_provider",
+                "signal": "liveness_score",
+            }),
+        )
+        evidence_records.append(record_evidence(db, attempt_id, data))
+
+    # liveness_passed → liveness signal (categorical: PASS/FAIL)
+    if result.liveness_passed is not None:
+        liveness_value = "PASS" if result.liveness_passed else "FAIL"
+        data = IdentityVerificationEvidenceCreate(
+            signal_type="liveness",
+            signal_value=liveness_value,
+            provider_name=result.provider_name,
+            provider_version=result.provider_version,
+            details=json.dumps({
+                "source": "face_verification_provider",
+                "signal": "liveness_passed",
+            }),
+        )
+        evidence_records.append(record_evidence(db, attempt_id, data))
+
+    # image_quality_score → image_quality signal (categorical: GOOD/POOR)
+    if result.image_quality_score is not None:
+        quality_value = "GOOD" if result.image_quality_score >= 0.5 else "POOR"
+        data = IdentityVerificationEvidenceCreate(
+            signal_type="image_quality",
+            signal_value=quality_value,
+            provider_name=result.provider_name,
+            provider_version=result.provider_version,
+            confidence=result.image_quality_score,
+            details=json.dumps({
+                "source": "face_verification_provider",
+                "signal": "image_quality_score",
+                "numeric_score": result.image_quality_score,
+            }),
+        )
+        evidence_records.append(record_evidence(db, attempt_id, data))
+
+    logger.info(
+        "Face verification completed for attempt %d: "
+        "%d evidence records created by provider %s",
+        attempt_id, len(evidence_records), result.provider_name,
+    )
+
+    return evidence_records

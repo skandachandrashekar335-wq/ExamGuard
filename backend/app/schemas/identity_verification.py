@@ -116,3 +116,9 @@ class IdentityVerificationContextResponse(BaseModel):
     evidence: list[IdentityVerificationEvidenceResponse]
     student: IdentityVerificationStudentInfo | None = None
     exam: IdentityVerificationExamInfo | None = None
+
+
+class VerifyFaceResponse(BaseModel):
+    """Response for face verification: evidence records produced."""
+    attempt_id: int
+    evidence: list[IdentityVerificationEvidenceResponse]

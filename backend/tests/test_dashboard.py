@@ -11,6 +11,10 @@ from app.models.subject import Subject
 from app.models.exam import Exam
 from app.models.exam_hall import ExamHall
 from app.models.exam_registration import ExamRegistration, RegistrationStatus
+from app.models.identity_verification import (
+    IdentityVerificationAttempt,
+    IdentityVerificationEvidence,
+)
 from app.models.seat_assignment import SeatAssignment, SeatAssignmentStatus
 from app.models.verification import VerificationDecision, VerificationOutcome
 from app.models.hall_ticket import HallTicket
@@ -35,6 +39,8 @@ def cleanup():
         db.execute(delete(ExtractionResult))
         db.execute(delete(SeatAssignment))
         db.execute(delete(HallTicket))
+        db.execute(delete(IdentityVerificationEvidence))
+        db.execute(delete(IdentityVerificationAttempt))
         db.execute(delete(ExamRegistration))
         db.execute(delete(ExamHall))
         db.execute(delete(Exam))

@@ -236,7 +236,7 @@ Focus:
 
 ## Phase 8 — Face Verification / UniFace Integration
 
-**Status: IN PROGRESS (Phase 8.1 complete)**
+**Status: IN PROGRESS (Phase 8.1 and 8.2 complete)**
 
 ### 8.1 Face Verification Architecture & Provider Abstraction
 **Status: COMPLETE**
@@ -277,7 +277,7 @@ evaluates that evidence. Providers NEVER directly authorize or deny exam entry.
 - Biometric templates are managed by the provider, not ExamGuard
 - Provider credentials are never exposed in API responses
 - Evidence metadata must not contain raw images or biometric templates
-- Provider errors are NOT logged with image content
+- Provider errors are not logged with image content
 
 **Security decisions:**
 - All dataclasses are frozen to prevent accidental mutation
@@ -294,18 +294,47 @@ evaluates that evidence. Providers NEVER directly authorize or deny exam entry.
 - Factory behavior (2 tests)
 - Immutability verification (5 tests)
 
-**Test count:** 688 passing (660 existing + 28 new)
-
 **Frontend changes:**
 - `privacy/page.tsx`: Fixed monochrome violations (replaced accent-cyan/emerald/amber/pink with monochrome tokens)
 - `terms/page.tsx`: Fixed monochrome violations (same treatment)
 - No camera UI, no fake face-match percentages, no fake liveness PASS
 
-### 8.2 Face Verification Provider Integration (NEXT)
-- Wire provider into identity verification service
-- Add evidence recording from provider results
-- Add provider error handling in service layer
-- Add API endpoint for face verification trigger
+### 8.2 Face Verification Provider Integration
+**Status: COMPLETE**
+
+Wire the face verification provider into the identity verification service.
+
+**Service integration (`app/services/identity_verification.py`):**
+- `verify_face()`: new service function that validates attempt eligibility, obtains provider via factory, checks provider health, calls `provider.verify()`, converts `FaceVerificationResult` → multiple `IdentityVerificationEvidence` records, persists via existing `record_evidence()`
+- Provider errors → `fail_attempt()` (not evidence). Verification results → evidence records (decision engine decides).
+- Works on CREATED and IN_PROGRESS attempts with FACE verification method
+
+**Evidence mapping (provider result → evidence records):**
+- `identity_match_score` → `signal_type="similarity_score"`, `confidence=score`
+- `liveness_score` → `signal_type="liveness_score"`, `confidence=score`
+- `liveness_passed` → `signal_type="liveness"`, `signal_value="PASS"/"FAIL"`
+- `image_quality_score` → `signal_type="image_quality"`, `signal_value="GOOD"/"POOR"`
+- All evidence details are JSON with `source: "face_verification_provider"`
+
+**API endpoint (`app/api/v1/identity_verification.py`):**
+- `POST /{attempt_id}/verify-face`: accepts base64-encoded reference_image and probe_image, returns `VerifyFaceResponse` with evidence records
+- Validates base64 encoding, attempt eligibility, and provider availability
+
+**Schema additions (`app/schemas/identity_verification.py`):**
+- `VerifyFaceRequest`: reference_image, probe_image, image format fields
+- `VerifyFaceResponse`: attempt_id + evidence list
+
+**Tests added:** 35 tests (`test_verify_face_integration.py`)
+- Happy path (5 tests): evidence records returned, persisted, attempt stays in progress, provider info present, works on CREATED attempts
+- Evidence mapping (8 tests): similarity_score, liveness_score, liveness PASS/FAIL, image_quality GOOD/POOR, none scores → no evidence, JSON details
+- Failure semantics (9 tests): attempt not found, wrong status, wrong method, empty images, provider unavailable fails attempt, provider error fails attempt
+- Sensitive data (2 tests): no raw images in evidence, no raw images in provider result
+- Evidence ≠ decision (3 tests): verify_face does not complete attempt, continuous values, decision engine processes evidence
+- Multiple calls (1 test): evidence accumulates
+- API happy path (2 tests): returns 201, correct response fields
+- API errors (5 tests): invalid base64, not found, wrong status, wrong method, provider unavailable
+
+**Test count:** 723 passing (688 existing + 35 new)
 
 ### 8.3 UniFace Integration (FUTURE)
 - Implement UniFace provider
@@ -667,7 +696,7 @@ Focus:
 ## Roadmap Rules
 
 1. Phases 0–7 are COMPLETE.
-2. Phase 8 is IN PROGRESS (8.1 complete).
+2. Phase 8 is IN PROGRESS (8.1 and 8.2 complete).
 3. Phases 9–23 are PLANNED.
 4. Do not mark future phases complete.
 5. Do not implement future phases.
@@ -686,10 +715,11 @@ Focus:
 
 ## Current Project State
 
-- **Current phase:** Phase 8 IN PROGRESS (8.1 complete)
-- **Current completed step:** Phase 8.1 — Face Verification Architecture & Provider Abstraction
-- **Current tests:** 688 passing (660 existing + 28 new)
+- **Current phase:** Phase 8 IN PROGRESS (8.1 and 8.2 complete)
+- **Current completed step:** Phase 8.2 — Wire Face Verification Provider Into Identity Verification Service
+- **Current tests:** 723 passing (688 existing + 35 new)
 - **Frontend pages:** 20 (all building successfully)
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono), zero border-radius, no neon colors
-- **Next step:** Phase 8.2 — Wire provider into identity verification service
+- **Next step:** Phase 8.3 — UniFace Integration (FUTURE)
 - **Provider architecture:** `app/services/face_verification/` with Protocol, DeterministicProvider, factory
+- **Identity verification API:** `POST /{attempt_id}/verify-face` endpoint for face verification trigger
