@@ -179,24 +179,58 @@ Focus:
 
 ## Phase 7 — Identity Verification Foundation
 
-**Status: PLANNED**
+**Status: IN PROGRESS**
 
-Focus:
-- Identity verification architecture
-- Identity evidence models
-- Verification interfaces
-- AI perception abstraction
-- Human-review fallback
-- Privacy and security design
-- No production biometric identification yet
+### 7.1 Identity Verification Domain Model & Database Foundation
+**Status: COMPLETE**
+- `IdentityVerificationAttempt` model with lifecycle: CREATED → IN_PROGRESS → COMPLETED/FAILED/CANCELLED
+- `IdentityVerificationEvidence` model for signal-level evidence storage
+- `IdentityVerificationMethod` enum: FACE, MANUAL, DOCUMENT, OTHER
+- `IdentityVerificationDecision` enum: PENDING, MATCH, NO_MATCH, INCONCLUSIVE
+- Alembic migration 015
+- `STATUS_TRANSITIONS` dict enforced on all status changes
+
+### 7.2 Identity Verification Service Layer
+**Status: COMPLETE**
+- `create_attempt()`: validates student, registration, hall_ticket ownership
+- `get_attempt()`, `list_attempts()`: retrieval with filters
+- `start_attempt()`: CREATED → IN_PROGRESS
+- `complete_attempt()`: → COMPLETED with decision
+- `fail_attempt()`: → FAILED with reason
+- `cancel_attempt()`: → CANCELLED
+- `record_evidence()`: stores evidence signals
+- `get_attempt_with_context()`: returns attempt + student + exam + hall_ticket
+
+### 7.3 Identity Verification Decision Engine
+**Status: COMPLETE**
+- Provider-independent decision engine (`identity_verification_decision.py`)
+- Configurable similarity threshold via `IDENTITY_VERIFICATION_MATCH_THRESHOLD` (default 0.85)
+- Decision logic: similarity + liveness + quality checks
+- No biometric data stored; no raw face images
+
+### 7.4 Identity Verification API
+**Status: COMPLETE**
+- REST API at `/api/v1/identity-verifications`
+- Endpoints: create, get, get-context, list, start, fail, cancel, evaluate
+- Full validation on all inputs
+- Read-only list with pagination
+
+### 7.5 Identity Verification Admin UI
+**Status: COMPLETE**
+- `/identity-verifications` list page with status/decision filters
+- `/identity-verifications/[id]` detail page with lifecycle progress, evidence, actions
+- 19 frontend pages total, all building successfully
+
+### 7.6 Identity Verification Tests
+**Status: COMPLETE**
+- 62 comprehensive tests: model, service create, lifecycle, evidence, context, list, decision engine, API
+- 660 total backend tests passing
 
 **Dependencies:** Phases 0–4. This is an architectural phase establishing abstractions before Phase 8 implements face verification.
 
-**New models/migrations likely required:** `IdentityVerification` or `IdentityEvidence` model. Verification interface ABCs.
+**New models/migrations:** `IdentityVerificationAttempt`, `IdentityVerificationEvidence` models (migration 015).
 
-**Frontend work expected:** Architecture-level — no user-facing pages expected yet.
-
-**Testing requirements:** Unit tests for abstraction interfaces, mock implementations.
+**Frontend work completed:** Identity verification list and detail pages.
 
 ---
 
@@ -570,8 +604,8 @@ Focus:
 
 ## Roadmap Rules
 
-1. Phases 0–6 are COMPLETE.
-2. Phases 7–23 are PLANNED.
+1. Phases 0–7 are COMPLETE.
+2. Phases 8–23 are PLANNED.
 3. Do not mark future phases complete.
 4. Do not implement future phases.
 5. Each future phase should eventually be broken into smaller implementation steps before coding begins.
@@ -589,9 +623,9 @@ Focus:
 
 ## Current Project State
 
-- **Current phase:** Phase 6 COMPLETE
-- **Current completed step:** Phase 6 Step 8 — Integration Tests + Phase 6 Hardening
-- **Current tests:** 598 passing
-- **Frontend pages:** 17 (`/`, `/students`, `/documents`, `/dashboard`, `/subjects`, `/exams`, `/exam-halls`, `/hall-tickets`, `/hall-tickets/[id]`, `/import`, `/import/history`, `/import/students`, `/import/subjects-exams`, `/import/registrations`, `/import/seat-assignments`)
-- **Next phase:** Phase 7 — Identity Verification Foundation
-- **Next action:** Before implementation, break Phase 7 into concrete steps and implement only Phase 7 Step 1.
+- **Current phase:** Phase 7 IN PROGRESS
+- **Current completed step:** Phase 7 Step 6 — Identity Verification Tests
+- **Current tests:** 660 passing
+- **Frontend pages:** 19 (`/`, `/students`, `/documents`, `/dashboard`, `/subjects`, `/exams`, `/exam-halls`, `/hall-tickets`, `/hall-tickets/[id]`, `/identity-verifications`, `/identity-verifications/[id]`, `/import`, `/import/history`, `/import/students`, `/import/subjects-exams`, `/import/registrations`, `/import/seat-assignments`)
+- **Next phase:** Phase 7 completion or Phase 8 — Face Verification / UniFace Integration
+- **Next action:** Continue Phase 7 remaining steps or proceed to Phase 8

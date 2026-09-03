@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     # Verification settings
     MIN_OCR_CONFIDENCE: float = 60.0
 
+    # Identity verification settings
+    IDENTITY_VERIFICATION_MATCH_THRESHOLD: float = 0.85
+
 
 @lru_cache
 def get_settings() -> Settings:
