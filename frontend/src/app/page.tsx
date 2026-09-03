@@ -18,21 +18,41 @@ const STAGE_DATA: Record<Stage, { num: string; title: string; subtitle: string; 
   authorize: { num: "04", title: "AUTHORIZE", subtitle: "AWAITING VERIFIED DECISION", systemLabel: "NO ENTRY WITHOUT DECISION" },
 };
 
+const STAGE_TITLES: Record<Stage, string[]> = {
+  ready: ["VERIFY.", "THEN", "ENTER."],
+  detect: ["IDENTITY", "DETECTED"],
+  verify: ["EXAMINATION", "CONTEXT"],
+  decide: ["EVIDENCE", "≠ DECISION"],
+  authorize: ["ENTRY", "SHOULD BE", "VERIFIED."],
+};
+
 export default function Home() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { subscribe } = useScrollProgress(scrollRef);
   const [stage, setStage] = useState<Stage>("ready");
   const [progress, setProgress] = useState(0);
+  const [subProgress, setSubProgress] = useState(0);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [navExpanded, setNavExpanded] = useState(false);
+  const [powerUp, setPowerUp] = useState(false);
+  const [prevStage, setPrevStage] = useState<Stage>("ready");
 
   useEffect(() => {
     return subscribe((state) => {
       setStage(state.stage);
       setProgress(state.progress);
+      setSubProgress(state.subProgress);
     });
   }, [subscribe]);
 
+  // Track stage changes for transitions
+  useEffect(() => {
+    if (stage !== prevStage) {
+      setPrevStage(stage);
+    }
+  }, [stage, prevStage]);
+
+  // Multi-layer mouse parallax
   const handleMouseMove = useCallback((e: MouseEvent) => {
     const x = (e.clientX / window.innerWidth - 0.5) * 2;
     const y = (e.clientY / window.innerHeight - 0.5) * 2;
@@ -44,6 +64,7 @@ export default function Home() {
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, [handleMouseMove]);
 
+  // Scroll to stage position
   const scrollToStage = (targetStage: string) => {
     const el = scrollRef.current;
     if (!el) return;
@@ -59,7 +80,22 @@ export default function Home() {
     window.scrollTo({ top: total * target + el.offsetTop, behavior: "smooth" });
   };
 
+  // Initialize power-up sequence
+  const handleInitialize = () => {
+    setPowerUp(true);
+    setTimeout(() => {
+      scrollToStage("detect");
+    }, 400);
+  };
+
   const currentData = STAGE_DATA[stage];
+  const titles = STAGE_TITLES[stage];
+
+  // Multi-layer depth for mouse
+  const d1 = { x: mousePos.x * 2, y: mousePos.y * 1 };
+  const d2 = { x: mousePos.x * 5, y: mousePos.y * 3 };
+  const d3 = { x: mousePos.x * 8, y: mousePos.y * 5 };
+  const d4 = { x: mousePos.x * 12, y: mousePos.y * 7 };
 
   return (
     <div className="bg-[var(--background)] text-[var(--foreground)]">
@@ -121,13 +157,17 @@ export default function Home() {
 
         {/* PINNED STAGE */}
         <div className="sticky top-0 h-screen overflow-hidden">
-          <div className="absolute inset-0 eg-grid" />
+          {/* LAYER 0: Background grid — depth 1 */}
+          <div
+            className="absolute inset-0 eg-grid"
+            style={{ transform: `translate(${d1.x * 0.3}px, ${d1.y * 0.3}px)` }}
+          />
 
           {/* Progress bar */}
           <div className="absolute top-0 left-0 right-0 h-[2px] z-10">
             <div
               className="h-full bg-gradient-to-r from-[var(--accent-cyan)] to-[var(--accent-emerald)]"
-              style={{ width: `${progress * 100}%`, transition: "width 0.1s linear" }}
+              style={{ width: `${progress * 100}%`, transition: "width 0.05s linear" }}
             />
           </div>
 
@@ -141,29 +181,36 @@ export default function Home() {
           {/* Main content */}
           <div className="relative h-full flex flex-col lg:flex-row items-center justify-center max-w-7xl mx-auto px-4 sm:px-6 pt-24 pb-12">
 
-            {/* Left — Text */}
-            <div className="flex-1 lg:pr-8 mb-8 lg:mb-0 z-10 text-center lg:text-left">
+            {/* Left — Text — depth layers 2-3 */}
+            <div
+              className="flex-1 lg:pr-8 mb-8 lg:mb-0 z-10 text-center lg:text-left"
+              style={{ transform: `translate(${d2.x * 0.4}px, ${d2.y * 0.4}px)` }}
+            >
               {stage === "ready" && (
-                <div className="eg-fade-up">
-                  <div className="eg-label mb-4">EXAMGUARD</div>
+                <div>
+                  <div className="eg-label mb-4 eg-scene-enter">EXAMGUARD</div>
                   <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold uppercase tracking-wider leading-none mb-6">
-                    VERIFY.
-                    <br />
-                    <span className="text-[var(--accent-cyan)]">THEN</span>
-                    <br />
-                    ENTER.
+                    {titles.map((line, i) => (
+                      <span key={i} className="block eg-scene-enter" style={{ animationDelay: `${i * 0.1}s` }}>
+                        {i === 1 ? (
+                          <span className="text-[var(--accent-cyan)]">{line}</span>
+                        ) : (
+                          line
+                        )}
+                      </span>
+                    ))}
                   </h1>
-                  <p className="text-[var(--text-secondary)] text-base sm:text-lg max-w-lg mx-auto lg:mx-0 mb-8 leading-relaxed">
+                  <p className="text-[var(--text-secondary)] text-base sm:text-lg max-w-lg mx-auto lg:mx-0 mb-8 leading-relaxed eg-scene-enter" style={{ animationDelay: "0.3s" }}>
                     Automated examination entry verification that connects
                     hall-ticket context with identity verification before
                     entry is authorized.
                   </p>
-                  <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start eg-scene-enter" style={{ animationDelay: "0.4s" }}>
                     <button
-                      onClick={() => scrollToStage("detect")}
-                      className="eg-btn-primary eg-focusable"
+                      onClick={handleInitialize}
+                      className={`eg-btn-primary eg-focusable eg-power-up ${powerUp ? "active" : ""}`}
                     >
-                      START EXPERIENCE
+                      INITIALIZE EXPERIENCE
                     </button>
                     <Link href="/dashboard" className="eg-btn-secondary eg-focusable text-center">
                       EXPLORE SYSTEM
@@ -173,21 +220,36 @@ export default function Home() {
               )}
 
               {stage !== "ready" && (
-                <div key={stage} className="eg-fade-up">
+                <div key={stage} className="eg-scene-enter">
                   <div className="eg-label mb-3">
                     <span className="text-[var(--accent-cyan)]">{currentData.num}</span>
                     <span className="mx-2">/</span>
                     {currentData.title}
                   </div>
+
+                  {/* Morphing title */}
                   <h2 className="text-3xl sm:text-4xl lg:text-6xl font-bold uppercase tracking-wider leading-none mb-4">
-                    {currentData.title}
+                    {titles.map((line, i) => (
+                      <span
+                        key={`${stage}-${i}`}
+                        className="block eg-scene-enter"
+                        style={{ animationDelay: `${i * 0.08}s` }}
+                      >
+                        {line.includes("≠") || line === "DETECTED" || line === "VERIFIED." ? (
+                          <span className="text-[var(--accent-cyan)]">{line}</span>
+                        ) : (
+                          line
+                        )}
+                      </span>
+                    ))}
                   </h2>
-                  <p className="text-[var(--text-secondary)] text-sm sm:text-base max-w-md mx-auto lg:mx-0 mb-6">
+
+                  <p className="text-[var(--text-secondary)] text-sm sm:text-base max-w-md mx-auto lg:mx-0 mb-6 eg-scene-enter" style={{ animationDelay: "0.2s" }}>
                     {currentData.subtitle}
                   </p>
 
                   {stage === "verify" && (
-                    <div className="eg-card max-w-md mx-auto lg:mx-0 mb-6">
+                    <div className="eg-card max-w-md mx-auto lg:mx-0 mb-6 eg-scene-enter" style={{ animationDelay: "0.3s" }}>
                       <div className="eg-label text-[0.6rem] mb-2">ARCHITECTURE PRINCIPLE</div>
                       <div className="font-mono text-xs text-[var(--accent-cyan)]">
                         EVIDENCE ≠ DECISION
@@ -200,7 +262,7 @@ export default function Home() {
                   )}
 
                   {stage === "decide" && (
-                    <div className="eg-card max-w-md mx-auto lg:mx-0 mb-6">
+                    <div className="eg-card max-w-md mx-auto lg:mx-0 mb-6 eg-scene-enter" style={{ animationDelay: "0.3s" }}>
                       <div className="eg-label text-[0.6rem] mb-3">DECISION FLOW</div>
                       <div className="space-y-2 font-mono text-xs">
                         <div className="flex items-center gap-2">
@@ -222,7 +284,7 @@ export default function Home() {
                   )}
 
                   {stage === "authorize" && (
-                    <div className="eg-card max-w-md mx-auto lg:mx-0 mb-6 border-[var(--accent-amber)]/30">
+                    <div className="eg-card max-w-md mx-auto lg:mx-0 mb-6 border-[var(--accent-amber)]/30 eg-scene-enter" style={{ animationDelay: "0.3s" }}>
                       <div className="eg-label text-[0.6rem] mb-2 text-[var(--accent-amber)]">SYSTEM STATE</div>
                       <div className="font-mono text-sm text-[var(--accent-amber)]">
                         AWAITING VERIFIED DECISION
@@ -234,7 +296,7 @@ export default function Home() {
                     </div>
                   )}
 
-                  <div className="flex gap-3 justify-center lg:justify-start">
+                  <div className="flex gap-3 justify-center lg:justify-start eg-scene-enter" style={{ animationDelay: "0.4s" }}>
                     {stage !== "authorize" && (
                       <button
                         onClick={() => {
@@ -255,28 +317,39 @@ export default function Home() {
               )}
             </div>
 
-            {/* Right — Visual */}
-            <div className="flex-1 lg:pl-8 flex flex-col items-center gap-6 z-10 max-w-lg w-full">
-              <div className="w-full aspect-square max-w-[400px]">
+            {/* Right — Visual — depth layers 3-4 */}
+            <div
+              className="flex-1 lg:pl-8 flex flex-col items-center gap-6 z-10 max-w-lg w-full"
+              style={{ transform: `translate(${d3.x * 0.3}px, ${d3.y * 0.3}px)` }}
+            >
+              <div className="w-full aspect-square max-w-[400px]" style={{ transform: `translate(${d4.x * 0.15}px, ${d4.y * 0.15}px)` }}>
                 <FaceGeometry
                   stage={stage}
                   progress={progress}
+                  subProgress={subProgress}
                   mouseX={mousePos.x}
                   mouseY={mousePos.y}
                 />
               </div>
               <div className="w-full">
-                <HallTicketViz stage={stage} />
+                <HallTicketViz
+                  stage={stage}
+                  progress={progress}
+                  subProgress={subProgress}
+                />
               </div>
             </div>
           </div>
 
-          {/* Bottom — Terminal */}
-          <div className="absolute bottom-0 left-0 right-0 px-4 sm:px-6 pb-4 max-w-7xl mx-auto">
-            <SystemTerminal stage={stage} />
+          {/* Bottom — Terminal — depth layer 1 */}
+          <div
+            className="absolute bottom-0 left-0 right-0 px-4 sm:px-6 pb-4 max-w-7xl mx-auto"
+            style={{ transform: `translate(${d1.x * 0.2}px, ${d1.y * 0.2}px)` }}
+          >
+            <SystemTerminal stage={stage} subProgress={subProgress} />
           </div>
 
-          {/* Scroll hint */}
+          {/* Scroll hint — only when ready */}
           {stage === "ready" && (
             <div className="absolute bottom-20 left-1/2 -translate-x-1/2 text-center z-10">
               <div className="eg-label text-[0.6rem] mb-2">SCROLL TO EXPLORE</div>
