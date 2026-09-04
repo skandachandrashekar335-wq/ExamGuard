@@ -604,7 +604,7 @@ Cross-component integration tests and comprehensive domain audit.
 
 - **11.1** Domain foundation: SecuritySignal + ProxyRiskAssessment models, 3 enums (SecuritySignalType, SignalStrength, RiskLevel), SIGNAL_STRENGTH_DEFAULTS, 6 config settings with validation, migration 020, 47 model tests — COMPLETE
 - **11.2** Deterministic signal detection: 14 signal detectors, idempotent detection service, 72 tests, migration 021 — COMPLETE
-- **11.3** Risk scoring engine: PLANNED
+- **11.3** Risk scoring engine: COMPLETE
 - **11.4** API layer: PLANNED
 - **11.5** Admin UI: PLANNED
 - **11.6** Integration tests & hardening: PLANNED
@@ -909,12 +909,12 @@ Focus:
 
 ## Current Project State
 
-- **Current phase:** Phase 11 — Anti-Proxy Detection (IN PROGRESS: 11.1 complete, 11.2 complete)
-- **Current completed step:** Phase 11.2 — Deterministic Anti-Proxy Signal Detection
-- **Current tests:** 1720 passing (0 failures, 0 errors)
+- **Current phase:** Phase 11 — Anti-Proxy Detection (IN PROGRESS: 11.1 complete, 11.2 complete, 11.3 complete)
+- **Current completed step:** Phase 11.3 — Proxy Risk Scoring & Assessment
+- **Current tests:** 1763 passing (0 failures, 0 errors)
 - **Frontend pages:** 24 (all building successfully)
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono), zero border-radius, no neon colors
-- **Next step:** Phase 11.3 — Risk Scoring Engine
+- **Next step:** Phase 11.4 — API Layer
 - **Provider architecture:** `app/services/face_verification/` with Protocol, DeterministicProvider, factory
 - **Identity verification API:** `POST /{attempt_id}/verify-face` endpoint for face verification trigger
 - **Camera infrastructure:** Complete — Camera, EntryPoint, Mapping, Credential, Health Observation, Device Auth API

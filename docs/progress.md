@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11.1 COMPLETE, 11.2 IN PROGRESS
-- **Tests:** 1720 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11.1 COMPLETE, 11.2 COMPLETE, 11.3 COMPLETE
+- **Tests:** 1763 passing, 0 failures, 0 errors
 - **Frontend:** 24 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -1136,3 +1136,59 @@ Deterministic signal detection service that examines EntryVerification and relat
 - Does NOT create API endpoints (Phase 11.4)
 - Does NOT create frontend UI (Phase 11.5)
 - Does NOT implement review workflow (Phase 11.6)
+
+---
+
+## Phase 11.3 — Proxy Risk Scoring & Assessment
+
+**Status: COMPLETE**
+
+Pure, deterministic risk-scoring engine that evaluates security signals and produces risk assessments. No biometric data. No AI claims.
+
+**Service:** `backend/app/services/proxy_risk.py`
+
+**Pure Scoring Engine:**
+- `compute_risk_score(signals) -> RiskAssessmentResult` — no DB side effects
+- `_parse_weights(raw) -> dict[str, float]` — parse config weight string
+- `_classify_risk_level(score, settings) -> str` — threshold-based classification
+- `_build_explanation(...)` — deterministic, reproducible explanation
+- `_build_signals_summary(result)` — JSON summary for ProxyRiskAssessment
+
+**DB Assessment:**
+- `assess_entry_verification(db, entry_verification_id) -> ProxyRiskAssessment` — loads signals, computes score, persists assessment
+
+**Scoring Algorithm:**
+1. Look up each signal's weight from configured `PROXY_RISK_WEIGHTS`
+2. Unknown signal types default to weight 0 (informational only)
+3. Sum all weights, cap at `PROXY_RISK_MAX_SCORE`
+4. Classify score into risk level via configured thresholds
+5. Build deterministic explanation from signal types and strengths
+
+**Risk Classification:**
+- LOW: score < ELEVATED_THRESHOLD (30.0)
+- ELEVATED: ELEVATED_THRESHOLD <= score < HIGH_THRESHOLD (60.0)
+- HIGH: HIGH_THRESHOLD <= score < CRITICAL_THRESHOLD (80.0)
+- CRITICAL: score >= CRITICAL_THRESHOLD (80.0)
+
+**Dataclass:**
+- `RiskAssessmentResult` — frozen, with risk_score, risk_level, signal_count, strong_signal_count, explanation, signals_detail
+
+**Design Decisions:**
+- Pure scoring separated from DB persistence
+- Unknown signal types gracefully handled (weight = 0)
+- Score capped at PROXY_RISK_MAX_SCORE
+- Historical assessments preserved (append-only, multiple per EntryVerification)
+- No biometric data in explanations or summaries
+- No AI claims in explanations
+- EntryVerification not mutated by assessment
+- Policy version tracked for audit trail
+
+**Files:**
+- `backend/app/services/proxy_risk.py` — risk scoring and assessment service
+- `backend/tests/test_proxy_risk.py` — 43 tests
+
+**Modified Files:**
+- None (no existing files changed)
+
+**Tests:** 1763 total (1720 previous + 43 new), 0 failures, 0 errors
+**Frontend:** 24 pages building successfully
