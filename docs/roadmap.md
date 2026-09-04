@@ -588,7 +588,7 @@ Cross-component integration tests and comprehensive domain audit.
 
 ## Phase 10 — Real-Time Examination Entry Verification
 
-**Status: PLANNED**
+**Status: IN PROGRESS (10.1 COMPLETE, 10.2+ PLANNED)**
 
 Focus:
 - Live entry workflow
@@ -601,7 +601,13 @@ Focus:
 
 **Dependencies:** Phases 7, 8, 9 (identity verification, face verification, and camera infrastructure must exist).
 
-**New models/migrations likely required:** `EntryVerification` or `EntryEvent` model capturing live verification attempts.
+**New models/migrations:** `EntryVerification` model (migration 019) capturing live verification attempts.
+
+- **10.1** Domain model: EntryVerification model, EntryVerificationStatus/HallTicketCheckStatus/IdentityCheckStatus/SeatCheckStatus enums, migration 019, 49 model tests — COMPLETE
+- **10.2** Service layer: PLANNED
+- **10.3** API layer: PLANNED
+- **10.4** Admin UI: PLANNED
+- **10.5** Integration tests & hardening: PLANNED
 
 **Frontend work expected:** Live entry monitoring dashboard, verification status displays, human review escalation UI.
 
