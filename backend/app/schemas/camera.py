@@ -96,10 +96,6 @@ class CameraUpdate(BaseModel):
         default=None,
         description="Connection metadata (IP, endpoint URL) — no credentials",
     )
-    status: str | None = Field(
-        default=None,
-        description="Device operational status (ONLINE, OFFLINE, UNKNOWN, DISABLED)",
-    )
     is_active: bool | None = Field(
         default=None,
         description="Set to false to deactivate a camera",
@@ -120,6 +116,9 @@ class CameraResponse(BaseModel):
     exam_hall_id: int | None
     status: str
     connection_info: str | None
+    last_seen_at: datetime | None
+    last_health_check_at: datetime | None
+    health_reason: str | None
     is_active: bool
     created_at: datetime
     updated_at: datetime

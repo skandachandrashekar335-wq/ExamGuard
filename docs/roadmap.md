@@ -531,11 +531,14 @@ Comprehensive integration tests verifying the complete Phase 8 system as ONE int
 
 ## Phase 9 — Camera & Entry Point Management
 
-**Status: COMPLETE**
+**Status: IN PROGRESS (9.1–9.4 complete, 9.5–9.6 future)**
 
-- **9.1** Domain foundation: Camera, EntryPoint, CameraEntryPointMapping models + migration 016 + 53 model tests
-- **9.2** CRUD API: 15 REST endpoints (cameras, entry-points, camera-entry-points) + 42 API integration tests + FK cleanup fixes
-- **9.3** Admin UI: Camera list/create/edit, entry point list/create/edit, mapping list/create/disable, API client, 23 frontend routes
+- **9.1** Domain foundation: Camera, EntryPoint, CameraEntryPointMapping models + migration 016 + 53 model tests — COMPLETE
+- **9.2** CRUD API: 15 REST endpoints (cameras, entry-points, camera-entry-points) + 42 API integration tests + FK cleanup fixes — COMPLETE
+- **9.3** Admin UI: Camera list/create/edit, entry point list/create/edit, mapping list/create/disable, API client, 23 frontend routes — COMPLETE
+- **9.4** Device health/status: Health observation boundary, last_seen_at/last_health_check_at/health_reason fields, health API endpoints, 53 tests — COMPLETE
+- **9.5** Secure communication — FUTURE
+- **9.6** Integration/hardening — FUTURE
 
 ---
 

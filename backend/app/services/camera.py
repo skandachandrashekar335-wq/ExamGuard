@@ -2,7 +2,7 @@ from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models.camera import Camera
+from app.models.camera import Camera, CameraStatus
 from app.schemas.camera import CameraCreate, CameraUpdate
 
 
@@ -150,6 +150,7 @@ def deactivate_camera(db: Session, camera_id: int) -> Camera:
         raise LookupError(f"Camera with id {camera_id} not found")
 
     camera.is_active = False
+    camera.status = CameraStatus.DISABLED.value
     db.commit()
     db.refresh(camera)
     return camera

@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 IN PROGRESS (9.1, 9.2, 9.3 complete)
-- **Tests:** 1198 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE, 9 IN PROGRESS (9.1, 9.2, 9.3, 9.4 complete)
+- **Tests:** 1251 passing, 0 failures, 0 errors
 - **Frontend:** 23 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -736,6 +736,54 @@ Full frontend management UI for cameras, entry points, and camera↔entry point 
 - Monochrome design system, consistent with existing admin pages
 
 **Tests:** 1198 total (no new backend tests — UI only), 0 failures, 0 errors
+
+---
+
+## Phase 9.4 — Device Health & Status Foundation
+
+**Status: COMPLETE**
+
+Real device health/status foundation for physical Camera infrastructure. Separates administrative state (`is_active`) from observed operational state (`status`).
+
+**Key Design Decisions:**
+- `is_active` = administrative availability; `status` = observed operational state
+- Status can only change via `record_health_observation()` — not via PATCH camera
+- Initial camera status is `UNKNOWN` (not `ONLINE`) — no observation = unknown
+- `ONLINE` only set when device actually responds; `OFFLINE` when unreachable
+- `DISABLED` set automatically when camera is deactivated (`is_active=false`)
+- Health observation endpoint is unauthenticated (Phase 19 will add auth)
+
+**New Model Fields (Camera):**
+- `last_seen_at` — when device was last observed responding (set on ONLINE observation)
+- `last_health_check_at` — when health status was last evaluated
+- `health_reason` — reason category for current status
+
+**HealthReason Enum:** `DEVICE_RESPONDED`, `DEVICE_UNREACHABLE`, `DEVICE_DISABLED`, `NO_OBSERVATION`
+
+**New Files:**
+- `backend/app/schemas/camera_health.py` — HealthObservationCreate, HealthResponse schemas
+- `backend/app/services/camera_health.py` — record_health_observation(), get_camera_health()
+- `backend/app/api/v1/camera_health.py` — GET /cameras/{id}/health, POST /cameras/{id}/health-observations
+- `backend/alembic/versions/017_add_camera_health_fields.py` — Migration
+- `backend/tests/test_phase_9_4_health.py` — 31 unit tests (SQLite in-memory)
+- `backend/tests/test_phase_9_4_api.py` — 22 API integration tests (real PostgreSQL)
+
+**Modified Files:**
+- `backend/app/models/camera.py` — Added HealthReason enum, last_seen_at, last_health_check_at, health_reason fields
+- `backend/app/schemas/camera.py` — Removed `status` from CameraUpdate, added health fields to CameraResponse
+- `backend/app/services/camera.py` — deactivate_camera() now sets status=DISABLED
+- `backend/app/api/v1/router.py` — Registered camera_health router
+- `backend/tests/test_phase_9_2_api.py` — Fixed test_update_camera (status no longer settable via PATCH)
+- `frontend/src/lib/camera-api.ts` — Added health fields to Camera interface, health API functions
+- `frontend/src/app/cameras/page.tsx` — Shows last_seen_at, health_reason in table
+
+**API Endpoints:**
+- `GET /api/v1/cameras/{id}/health` — Returns current health state
+- `POST /api/v1/cameras/{id}/health-observations` — Records a health observation
+
+**Security:** Status cannot be faked via camera CRUD. Health observations are the only path to change status. No credential/secret/biometric leakage.
+
+**Tests:** 1251 total (1198 previous + 53 new), 0 failures, 0 errors
 
 ## Files Changed in Phase 8.2
 

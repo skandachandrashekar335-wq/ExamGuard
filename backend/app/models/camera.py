@@ -23,6 +23,13 @@ class CameraStatus(str, enum.Enum):
     DISABLED = "DISABLED"
 
 
+class HealthReason(str, enum.Enum):
+    DEVICE_RESPONDED = "DEVICE_RESPONDED"
+    DEVICE_UNREACHABLE = "DEVICE_UNREACHABLE"
+    DEVICE_DISABLED = "DEVICE_DISABLED"
+    NO_OBSERVATION = "NO_OBSERVATION"
+
+
 class Camera(Base):
     __tablename__ = "cameras"
     __table_args__ = (
@@ -83,6 +90,21 @@ class Camera(Base):
         Text,
         nullable=True,
         comment="Connection metadata (IP, endpoint URL) — no credentials",
+    )
+    last_seen_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="When device was last observed responding",
+    )
+    last_health_check_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="When health status was last evaluated",
+    )
+    health_reason: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="Reason for current status (DEVICE_RESPONDED, DEVICE_UNREACHABLE, etc.)",
     )
     is_active: Mapped[bool] = mapped_column(
         Boolean,

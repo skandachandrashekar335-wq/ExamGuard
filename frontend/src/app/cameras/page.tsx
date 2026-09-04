@@ -16,6 +16,23 @@ import {
 
 const STATUS_OPTIONS = ["ONLINE", "OFFLINE", "UNKNOWN", "DISABLED"] as const;
 
+function formatTimestamp(ts: string | null): string {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  return d.toLocaleString();
+}
+
+function healthReasonLabel(reason: string | null): string {
+  if (!reason) return "—";
+  const labels: Record<string, string> = {
+    DEVICE_RESPONDED: "Device Responded",
+    DEVICE_UNREACHABLE: "Device Unreachable",
+    DEVICE_DISABLED: "Device Disabled",
+    NO_OBSERVATION: "No Observation",
+  };
+  return labels[reason] || reason;
+}
+
 export default function CamerasPage() {
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [total, setTotal] = useState(0);
@@ -251,6 +268,7 @@ export default function CamerasPage() {
                     <th className="px-4 py-3 font-mono">Identifier</th>
                     <th className="px-4 py-3 font-mono">Type</th>
                     <th className="px-4 py-3 font-mono">Status</th>
+                    <th className="px-4 py-3 font-mono">Last Seen</th>
                     <th className="px-4 py-3 font-mono">Hall</th>
                     <th className="px-4 py-3 font-mono">Active</th>
                     <th className="px-4 py-3 font-mono">Actions</th>
@@ -281,6 +299,14 @@ export default function CamerasPage() {
                         >
                           {c.status}
                         </span>
+                        {c.health_reason && (
+                          <div className="text-[10px] text-[#666] mt-0.5">
+                            {healthReasonLabel(c.health_reason)}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-[#666] font-mono">
+                        {formatTimestamp(c.last_seen_at)}
                       </td>
                       <td className="px-4 py-3 text-sm text-[#999]">
                         {hallLabel(c.exam_hall_id)}

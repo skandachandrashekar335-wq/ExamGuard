@@ -32,6 +32,9 @@ export interface Camera {
   exam_hall_id: number | null;
   status: string;
   connection_info: string | null;
+  last_seen_at: string | null;
+  last_health_check_at: string | null;
+  health_reason: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -57,7 +60,6 @@ export interface CameraCreate {
 }
 
 export type CameraUpdate = Partial<CameraCreate> & {
-  status?: string | null;
   is_active?: boolean | null;
 };
 
@@ -269,4 +271,38 @@ export function listExamHalls(params: {
   if (params.include_inactive) q.set("include_inactive", "true");
   const qs = q.toString();
   return request(`/api/v1/exam-halls${qs ? `?${qs}` : ""}`);
+}
+
+// ---------------------------------------------------------------------------
+// Camera Health
+// ---------------------------------------------------------------------------
+
+export interface CameraHealth {
+  camera_id: number;
+  status: string;
+  last_seen_at: string | null;
+  last_health_check_at: string | null;
+  health_reason: string | null;
+  is_active: boolean;
+}
+
+export interface HealthObservationCreate {
+  status: string;
+  observed_at?: string | null;
+  reason?: string | null;
+}
+
+export function getCameraHealth(cameraId: number): Promise<CameraHealth> {
+  return request(`/api/v1/cameras/${cameraId}/health`);
+}
+
+export function recordHealthObservation(
+  cameraId: number,
+  data: HealthObservationCreate
+): Promise<CameraHealth> {
+  return request(`/api/v1/cameras/${cameraId}/health-observations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
 }

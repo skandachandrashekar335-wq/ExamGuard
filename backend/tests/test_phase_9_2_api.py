@@ -158,11 +158,11 @@ class TestCameraAPI:
     def test_update_camera(self, client, camera):
         r = client.patch(
             f"/api/v1/cameras/{camera['id']}",
-            json={"name": "Updated Cam", "status": "ONLINE"},
+            json={"name": "Updated Cam"},
         )
         assert r.status_code == 200
         assert r.json()["name"] == "Updated Cam"
-        assert r.json()["status"] == "ONLINE"
+        assert r.json()["status"] == "UNKNOWN"
 
     def test_update_camera_not_found(self, client):
         r = client.patch("/api/v1/cameras/99999", json={"name": "X"})

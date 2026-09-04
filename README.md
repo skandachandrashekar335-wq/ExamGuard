@@ -4,8 +4,8 @@ AI-powered Examination Entry Verification, Anti-Proxy, Security, and Attendance 
 
 ## Project Status
 
-- **Phase:** 9 IN PROGRESS (9.1, 9.2, 9.3 complete)
-- **Backend:** 1198 tests passing (0 failures, 0 errors)
+- **Phase:** 9 IN PROGRESS (9.1–9.4 complete)
+- **Backend:** 1251 tests passing (0 failures, 0 errors)
 - **Frontend:** 23 pages (Next.js 16.3.3, React 19, TypeScript, Tailwind v4)
 - **Tech stack:** FastAPI + SQLAlchemy + PostgreSQL (backend), Next.js + TypeScript + Tailwind (frontend)
 
@@ -25,6 +25,7 @@ AI-powered Examination Entry Verification, Anti-Proxy, Security, and Attendance 
 - **9.1** Domain foundation: Camera, EntryPoint, CameraEntryPointMapping models + migration 016 + 53 model tests
 - **9.2** CRUD API: 15 REST endpoints (cameras, entry-points, camera-entry-points) + 42 API integration tests + FK cleanup fixes
 - **9.3** Admin UI: Camera list/create/edit, entry point list/create/edit, mapping list/create/disable, API client, 23 frontend routes
+- **9.4** Device health/status: Health observation boundary, last_seen_at/last_health_check_at/health_reason, health API endpoints, 53 tests
 
 ## Development
 
