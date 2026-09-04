@@ -944,19 +944,31 @@ class TestRepeatedVerification:
 class TestConcurrency:
     """Test concurrent operations for race conditions."""
 
-    def test_concurrent_verify_calls(self, db, sample_data):
-        """Two concurrent verify_face calls on the same attempt."""
-        a = _create_attempt(db, sample_data)
-        a = iv_service.start_attempt(db, a.id)
+    def test_concurrent_verify_calls(self, sample_data):
+        """Two concurrent verify_face calls on the same attempt.
+
+        Each thread uses its own SessionLocal() session, matching
+        production behaviour where each FastAPI request gets an
+        independent session via get_db().  Sharing a single Session
+        across threads is undefined behaviour in SQLAlchemy and causes
+        duplicate primary-key violations during autoflush.
+        """
+        setup_db = SessionLocal()
+        try:
+            a = _create_attempt(setup_db, sample_data)
+            a = iv_service.start_attempt(setup_db, a.id)
+        finally:
+            setup_db.close()
 
         provider = _StubProvider()
         errors = []
 
         def verify():
+            thread_db = SessionLocal()
             try:
                 with patch("app.services.face_verification.get_face_verification_provider", return_value=provider):
                     iv_service.verify_face(
-                        db, a.id,
+                        thread_db, a.id,
                         reference_image=_make_jpeg(),
                         probe_image=_make_jpeg(),
                         reference_image_format="image/jpeg",
@@ -964,6 +976,8 @@ class TestConcurrency:
                     )
             except Exception as e:
                 errors.append(e)
+            finally:
+                thread_db.close()
 
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = [executor.submit(verify) for _ in range(2)]
@@ -971,25 +985,40 @@ class TestConcurrency:
                 f.result()
 
         # Both should succeed (evidence accumulates)
-        evidence = db.query(IdentityVerificationEvidence).filter(
-            IdentityVerificationEvidence.attempt_id == a.id
-        ).all()
-        # At least 3 signals from one call, possibly more
-        assert len(evidence) >= 3
+        verify_db = SessionLocal()
+        try:
+            evidence = verify_db.query(IdentityVerificationEvidence).filter(
+                IdentityVerificationEvidence.attempt_id == a.id
+            ).all()
+            # At least 3 signals from one call, possibly more
+            assert len(evidence) >= 3
+        finally:
+            verify_db.close()
 
-    def test_concurrent_review_requests(self, db, sample_data):
-        """Two concurrent review requests on the same attempt."""
-        a = _create_attempt(db, sample_data)
-        a = _advance_attempt(db, a.id, to_status="COMPLETED")
+    def test_concurrent_review_requests(self, sample_data):
+        """Two concurrent review requests on the same attempt.
+
+        Each thread uses its own SessionLocal() session, matching
+        production behaviour.
+        """
+        setup_db = SessionLocal()
+        try:
+            a = _create_attempt(setup_db, sample_data)
+            a = _advance_attempt(setup_db, a.id, to_status="COMPLETED")
+        finally:
+            setup_db.close()
 
         results = []
 
         def review():
+            thread_db = SessionLocal()
             try:
-                iv_service.review_attempt(db, a.id, reviewer_notes="concurrent")
+                iv_service.review_attempt(thread_db, a.id, reviewer_notes="concurrent")
                 results.append("ok")
             except Exception:
                 results.append("error")
+            finally:
+                thread_db.close()
 
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = [executor.submit(review) for _ in range(2)]
@@ -999,23 +1028,34 @@ class TestConcurrency:
         # At least one should succeed (both may succeed since review is idempotent-ish)
         assert len(results) == 2
 
-    def test_concurrent_overrides(self, db, sample_data):
-        """Two concurrent override requests — at least one should succeed."""
-        a = _create_attempt(db, sample_data)
-        a = _advance_attempt(db, a.id, to_status="COMPLETED")
+    def test_concurrent_overrides(self, sample_data):
+        """Two concurrent override requests — at least one should succeed.
+
+        Each thread uses its own SessionLocal() session, matching
+        production behaviour.
+        """
+        setup_db = SessionLocal()
+        try:
+            a = _create_attempt(setup_db, sample_data)
+            a = _advance_attempt(setup_db, a.id, to_status="COMPLETED")
+        finally:
+            setup_db.close()
 
         results = []
 
         def override():
+            thread_db = SessionLocal()
             try:
                 iv_service.override_decision(
-                    db, a.id,
+                    thread_db, a.id,
                     new_decision="NO_MATCH",
                     reason="concurrent override",
                 )
                 results.append("ok")
             except Exception:
                 results.append("error")
+            finally:
+                thread_db.close()
 
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = [executor.submit(override) for _ in range(2)]
