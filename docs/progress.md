@@ -2,7 +2,7 @@
 
 ## Current State
 
-- **Phase:** 8 IN PROGRESS (8.1, 8.2, 8.3, 8.4, 8.5, 8.6 complete, 8.7 future)
+- **Phase:** 8 IN PROGRESS (8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7 complete, 8.8 future)
 - **Tests:** 996 passing, 0 failures, 0 errors
 - **Frontend:** 20 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
@@ -449,9 +449,114 @@ Hardened the complete verification pipeline with typed failure categories, provi
 
 ---
 
+## Phase 8.7 — Admin Face Verification UI
+
+**Status: COMPLETE**
+
+Built the real Admin Face Verification interface — camera capture, real API integration, evidence display, review/override, and audit trail.
+
+**Architecture:**
+- Centralized API client (`lib/iv-api.ts`) with typed functions for all endpoints
+- Shared TypeScript types (`lib/types.ts`) matching backend schemas exactly
+- Component-based UI: CameraCapture, ImageUpload, EvidenceDisplay, DecisionDisplay, OverrideDialog, VerificationState, AuditTimeline
+
+**Camera Capture (`components/CameraCapture.tsx`):**
+- Real browser camera via `navigator.mediaDevices.getUserMedia()`
+- States: idle → requesting → active → captured
+- Permission handling: denied, unavailable, unsupported browser
+- Frame capture via canvas API
+- Retake support
+- Proper cleanup: tracks stopped on unmount, on retake, on completion
+- No persistent image storage
+
+**Image Upload (`components/ImageUpload.tsx`):**
+- File upload for reference/enrollment image
+- Accepts JPEG/PNG only
+- Preview via URL.createObjectURL (revoked on clear)
+- No persistent storage
+
+**Verification Flow:**
+1. Operator uploads reference image (enrollment photo)
+2. Operator captures probe image (live camera)
+3. Operator clicks "Verify Identity"
+4. Both images base64-encoded and sent to `POST /{attempt_id}/verify-face`
+5. Evidence evaluated via `POST /{attempt_id}/evaluate`
+6. UI displays evidence and decision
+7. No fake delay, no fake progress, no fake results
+
+**List Page (`identity-verifications/page.tsx`):**
+- Upgraded with shared API client
+- Filters: status, decision, student ID
+- Loading state, error state, empty state
+- Monochrome design tokens (no colored badges)
+- Paginated results
+
+**Detail Workspace (`identity-verifications/[id]/page.tsx`):**
+- Left column: Camera, Reference Image, Verification State, Evidence, Decision
+- Right column: Candidate context, Exam context, Attempt details, Actions, Audit Trail
+- All data from backend API — no fabricated fields
+- "NOT AVAILABLE" for missing context
+
+**Human Review UI:**
+- "Request Review" button on terminal states (COMPLETED/FAILED)
+- Optional notes textarea
+- Calls `POST /{attempt_id}/review`
+- Refreshes attempt state after review
+
+**Human Override UI:**
+- "Override Decision" button on terminal states
+- Three-way decision selector: MATCH, NO_MATCH, INCONCLUSIVE
+- Required reason textarea
+- Confirmation dialog with audit trail notice
+- Calls `POST /{attempt_id}/override`
+- Refreshes attempt state after override
+
+**Audit Trail:**
+- Timeline display from attempt timestamps + evidence records
+- Override entries parsed from failure_reason JSON
+- Chronological ordering
+- No raw images, embeddings, or biometric data displayed
+
+**Evidence Display:**
+- Signal types with labels: similarity_score, liveness_score, liveness_signal, image_quality
+- Percentage bars for numeric scores
+- Provider info and confidence values
+- Details text when available
+
+**Decision Display:**
+- Exact domain vocabulary: MATCH, NO_MATCH, INCONCLUSIVE, PENDING
+- Failure reason displayed when present
+- No frontend-computed confidence scores
+
+**Security/Privacy:**
+- No localStorage/sessionStorage/indexedDB usage
+- No console.log/debug/error
+- No persistent image storage
+- Camera streams properly cleaned up on unmount
+- No hard-coded thresholds used as authority
+- Base64 usage transient for API requests only
+- All decisions from backend
+
+### Files Changed in Phase 8.7
+
+| File | Change |
+|---|---|
+| `frontend/src/lib/types.ts` | New: shared TypeScript types for API responses |
+| `frontend/src/lib/iv-api.ts` | New: centralized API client for identity verification |
+| `frontend/src/components/CameraCapture.tsx` | New: real browser camera capture component |
+| `frontend/src/components/ImageUpload.tsx` | New: file upload for reference images |
+| `frontend/src/components/EvidenceDisplay.tsx` | New: evidence signals display |
+| `frontend/src/components/DecisionDisplay.tsx` | New: decision display |
+| `frontend/src/components/OverrideDialog.tsx` | New: override confirmation dialog |
+| `frontend/src/components/VerificationState.tsx` | New: verification state progress indicator |
+| `frontend/src/components/AuditTimeline.tsx` | New: audit trail timeline |
+| `frontend/src/app/identity-verifications/page.tsx` | Upgraded: shared API, monochrome design, empty/loading states |
+| `frontend/src/app/identity-verifications/[id]/page.tsx` | Rebuilt: full verification workspace with camera, review, override |
+
+---
+
 ## Remaining Phase 8 Work
 
-- **8.7 Admin UI** (FUTURE): Camera capture interface, real-time verification status, review workflow
 - **8.8 Integration testing/hardening** (FUTURE): End-to-end testing, production readiness
 
 ## Files Changed in Phase 8.2

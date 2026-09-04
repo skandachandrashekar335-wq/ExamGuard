@@ -1,312 +1,478 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import {
+  getAttemptContext,
+  startAttempt,
+  verifyFace,
+  evaluateEvidence,
+  reviewAttempt,
+  overrideDecision,
+  cancelAttempt,
+  ApiError,
+} from "@/lib/iv-api";
+import type {
+  VerificationContext,
+  IdentityVerificationEvidence,
+} from "@/lib/types";
+import CameraCapture from "@/components/CameraCapture";
+import ImageUpload from "@/components/ImageUpload";
+import EvidenceDisplay from "@/components/EvidenceDisplay";
+import DecisionDisplay from "@/components/DecisionDisplay";
+import VerificationState, {
+  type VerificationUIState,
+} from "@/components/VerificationState";
+import AuditTimeline from "@/components/AuditTimeline";
+import OverrideDialog from "@/components/OverrideDialog";
 
-interface Attempt {
-  id: number;
-  student_id: number;
-  exam_registration_id: number;
-  hall_ticket_id: number | null;
-  status: string;
-  verification_method: string;
-  decision: string;
-  failure_reason: string | null;
-  created_at: string;
-  started_at: string | null;
-  completed_at: string | null;
+function fileToBase64(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(",")[1];
+      if (base64) resolve(base64);
+      else reject(new Error("Failed to encode image"));
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
-
-interface Evidence {
-  id: number;
-  attempt_id: number;
-  signal_type: string;
-  signal_value: string | null;
-  provider_name: string | null;
-  provider_version: string | null;
-  confidence: number | null;
-  details: string | null;
-  created_at: string;
-}
-
-interface ContextResponse {
-  attempt: Attempt;
-  evidence: Evidence[];
-  student: { id: number; usn: string; name: string } | null;
-  exam: { id: number; subject_id: number; exam_name: string } | null;
-}
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
-const STATUS_COLORS: Record<string, string> = {
-  CREATED: "bg-blue-500/20 text-blue-400",
-  IN_PROGRESS: "bg-cyan-500/20 text-cyan-400",
-  COMPLETED: "bg-emerald-500/20 text-emerald-400",
-  FAILED: "bg-red-500/20 text-red-400",
-  CANCELLED: "bg-gray-500/20 text-gray-400",
-};
-
-const DECISION_COLORS: Record<string, string> = {
-  PENDING: "bg-yellow-500/20 text-yellow-400",
-  MATCH: "bg-emerald-500/20 text-emerald-400",
-  NO_MATCH: "bg-red-500/20 text-red-400",
-  INCONCLUSIVE: "bg-orange-500/20 text-orange-400",
-};
-
-const STATUS_FLOW = ["CREATED", "IN_PROGRESS", "COMPLETED"];
 
 export default function IdentityVerificationDetailPage() {
   const params = useParams();
-  const id = params.id as string;
-  const [data, setData] = useState<ContextResponse | null>(null);
+  const id = Number(params.id);
+
+  const [ctx, setCtx] = useState<VerificationContext | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const [uiState, setUiState] = useState<VerificationUIState>("READY");
+
+  const [referenceImage, setReferenceImage] = useState<Blob | null>(null);
+  const [probeImage, setProbeImage] = useState<Blob | null>(null);
+  const [probeDataUrl, setProbeDataUrl] = useState<string | null>(null);
+
+  const [verifyError, setVerifyError] = useState("");
   const [actionMsg, setActionMsg] = useState("");
 
-  const fetchDetail = async () => {
-    const res = await fetch(`${API}/api/v1/identity-verifications/${id}/context`);
-    if (!res.ok) {
-      setError("Identity verification attempt not found");
-      return;
-    }
-    const json: ContextResponse = await res.json();
-    setData(json);
-  };
+  const [showReview, setShowReview] = useState(false);
+  const [reviewNotes, setReviewNotes] = useState("");
+  const [showOverride, setShowOverride] = useState(false);
 
-  useEffect(() => {
-    fetchDetail();
+  const fetchContext = useCallback(async () => {
+    try {
+      const data = await getAttemptContext(id);
+      setCtx(data);
+      setError("");
+    } catch {
+      setError("Attempt not found");
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
-  const startAttempt = async () => {
+  useEffect(() => {
+    fetchContext();
+  }, [fetchContext]);
+
+  const attempt = ctx?.attempt;
+  const evidence = ctx?.evidence || [];
+  const isTerminal = attempt
+    ? ["COMPLETED", "FAILED", "CANCELLED"].includes(attempt.status)
+    : false;
+  const canVerify = attempt
+    ? ["CREATED", "IN_PROGRESS"].includes(attempt.status)
+    : false;
+
+  const handleVerify = async () => {
+    if (!referenceImage || !probeImage) return;
+    setVerifyError("");
     setActionMsg("");
-    const res = await fetch(
-      `${API}/api/v1/identity-verifications/${id}/start`,
-      { method: "POST" }
-    );
-    if (res.ok) {
-      setActionMsg("Attempt started");
-      fetchDetail();
-    } else {
-      const err = await res.json();
-      setActionMsg(err.detail || "Failed to start");
+    setUiState("SUBMITTING");
+    try {
+      const refBase64 = await fileToBase64(referenceImage);
+      const probeBase64 = await fileToBase64(probeImage);
+
+      setUiState("VERIFYING");
+      await verifyFace(id, {
+        reference_image: refBase64,
+        probe_image: probeBase64,
+        reference_image_format: referenceImage.type || "image/jpeg",
+        probe_image_format: probeImage.type || "image/jpeg",
+      });
+
+      setUiState("EVALUATING");
+      await evaluateEvidence(id);
+
+      setUiState("COMPLETED");
+      await fetchContext();
+    } catch (e: unknown) {
+      setUiState("READY");
+      if (e instanceof ApiError) {
+        setVerifyError(e.message);
+      } else {
+        setVerifyError("Verification failed");
+      }
     }
   };
 
-  const evaluate = async () => {
+  const handleReview = async () => {
     setActionMsg("");
-    const res = await fetch(
-      `${API}/api/v1/identity-verifications/${id}/evaluate`,
-      { method: "POST" }
-    );
-    if (res.ok) {
-      setActionMsg("Evidence evaluated");
-      fetchDetail();
-    } else {
-      const err = await res.json();
-      setActionMsg(err.detail || "Failed to evaluate");
+    try {
+      await reviewAttempt(id, reviewNotes || undefined);
+      setActionMsg("Review requested");
+      setShowReview(false);
+      setReviewNotes("");
+      await fetchContext();
+    } catch (e: unknown) {
+      setActionMsg(e instanceof ApiError ? e.message : "Review failed");
     }
   };
 
-  const cancelAttempt = async () => {
+  const handleOverride = async (newDecision: string, reason: string) => {
+    await overrideDecision(id, { new_decision: newDecision, reason });
+    setActionMsg("Override recorded");
+    setShowOverride(false);
+    await fetchContext();
+  };
+
+  const handleCancel = async () => {
     setActionMsg("");
-    const res = await fetch(
-      `${API}/api/v1/identity-verifications/${id}/cancel`,
-      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) }
-    );
-    if (res.ok) {
+    try {
+      await cancelAttempt(id);
       setActionMsg("Attempt cancelled");
-      fetchDetail();
-    } else {
-      const err = await res.json();
-      setActionMsg(err.detail || "Failed to cancel");
+      await fetchContext();
+    } catch (e: unknown) {
+      setActionMsg(e instanceof ApiError ? e.message : "Cancel failed");
     }
   };
 
-  if (error) {
+  const handleStart = async () => {
+    setActionMsg("");
+    try {
+      await startAttempt(id);
+      setActionMsg("Attempt started");
+      await fetchContext();
+    } catch (e: unknown) {
+      setActionMsg(e instanceof ApiError ? e.message : "Start failed");
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-[#050505] text-white p-8">
-        <div className="max-w-4xl mx-auto">
-          <p className="text-pink-400">{error}</p>
-          <Link href="/identity-verifications" className="text-cyan-400 hover:text-cyan-300 mt-4 inline-block">
-            &larr; Back to list
+      <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] p-8">
+        <div className="max-w-5xl mx-auto">
+          <span className="eg-mono text-[var(--text-muted)]">
+            Loading attempt...
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !attempt) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] p-8">
+        <div className="max-w-5xl mx-auto">
+          <p className="text-red-400 mb-4">{error || "Not found"}</p>
+          <Link
+            href="/identity-verifications"
+            className="eg-mono-sm text-white hover:text-[var(--text-secondary)]"
+          >
+            Back to list
           </Link>
         </div>
       </div>
     );
   }
 
-  if (!data) {
-    return (
-      <div className="min-h-screen bg-[#050505] text-white p-8">
-        <div className="max-w-4xl mx-auto text-[#666]">Loading...</div>
-      </div>
-    );
-  }
-
-  const a = data.attempt;
-  const currentIdx = STATUS_FLOW.indexOf(a.status);
-  const isTerminal = ["COMPLETED", "FAILED", "CANCELLED"].includes(a.status);
-
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-8">
-      <div className="max-w-4xl mx-auto">
-        <Link href="/identity-verifications" className="text-cyan-400 hover:text-cyan-300 text-sm mb-6 inline-block">
-          &larr; Back to identity verifications
+    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] p-8">
+      <div className="max-w-5xl mx-auto">
+        {/* Header */}
+        <Link
+          href="/identity-verifications"
+          className="eg-mono-sm text-[var(--text-secondary)] hover:text-white mb-6 inline-block transition-colors"
+        >
+          Identity Verifications
         </Link>
 
-        <div className="flex items-center gap-4 mb-6">
-          <h1 className="text-3xl font-bold uppercase tracking-wider">
-            Verification #{a.id}
+        <div className="flex flex-wrap items-center gap-3 mb-6">
+          <h1 className="eg-display text-2xl">
+            Verification #{attempt.id}
           </h1>
-          <span className={`text-xs px-3 py-1 rounded-full font-medium ${STATUS_COLORS[a.status] || "bg-gray-500/20 text-gray-400"}`}>
-            {a.status}
+          <span className="eg-mono-sm border border-white/20 px-2 py-0.5">
+            {attempt.status}
           </span>
-          <span className={`text-xs px-3 py-1 rounded-full font-medium ${DECISION_COLORS[a.decision] || "bg-gray-500/20 text-gray-400"}`}>
-            {a.decision}
+          <span className="eg-mono-sm border border-white/20 px-2 py-0.5">
+            {attempt.decision}
           </span>
         </div>
 
-        {/* Lifecycle */}
-        <div className="bg-[#111] border border-white/10 rounded-lg p-6 mb-6">
-          <h2 className="text-sm font-semibold text-[#999] uppercase tracking-wider mb-4">Lifecycle</h2>
-          <div className="flex items-center gap-2">
-            {STATUS_FLOW.map((s, i) => (
-              <div key={s} className="flex items-center gap-2">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${i <= currentIdx ? "bg-cyan-500 text-white" : "bg-[#222] text-[#666]"}`}>
-                  {i + 1}
-                </div>
-                <span className={`text-xs ${i <= currentIdx ? "text-white" : "text-[#666]"}`}>{s}</span>
-                {i < STATUS_FLOW.length - 1 && (
-                  <div className={`w-8 h-0.5 ${i < currentIdx ? "bg-cyan-500" : "bg-[#222]"}`} />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          {/* Student */}
-          <div className="bg-[#111] border border-white/10 rounded-lg p-6">
-            <h2 className="text-sm font-semibold text-[#999] uppercase tracking-wider mb-4">Student</h2>
-            {data.student ? (
-              <div className="space-y-2 text-sm">
-                <p><span className="text-[#666]">USN:</span> <span className="font-mono">{data.student.usn}</span></p>
-                <p><span className="text-[#666]">Name:</span> {data.student.name}</p>
-                <p><span className="text-[#666]">ID:</span> {data.student.id}</p>
-              </div>
-            ) : (
-              <p className="text-[#666] text-sm">No student linked</p>
-            )}
-          </div>
-
-          {/* Exam */}
-          <div className="bg-[#111] border border-white/10 rounded-lg p-6">
-            <h2 className="text-sm font-semibold text-[#999] uppercase tracking-wider mb-4">Exam</h2>
-            {data.exam ? (
-              <div className="space-y-2 text-sm">
-                <p><span className="text-[#666]">Exam:</span> {data.exam.exam_name}</p>
-                <p><span className="text-[#666]">Subject ID:</span> {data.exam.subject_id}</p>
-              </div>
-            ) : (
-              <p className="text-[#666] text-sm">No exam linked</p>
-            )}
-          </div>
-        </div>
-
-        {/* Attempt details */}
-        <div className="bg-[#111] border border-white/10 rounded-lg p-6 mb-6">
-          <h2 className="text-sm font-semibold text-[#999] uppercase tracking-wider mb-4">Attempt Details</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <span className="text-[#666] block">Method</span>
-              <span>{a.verification_method}</span>
-            </div>
-            <div>
-              <span className="text-[#666] block">Registration</span>
-              <span className="font-mono">#{a.exam_registration_id}</span>
-            </div>
-            <div>
-              <span className="text-[#666] block">Hall Ticket</span>
-              <span className="font-mono">{a.hall_ticket_id ? `#${a.hall_ticket_id}` : "—"}</span>
-            </div>
-            <div>
-              <span className="text-[#666] block">Started</span>
-              <span>{a.started_at ? new Date(a.started_at).toLocaleString() : "—"}</span>
-            </div>
-          </div>
-          {a.failure_reason && (
-            <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-              <span className="text-xs text-red-400">Failure/Reason:</span>
-              <p className="text-sm text-red-300 mt-1">{a.failure_reason}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Evidence */}
-        <div className="bg-[#111] border border-white/10 rounded-lg p-6 mb-6">
-          <h2 className="text-sm font-semibold text-[#999] uppercase tracking-wider mb-4">Evidence Signals</h2>
-          {data.evidence.length === 0 ? (
-            <p className="text-[#666] text-sm">No evidence recorded yet</p>
-          ) : (
-            <div className="space-y-3">
-              {data.evidence.map((e) => (
-                <div key={e.id} className="bg-[#050505] border border-white/5 rounded-lg p-4 text-sm">
-                  <div className="flex items-center gap-4">
-                    <span className="font-mono text-cyan-400">{e.signal_type}</span>
-                    <span className="text-white">{e.signal_value || "—"}</span>
-                    {e.confidence !== null && (
-                      <span className="text-[#999]">confidence: {e.confidence.toFixed(3)}</span>
-                    )}
-                    {e.provider_name && (
-                      <span className="text-[#666]">{e.provider_name} {e.provider_version || ""}</span>
-                    )}
-                  </div>
-                  {e.details && <p className="text-[#666] mt-2">{e.details}</p>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Not biometric notice */}
-        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mb-6">
-          <p className="text-sm text-blue-300">
-            This is the identity verification foundation. Actual biometric face verification
-            will be connected in Phase 8. Currently supports manual and deterministic
-            verification methods only.
-          </p>
-        </div>
-
-        {/* Actions */}
-        {!isTerminal && (
-          <div className="bg-[#111] border border-white/10 rounded-lg p-6">
-            <h2 className="text-sm font-semibold text-[#999] uppercase tracking-wider mb-4">Actions</h2>
-            {actionMsg && (
-              <p className={`text-sm mb-4 ${actionMsg.includes("Failed") ? "text-pink-400" : "text-emerald-400"}`}>
-                {actionMsg}
-              </p>
-            )}
-            <div className="flex gap-4">
-              {a.status === "CREATED" && (
-                <button onClick={startAttempt} className="bg-cyan-600 hover:bg-cyan-500 px-4 py-2 rounded-lg text-sm font-medium">
-                  Start
-                </button>
-              )}
-              {(a.status === "CREATED" || a.status === "IN_PROGRESS") && (
-                <button onClick={evaluate} className="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg text-sm font-medium">
-                  Evaluate Evidence
-                </button>
-              )}
-              <button onClick={cancelAttempt} className="border border-white/20 px-4 py-2 rounded-lg text-sm hover:bg-white/5">
-                Cancel
-              </button>
-            </div>
+        {actionMsg && (
+          <div className="border border-white/10 bg-[var(--bg-raised)] p-3 mb-4">
+            <span className="eg-mono-sm text-[var(--text-secondary)]">
+              {actionMsg}
+            </span>
           </div>
         )}
 
-        <div className="mt-6 text-sm text-[#666]">
-          Created: {new Date(a.created_at).toLocaleString()}
-          {a.completed_at && <> · Completed: {new Date(a.completed_at).toLocaleString()}</>}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left column — Camera + Images */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Verification State */}
+            <VerificationState current={uiState} />
+
+            {/* Camera + Reference Image */}
+            {canVerify && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <ImageUpload
+                  label="Reference Image"
+                  onImage={(blob) => setReferenceImage(blob)}
+                  onClear={() => setReferenceImage(null)}
+                  disabled={uiState !== "READY"}
+                />
+                <CameraCapture
+                  onCapture={(blob, url) => {
+                    setProbeImage(blob);
+                    setProbeDataUrl(url);
+                  }}
+                  onRetake={() => {
+                    setProbeImage(null);
+                    setProbeDataUrl(null);
+                  }}
+                  disabled={uiState !== "READY"}
+                />
+              </div>
+            )}
+
+            {/* Verify button */}
+            {canVerify && (
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={handleVerify}
+                  disabled={!referenceImage || !probeImage || uiState !== "READY"}
+                  className="eg-btn-primary eg-btn px-6 py-2 disabled:opacity-30"
+                >
+                  Verify Identity
+                </button>
+                {verifyError && (
+                  <span className="text-xs text-red-400">{verifyError}</span>
+                )}
+              </div>
+            )}
+
+            {/* Evidence */}
+            <div className="border border-white/10 bg-[var(--bg-raised)] p-4">
+              <h3 className="eg-mono-sm text-[var(--text-muted)] mb-3">
+                Evidence
+              </h3>
+              <EvidenceDisplay evidence={evidence} />
+            </div>
+
+            {/* Decision */}
+            <DecisionDisplay
+              decision={attempt.decision}
+              failureReason={attempt.failure_reason}
+            />
+          </div>
+
+          {/* Right column — Context + Actions */}
+          <div className="space-y-6">
+            {/* Student context */}
+            <div className="border border-white/10 bg-[var(--bg-raised)] p-4">
+              <h3 className="eg-mono-sm text-[var(--text-muted)] mb-3">
+                Candidate
+              </h3>
+              {ctx?.student ? (
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-[var(--text-secondary)]">USN</span>
+                    <span className="font-mono">{ctx.student.usn}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[var(--text-secondary)]">Name</span>
+                    <span>{ctx.student.name}</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-[var(--text-muted)]">
+                  No student linked
+                </p>
+              )}
+            </div>
+
+            {/* Exam context */}
+            <div className="border border-white/10 bg-[var(--bg-raised)] p-4">
+              <h3 className="eg-mono-sm text-[var(--text-muted)] mb-3">
+                Exam
+              </h3>
+              {ctx?.exam ? (
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-[var(--text-secondary)]">Exam</span>
+                    <span>{ctx.exam.exam_name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[var(--text-secondary)]">
+                      Subject ID
+                    </span>
+                    <span className="font-mono">{ctx.exam.subject_id}</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-[var(--text-muted)]">
+                  No exam linked
+                </p>
+              )}
+            </div>
+
+            {/* Attempt details */}
+            <div className="border border-white/10 bg-[var(--bg-raised)] p-4">
+              <h3 className="eg-mono-sm text-[var(--text-muted)] mb-3">
+                Attempt
+              </h3>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Method</span>
+                  <span>{attempt.verification_method}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">
+                    Registration
+                  </span>
+                  <span className="font-mono">
+                    #{attempt.exam_registration_id}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">
+                    Hall Ticket
+                  </span>
+                  <span className="font-mono">
+                    {attempt.hall_ticket_id
+                      ? `#${attempt.hall_ticket_id}`
+                      : "—"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Created</span>
+                  <span className="font-mono text-xs">
+                    {new Date(attempt.created_at).toLocaleString()}
+                  </span>
+                </div>
+                {attempt.started_at && (
+                  <div className="flex justify-between">
+                    <span className="text-[var(--text-secondary)]">Started</span>
+                    <span className="font-mono text-xs">
+                      {new Date(attempt.started_at).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+                {attempt.completed_at && (
+                  <div className="flex justify-between">
+                    <span className="text-[var(--text-secondary)]">
+                      Completed
+                    </span>
+                    <span className="font-mono text-xs">
+                      {new Date(attempt.completed_at).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="border border-white/10 bg-[var(--bg-raised)] p-4">
+              <h3 className="eg-mono-sm text-[var(--text-muted)] mb-3">
+                Actions
+              </h3>
+              <div className="space-y-2">
+                {attempt.status === "CREATED" && (
+                  <button
+                    onClick={handleStart}
+                    className="eg-btn w-full py-2"
+                  >
+                    Start
+                  </button>
+                )}
+                {isTerminal && (
+                  <>
+                    <button
+                      onClick={() => setShowReview(!showReview)}
+                      className="eg-btn w-full py-2"
+                    >
+                      Request Review
+                    </button>
+                    <button
+                      onClick={() => setShowOverride(!showOverride)}
+                      className="eg-btn w-full py-2"
+                    >
+                      Override Decision
+                    </button>
+                  </>
+                )}
+                {!isTerminal && attempt.status !== "CREATED" && (
+                  <button
+                    onClick={handleCancel}
+                    className="eg-btn w-full py-2"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Review form */}
+            {showReview && (
+              <div className="border border-white/10 bg-[var(--bg-raised)] p-4">
+                <h4 className="eg-mono-sm text-[var(--text-muted)] mb-3">
+                  Review Notes
+                </h4>
+                <textarea
+                  value={reviewNotes}
+                  onChange={(e) => setReviewNotes(e.target.value)}
+                  rows={3}
+                  className="w-full bg-black border border-white/10 px-3 py-2 text-sm text-white placeholder:text-[var(--text-muted)] focus:outline-none focus:border-white/30 resize-none mb-3"
+                  placeholder="Optional notes..."
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setShowReview(false);
+                      setReviewNotes("");
+                    }}
+                    className="eg-btn px-3 py-1"
+                  >
+                    Cancel
+                  </button>
+                  <button onClick={handleReview} className="eg-btn px-3 py-1">
+                    Submit Review
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Override form */}
+            {showOverride && (
+              <OverrideDialog
+                currentDecision={attempt.decision}
+                onConfirm={handleOverride}
+                onCancel={() => setShowOverride(false)}
+              />
+            )}
+
+            {/* Audit timeline */}
+            <div className="border border-white/10 bg-[var(--bg-raised)] p-4">
+              <h3 className="eg-mono-sm text-[var(--text-muted)] mb-3">
+                Audit Trail
+              </h3>
+              <AuditTimeline attempt={attempt} evidence={evidence} />
+            </div>
+          </div>
         </div>
       </div>
     </div>

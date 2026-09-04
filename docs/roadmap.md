@@ -236,7 +236,7 @@ Focus:
 
 ## Phase 8 — Face Verification / UniFace Integration
 
-**Status: IN PROGRESS (Phase 8.1, 8.2, 8.3, 8.4, 8.5, and 8.6 complete)**
+**Status: IN PROGRESS (Phase 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, and 8.7 complete)**
 
 ### 8.1 Face Verification Architecture & Provider Abstraction
 **Status: COMPLETE**
@@ -465,6 +465,40 @@ Hardened the complete verification pipeline with typed failure categories, provi
 - No filesystem paths, Python tracebacks, or internal module names exposed
 
 **Tests:** 77 tests (`test_phase_8_6_hardening.py`) — failure categories, audit trail, rate limiter, idempotency, human review, human override, security invariants, API sanitization, privacy, config, regression
+
+### 8.7 Admin Face Verification UI
+**Status: COMPLETE**
+
+Built the real Admin Face Verification interface with camera capture, real API integration, evidence display, review/override, and audit trail.
+
+**Components:**
+- `CameraCapture` — real browser camera via `getUserMedia()`, permission handling, frame capture, retake, cleanup
+- `ImageUpload` — file upload for reference/enrollment images, JPEG/PNG only
+- `EvidenceDisplay` — signal labels, percentage bars, provider info
+- `DecisionDisplay` — exact domain vocabulary, failure reason
+- `OverrideDialog` — three-way decision selector, required reason, confirmation
+- `VerificationState` — state progress indicator (READY → CAPTURING → SUBMITTING → VERIFYING → EVALUATING → COMPLETED)
+- `AuditTimeline` — chronological timeline from attempt timestamps + evidence
+
+**API Client (`lib/iv-api.ts`):**
+- Centralized functions: listAttempts, getAttemptContext, startAttempt, verifyFace, evaluateEvidence, reviewAttempt, overrideDecision, cancelAttempt
+- Typed errors via `ApiError` class
+
+**Verification Flow:**
+1. Upload reference image (enrollment photo)
+2. Capture probe image (live camera)
+3. Click "Verify Identity"
+4. Both images base64-encoded → `POST /{attempt_id}/verify-face`
+5. Evidence evaluated → `POST /{attempt_id}/evaluate`
+6. UI displays evidence and decision
+7. No fake delay, no fake progress, no fake results
+
+**Human Review:** `POST /{attempt_id}/review` with optional notes
+**Human Override:** `POST /{attempt_id}/override` with new_decision + reason + audit trail notice
+
+**Privacy:** No persistent image storage, camera tracks cleaned up on unmount, no localStorage/sessionStorage/indexedDB, no console.log
+
+**Tests:** 996 backend tests passing, 0 failures, 0 errors; 20 frontend routes building
 
 ---
 
