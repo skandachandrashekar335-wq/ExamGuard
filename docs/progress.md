@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 IN PROGRESS (9.1, 9.2, 9.3, 9.4, 9.5 complete)
-- **Tests:** 1305 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE, 9 COMPLETE
+- **Tests:** 1349 passing, 0 failures, 0 errors
 - **Frontend:** 23 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -828,15 +828,54 @@ Secure credential provisioning, authentication, and revocation for physical came
 
 **Tests:** 1305 total (1251 previous + 54 new), 0 failures, 0 errors
 
-## Files Changed in Phase 8.2
+---
 
-| File | Change |
-|---|---|
-| `backend/app/services/identity_verification.py` | Added `verify_face()` function |
-| `backend/app/api/v1/identity_verification.py` | Added `POST /{attempt_id}/verify-face` endpoint, `VerifyFaceRequest` |
-| `backend/app/schemas/identity_verification.py` | Added `VerifyFaceRequest`, `VerifyFaceResponse` |
-| `backend/tests/test_verify_face_integration.py` | 35 new integration tests |
-| `backend/tests/test_batch_verification.py` | Fixed FK cleanup ordering |
-| `backend/tests/test_dashboard.py` | Fixed FK cleanup ordering |
-| `docs/roadmap.md` | Updated Phase 8.2 status |
-| `docs/progress.md` | Created |
+## Phase 9.6 — Camera Infrastructure Integration & Hardening
+
+**Status: COMPLETE**
+
+Cross-component integration tests and comprehensive audit verifying the complete Phase 9 camera infrastructure works correctly as one domain.
+
+**Audit Results (all passed):**
+- Domain Integration: All FKs correct, relationships registered, cascade intentional, unique constraints correct, indexes appropriate
+- Camera State Invariants: is_active ≠ status, deactivate sets DISABLED, health observation only path to change status, admin PATCH cannot set status
+- Mapping Integration: Duplicate prevention works, deactivation preserves history, camera deactivation does not break mappings
+- Exam Hall Integration: No cascade delete of exam data, camera/entry point can exist without hall
+- Device Credential Integration: SHA-256 + constant-time comparison, raw secret never stored, credential-camera binding correct
+- Device Health Integration: Full chain verified (auth → camera identity → observation → status update), future timestamps rejected
+- API Consistency: All endpoints use correct HTTP codes, thin routes, no secrets in errors
+- Security: No hard-coded credentials, no hash leakage, no IDOR, no mass assignment, no biometric data
+- Privacy: No face images, embeddings, student data, or video in Phase 9
+- Migrations: 016→017→018 chain correct, all have downgrades, no destructive ops
+- Frontend: Real API data only, no fake monitoring, honest states
+
+**New Files:**
+- `backend/tests/test_phase_9_6_integration.py` — 44 cross-component integration tests
+
+**Test Coverage Added:**
+- Camera lifecycle: create → UNKNOWN → deactivate → DISABLED → reactivate → UNKNOWN
+- Mapping lifecycle: create → duplicate rejection → disable preserves history → camera deactivation doesn't break mapping
+- Credential binding: exact camera binding, multi-camera independence, revocation, cascade delete
+- Device auth → health chain: full ONLINE/OFFLINE chain, deactivated camera breaks chain
+- Hall integration: camera/entry point in hall, without hall, cascade delete safety
+- Security invariants: secret never stored, hash never exposed, constant-time comparison, empty/whitespace rejection, error sanitization, no biometric data
+- API integration: camera CRUD lifecycle, status immutability via PATCH, health observation via API, device health auth, mapping CRUD, duplicate mapping rejection
+- Cross-component state: deactivated camera rejected by credential and health services, health observation updates admin view
+
+**Tests:** 1349 total (1305 previous + 44 new), 0 failures, 0 errors
+
+---
+
+## Phase 9 — COMPLETE
+
+All sub-phases complete:
+- 9.1 Camera & Entry Point Domain Foundation ✅
+- 9.2 Camera/Entry Point/Mapping CRUD APIs ✅
+- 9.3 Camera Infrastructure Admin UI ✅
+- 9.4 Device Health & Status ✅
+- 9.5 Secure Device Communication Foundation ✅
+- 9.6 Integration & Hardening ✅
+
+**Total Phase 9 Tests:** 44 integration + 54 device comm + 53 health + 42 API + 53 model = 246 Phase 9-specific tests
+**Total Backend Tests:** 1349 passing, 0 failures, 0 errors
+**Total Frontend Pages:** 23 routes building successfully

@@ -552,18 +552,37 @@ Secure credential provisioning, authentication, and revocation for physical came
 
 **Tests:** 54 tests (38 service + 16 API)
 
+### 9.6 Integration & Hardening
+**Status: COMPLETE**
+
+Cross-component integration tests and comprehensive domain audit.
+
+**Audit Verified:**
+- All FKs, relationships, cascades, unique constraints, indexes correct
+- Camera state invariants: is_active ≠ status, health observation is only path
+- Mapping: duplicate prevention, deactivation preserves history
+- Credential binding: camera identity derived from credential, no IDOR
+- Device health chain: auth → camera → observation → status, future timestamps rejected
+- API consistency: correct HTTP codes, thin routes, no secrets in errors
+- Security: no hard-coded credentials, no hash leakage, no mass assignment
+- Privacy: no biometric/student/video data in Phase 9
+- Migrations 016→017→018 correct with downgrades
+- Frontend: real API data only, no fake monitoring
+
+**Tests:** 44 cross-component integration tests
+
 ---
 
 ## Phase 9 — Camera & Entry Point Management
 
-**Status: IN PROGRESS (9.1–9.5 complete, 9.6 future)**
+**Status: COMPLETE**
 
 - **9.1** Domain foundation: Camera, EntryPoint, CameraEntryPointMapping models + migration 016 + 53 model tests — COMPLETE
 - **9.2** CRUD API: 15 REST endpoints (cameras, entry-points, camera-entry-points) + 42 API integration tests + FK cleanup fixes — COMPLETE
 - **9.3** Admin UI: Camera list/create/edit, entry point list/create/edit, mapping list/create/disable, API client, 23 frontend routes — COMPLETE
 - **9.4** Device health/status: Health observation boundary, last_seen_at/last_health_check_at/health_reason fields, health API endpoints, 53 tests — COMPLETE
 - **9.5** Secure communication: Device credential provisioning, authentication, revocation, SHA-256 hashing, device health API (authenticated), 54 tests, security audit — COMPLETE
-- **9.6** Integration/hardening — FUTURE
+- **9.6** Integration/hardening: Cross-component integration tests (44 tests), full domain audit, security/privacy audit — COMPLETE
 
 ---
 
@@ -892,9 +911,9 @@ Focus:
 
 ## Roadmap Rules
 
-1. Phases 0–7 are COMPLETE.
-2. Phase 8 is IN PROGRESS (8.1, 8.2, 8.3, and 8.4 complete).
-3. Phases 9–23 are PLANNED.
+1. Phases 0–9 are COMPLETE.
+2. Phase 10 is PLANNED.
+3. Phases 11–23 are PLANNED.
 4. Do not mark future phases complete.
 5. Do not implement future phases.
 6. Each future phase should eventually be broken into smaller implementation steps before coding begins.
@@ -912,11 +931,12 @@ Focus:
 
 ## Current Project State
 
-- **Current phase:** Phase 9 IN PROGRESS (9.1, 9.2, 9.3, 9.4, 9.5 complete)
-- **Current completed step:** Phase 9.5 — Secure Device Communication Foundation
-- **Current tests:** 1305 passing (0 failures, 0 errors)
+- **Current phase:** Phase 9 COMPLETE
+- **Current completed step:** Phase 9.6 — Camera Infrastructure Integration & Hardening
+- **Current tests:** 1349 passing (0 failures, 0 errors)
 - **Frontend pages:** 23 (all building successfully)
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono), zero border-radius, no neon colors
-- **Next step:** Phase 9.6 — Integration/Hardening (FUTURE)
+- **Next step:** Phase 10 — Real-Time Examination Entry Verification (PLANNED)
 - **Provider architecture:** `app/services/face_verification/` with Protocol, DeterministicProvider, factory
 - **Identity verification API:** `POST /{attempt_id}/verify-face` endpoint for face verification trigger
+- **Camera infrastructure:** Complete — Camera, EntryPoint, Mapping, Credential, Health Observation, Device Auth API
