@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 IN PROGRESS (8.1, 8.2, 8.3, 8.4 complete, 8.5 future)
-- **Tests:** 832 passing, 0 failures, 0 errors
+- **Phase:** 8 IN PROGRESS (8.1, 8.2, 8.3, 8.4, 8.5 complete, 8.6 future)
+- **Tests:** 919 passing, 0 failures, 0 errors
 - **Frontend:** 20 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -285,9 +285,65 @@ End-to-end face verification pipeline with robust input validation, real provide
 
 ---
 
+## Phase 8.5 — Threshold + Decision Integration
+
+**Status: COMPLETE**
+
+### Implementation
+
+Enhanced the decision engine with configurable thresholds, near-threshold zone, decision metadata for audit trail, and comprehensive configuration validation.
+
+**Configuration (`app/core/config.py`):**
+- `IDENTITY_VERIFICATION_MATCH_THRESHOLD: float = 0.85` — similarity score threshold
+- `IDENTITY_VERIFICATION_NEAR_THRESHOLD_FACTOR: float = 0.7` — near-zone factor (threshold * factor = near-zone lower bound)
+- `IDENTITY_VERIFICATION_POLICY_VERSION: str = "1.0"` — policy version for audit trail
+- `model_validator` enforces valid ranges: both must be in (0.0, 1.0]
+
+**Decision Engine (`app/services/identity_verification_decision.py`):**
+- Refactored `evaluate_evidence()` to use configurable thresholds from settings
+- New `evaluate_evidence_detailed()` returns `DecisionResult` with audit metadata
+- `DecisionResult` dataclass: decision, reasoning, policy_version, metadata
+- Metadata includes: threshold, near_threshold, decision_reason, providers_used, similarity counts/stats
+- Decision logic preserved: liveness fail → NO_MATCH, high similarity → MATCH, near zone → INCONCLUSIVE, low similarity → NO_MATCH
+- Near-threshold zone uses average similarity (not max) for more conservative evaluation
+- Missing evidence never silently treated as PASS or NO_MATCH
+
+**Decision Policy:**
+1. No evidence → INCONCLUSIVE
+2. Liveness FAIL → NO_MATCH (possible spoof)
+3. Similarity >= threshold → MATCH (unless poor quality → INCONCLUSIVE)
+4. Similarity >= threshold * near_factor → INCONCLUSIVE (near zone)
+5. Similarity < near zone → NO_MATCH
+6. Liveness PASS without similarity → INCONCLUSIVE
+7. Insufficient evidence → INCONCLUSIVE
+
+### Tests
+
+87 tests (`test_decision_engine.py`):
+- Boundary testing (11): exact threshold, just above, just below, zero, one, half-threshold
+- Near-threshold zone (9): default factor, below zone, at boundary, configurable factor, average similarity
+- Missing evidence (10): no evidence, similarity only, liveness only, quality only, combinations
+- Liveness policy (7): fail overrides all similarities, spoof_detected, lowercase, false
+- Provider failure mapping (3): provider names in metadata, multiple providers, failure not silently converted
+- Quality policy (5): poor+high sim, poor+low sim, good+high sim, unacceptable, low quality
+- Decision metadata (13): threshold, near_threshold, policy_version, counts, max/avg similarity, decision_reason, providers_used
+- Security invariants (5): client cannot submit threshold, no evidence → INCONCLUSIVE, liveness fail → NO_MATCH, no composite score leakage, provider never directly authorizes
+- Config validation (11): valid defaults, zero/negative/above-one raise errors, boundary values valid
+- Evidence edge cases (6): confidence preferred over signal_value, fallback, invalid/out-of-range values
+- Regression (7): all existing decision engine behavior preserved
+
+### Files Changed in Phase 8.5
+
+| File | Change |
+|---|---|
+| `backend/app/core/config.py` | Added `IDENTITY_VERIFICATION_NEAR_THRESHOLD_FACTOR`, `IDENTITY_VERIFICATION_POLICY_VERSION`, `model_validator` for threshold validation |
+| `backend/app/services/identity_verification_decision.py` | Enhanced with configurable thresholds, `DecisionResult` dataclass, `evaluate_evidence_detailed()`, audit metadata |
+| `backend/tests/test_decision_engine.py` | New comprehensive test suite (87 tests) |
+
+---
+
 ## Remaining Phase 8 Work
 
-- **8.5 Threshold + decision integration** (FUTURE): Wire decision engine thresholds with face verification evidence
 - **8.6 Failure/security/review hardening** (FUTURE): Security audit, failure modes, human review
 - **8.7 Admin UI** (FUTURE): Camera capture interface, real-time verification status, review workflow
 - **8.8 Integration testing/hardening** (FUTURE): End-to-end testing, production readiness

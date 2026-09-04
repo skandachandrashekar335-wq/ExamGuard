@@ -236,7 +236,7 @@ Focus:
 
 ## Phase 8 — Face Verification / UniFace Integration
 
-**Status: IN PROGRESS (Phase 8.1, 8.2, and 8.3 complete)**
+**Status: IN PROGRESS (Phase 8.1, 8.2, 8.3, 8.4, and 8.5 complete)**
 
 ### 8.1 Face Verification Architecture & Provider Abstraction
 **Status: COMPLETE**
@@ -399,8 +399,32 @@ End-to-end face verification pipeline with robust input validation, real provide
 
 **Tests:** 82 tests (`test_face_verification_pipeline.py`) — image validation, API validation, service validation, detection, recognition, liveness, evidence mapping, privacy, lifecycle, provider abstraction, decision separation, error types
 
-### 8.5 Threshold + Decision Integration (FUTURE)
-- Wire decision engine thresholds with face verification evidence
+### 8.5 Threshold + Decision Integration
+**Status: COMPLETE**
+
+Enhanced the decision engine with configurable thresholds, near-threshold zone, and decision metadata for audit trail.
+
+**Configuration (`app/core/config.py`):**
+- `IDENTITY_VERIFICATION_MATCH_THRESHOLD: float = 0.85` — similarity score threshold
+- `IDENTITY_VERIFICATION_NEAR_THRESHOLD_FACTOR: float = 0.7` — near-zone factor
+- `IDENTITY_VERIFICATION_POLICY_VERSION: str = "1.0"` — policy version for audit
+- `model_validator` enforces valid ranges: both in (0.0, 1.0]
+
+**Decision Engine (`app/services/identity_verification_decision.py`):**
+- `evaluate_evidence_detailed()` returns `DecisionResult` with audit metadata
+- Metadata: threshold, near_threshold, decision_reason, providers_used, similarity stats
+- Near-threshold zone uses average similarity (conservative evaluation)
+- Missing evidence never silently treated as PASS or NO_MATCH
+
+**Decision Policy:**
+1. No evidence → INCONCLUSIVE
+2. Liveness FAIL → NO_MATCH
+3. Similarity >= threshold → MATCH (poor quality → INCONCLUSIVE)
+4. Similarity >= threshold * near_factor → INCONCLUSIVE
+5. Similarity < near zone → NO_MATCH
+6. Liveness PASS without similarity → INCONCLUSIVE
+
+**Tests:** 87 tests (`test_decision_engine.py`) — boundary, near-zone, missing evidence, liveness, provider failure, quality, metadata, security invariants, config validation, edge cases, regression
 
 ---
 
@@ -771,11 +795,11 @@ Focus:
 
 ## Current Project State
 
-- **Current phase:** Phase 8 IN PROGRESS (8.1 and 8.2 complete)
-- **Current completed step:** Phase 8.2 — Wire Face Verification Provider Into Identity Verification Service
-- **Current tests:** 723 passing (688 existing + 35 new)
+- **Current phase:** Phase 8 IN PROGRESS (8.1, 8.2, 8.3, 8.4, 8.5 complete)
+- **Current completed step:** Phase 8.5 — Threshold + Decision Integration
+- **Current tests:** 919 passing (0 failures, 0 errors)
 - **Frontend pages:** 20 (all building successfully)
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono), zero border-radius, no neon colors
-- **Next step:** Phase 8.3 — UniFace Integration (FUTURE)
+- **Next step:** Phase 8.6 — Failure/Security/Review Hardening (FUTURE)
 - **Provider architecture:** `app/services/face_verification/` with Protocol, DeterministicProvider, factory
 - **Identity verification API:** `POST /{attempt_id}/verify-face` endpoint for face verification trigger
