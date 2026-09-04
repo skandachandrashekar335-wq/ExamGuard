@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 IN PROGRESS (8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7 complete, 8.8 future)
-- **Tests:** 996 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE (8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8 complete)
+- **Tests:** 1103 passing, 0 failures, 0 errors
 - **Frontend:** 20 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -555,9 +555,81 @@ Built the real Admin Face Verification interface — camera capture, real API in
 
 ---
 
-## Remaining Phase 8 Work
+## Phase 8.8 — Integration Testing + Final Hardening
 
-- **8.8 Integration testing/hardening** (FUTURE): End-to-end testing, production readiness
+**Status: COMPLETE**
+
+Comprehensive integration tests verifying the complete Phase 8 system works correctly as ONE integrated system.
+
+**Integration Test Coverage (`test_phase_8_8_integration.py` — 107 new tests):**
+
+1. **Full Pipeline E2E** (5 tests): Complete flow from creation through face verification to decision, via both service layer and HTTP API. Tests MATCH, NO_MATCH, INCONCLUSIVE, and liveness failure paths.
+
+2. **Provider Abstraction** (5 tests): DeterministicProvider through API, custom stub provider through service, provider failure/exception handling, authorization field isolation.
+
+3. **Decision Engine Integration** (7 tests): High/low/near-threshold similarity, missing evidence, liveness fail override, poor quality, detailed metadata.
+
+4. **Lifecycle State Machine** (12 tests): All valid transitions, cancel/fail from CREATED, cannot start/complete/fail/cancel twice, cannot verify after terminal states, cannot review/override from non-terminal states, completed_at verification.
+
+5. **Evidence Consistency** (5 tests): Evidence belongs to correct attempt, accumulates across multiple calls, metadata sanitized, manual recording, cannot record on completed.
+
+6. **Repeated Verification** (3 tests): Three calls accumulate, lifecycle intact, decision correct after accumulation.
+
+7. **Concurrency** (4 tests): Concurrent verify calls, concurrent review requests, concurrent overrides, verify-then-cancel.
+
+8. **Human Review** (4 tests): Review flow, evidence preservation, review on failed attempts, review without notes.
+
+9. **Human Override** (7 tests): All 6 transition directions, audit entry creation, evidence preservation, reason requirement, terminal state requirement, multiple override chaining, API integration.
+
+10. **Audit Trail** (5 tests): Override JSON structure, review JSON structure, metadata safety, non-override parsing, full flow audit.
+
+11. **Failure Matrix** (9 tests): Provider unavailable/exception, empty images, wrong method, attempt not found, invalid decision, empty failure reason, provider failure ≠ identity mismatch, insufficient evidence ≠ MATCH.
+
+12. **Security Invariants** (7 tests): Client cannot set threshold, cannot force decision via evidence, provider cannot authorize, VerifyFaceRequest schema validation, decision engine cannot be bypassed, liveness fail always NO_MATCH, no composite score leakage.
+
+13. **Rate Limiting** (8 tests): Attempt limits within/at/over, global limits within/at, zero means unlimited, independent attempts, reset.
+
+14. **API Contract** (8 tests): List, context, verify-face, complete, override response shapes, 404, 422, filter parameters.
+
+15. **Configuration** (9 tests): Default values, retention zero, rate limits, invalid threshold/factor rejection.
+
+16. **Error Sanitization** (3 tests): No filesystem paths, no tracebacks, safe validation errors.
+
+17. **Privacy** (3 tests): No raw images in API responses, no images in context, config retention zero.
+
+18. **Provider Failure ≠ False Decision** (3 tests): Unavailable not NO_MATCH, exception not mismatch, empty evidence not MATCH.
+
+**Issues Found and Verified:**
+- Rate limiter is a module-level singleton (in-memory) — appropriate for single-process, would need shared limiter for multi-worker deployment
+- `review_attempt` overwrites `failure_reason` (review/override audit are sequential, not cumulative)
+- Double validation in verify-face endpoint (defense-in-depth by design)
+- Image quality threshold hardcoded at 0.5 (not configurable)
+
+**Tests:** 1103 total (996 previous + 107 new), 0 failures, 0 errors
+**Frontend:** 20 routes building successfully
+**Repeatability:** Two full suite runs, both 1103 passed
+
+### Files Changed in Phase 8.8
+
+| File | Change |
+|---|---|
+| `backend/tests/test_phase_8_8_integration.py` | New: 107 integration tests covering full pipeline, providers, decision engine, lifecycle, evidence, concurrency, review, override, audit, failures, security, rate limiting, API contracts, config, privacy |
+
+---
+
+## Phase 8 — COMPLETE
+
+All sub-phases complete:
+- 8.1 Provider Architecture ✅
+- 8.2 Service Integration ✅
+- 8.3 UniFace Provider ✅
+- 8.4 Real Face Verification Pipeline ✅
+- 8.5 Threshold + Decision Integration ✅
+- 8.6 Failure/Security/Review Hardening ✅
+- 8.7 Admin Face Verification UI ✅
+- 8.8 Integration Testing + Final Hardening ✅
+
+**Total Phase 8 Tests:** 1103 backend + 20 frontend routes
 
 ## Files Changed in Phase 8.2
 
