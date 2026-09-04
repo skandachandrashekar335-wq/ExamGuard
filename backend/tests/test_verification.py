@@ -29,6 +29,10 @@ def cleanup():
         db.execute(delete(VerificationOutcome))
         all_match_results = db.query(HallTicketMatchResult.id).subquery()
         from app.models.hall_ticket_match import HallTicketMatchSignal
+        from app.models.identity_verification import (
+            IdentityVerificationEvidence,
+            IdentityVerificationAttempt,
+        )
         db.execute(
             delete(HallTicketMatchSignal).where(
                 HallTicketMatchSignal.match_result_id.in_(
@@ -39,6 +43,8 @@ def cleanup():
         db.execute(delete(HallTicketMatchResult))
         db.execute(delete(ExtractedField))
         db.execute(delete(ExtractionResult))
+        db.execute(delete(IdentityVerificationEvidence))
+        db.execute(delete(IdentityVerificationAttempt))
         db.execute(delete(SeatAssignment))
         db.execute(delete(HallTicket))
         db.execute(delete(ExamRegistration))

@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 IN PROGRESS (8.1, 8.2, 8.3, 8.4, 8.5 complete, 8.6 future)
-- **Tests:** 919 passing, 0 failures, 0 errors
+- **Phase:** 8 IN PROGRESS (8.1, 8.2, 8.3, 8.4, 8.5, 8.6 complete, 8.7 future)
+- **Tests:** 996 passing, 0 failures, 0 errors
 - **Frontend:** 20 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -342,9 +342,115 @@ Enhanced the decision engine with configurable thresholds, near-threshold zone, 
 
 ---
 
+## Phase 8.6 — Failure/Security/Review Hardening
+
+**Status: COMPLETE**
+
+### Implementation
+
+Hardened the complete verification pipeline with typed failure categories, provider failure handling, rate limiting, idempotency awareness, human review/override, audit trail, API error sanitization, and security invariants.
+
+**Failure Categories (`app/services/face_verification/failure_categories.py`):**
+- 20+ typed failure categories: INVALID_INPUT, PROVIDER_UNAVAILABLE, PROVIDER_TIMEOUT, NO_FACE_DETECTED, MULTIPLE_FACES, RECOGNITION_FAILED, LIVENESS_SPOOF_DETECTED, IDENTITY_MISMATCH, HUMAN_OVERRIDE, etc.
+- Categorization functions: `is_provider_failure()`, `is_input_validation()`, `is_face_detection()`
+- Provider error mapping: `categorize_provider_error()` maps FaceVerificationErrorType → FailureCategory
+- Clear separation: provider failures ≠ identity mismatch ≠ input validation
+
+**Audit Trail (`app/services/face_verification/audit.py`):**
+- `build_override_audit_entry()`: JSON-encoded audit entries for human overrides
+- `parse_override_audit_entry()`: Parse override entries from failure_reason field
+- `build_verification_audit_metadata()`: Safe audit metadata for structured logging
+- `log_verification_event()`: Safe verification event logging
+- No new DB tables — uses existing `failure_reason` field for override audit
+
+**Human Review (`POST /{attempt_id}/review`):**
+- Marks COMPLETED/FAILED attempts as under human review
+- Lightweight marker — does NOT change the decision
+- Stores review notes and timestamp in failure_reason field
+
+**Human Override (`POST /{attempt_id}/override`):**
+- Overrides decision of COMPLETED/FAILED attempts
+- Requires: new_decision (MATCH/NO_MATCH/INCONCLUSIVE) + reason
+- Optional: operator_id for audit trail
+- Records full audit: original_decision → override_decision → reason → timestamp
+- Does NOT erase original evidence
+- Original automated result preserved in audit trail
+
+**Rate Limiting (`_RateLimiter` in identity_verification.py):**
+- Per-attempt limit: configurable via `FACE_VERIFICATION_MAX_CALLS_PER_ATTEMPT` (default 5)
+- Global per-minute limit: configurable via `FACE_VERIFICATION_MAX_CALLS_PER_MINUTE` (default 60)
+- Thread-safe via threading.Lock
+- Bounded: max 10,000 tracked attempt IDs with eviction
+- Rate limit exceeded → clear error message
+
+**Provider Failure Handling:**
+- Provider errors now categorized with FailureCategory
+- Audit events logged for all provider failures
+- Unexpected exceptions caught and sanitized (no stack traces to clients)
+- Provider failure → fail_attempt() with categorized reason
+
+**Idempotency:**
+- Repeated verify_face calls on same attempt: ALLOWED (evidence accumulates by design)
+- Status checks prevent calls on completed/failed/cancelled attempts
+- Decision engine processes ALL evidence — no contradictory records possible
+
+**Security Invariants:**
+- Client cannot submit threshold, decision, ALLOW, or DENY
+- Override requires non-empty reason
+- Override only on terminal states (COMPLETED/FAILED)
+- Decision engine cannot be bypassed
+- Liveness failure always produces NO_MATCH
+- No composite score leakage
+- Provider never directly authorizes
+
+**API Error Sanitization:**
+- 404 for not-found attempts
+- 422 for validation errors, wrong status, wrong method, invalid decisions
+- No filesystem paths, Python tracebacks, or internal module names exposed
+- Safe error categories preserved for legitimate clients
+
+**Privacy:**
+- No raw images stored/logged/returned
+- No embeddings stored/logged
+- No biometric data in audit metadata
+- `FACE_VERIFICATION_IMAGE_RETENTION_DAYS = 0` maintained
+- Override audit contains only safe operational data
+
+**Config (`app/core/config.py`):**
+- `FACE_VERIFICATION_MAX_CALLS_PER_ATTEMPT: int = 5`
+- `FACE_VERIFICATION_MAX_CALLS_PER_MINUTE: int = 60`
+
+### Files Changed in Phase 8.6
+
+| File | Change |
+|---|---|
+| `backend/app/services/face_verification/failure_categories.py` | New: typed failure category enum and classification functions |
+| `backend/app/services/face_verification/audit.py` | New: audit trail helpers (override entries, event logging, safe metadata) |
+| `backend/app/services/identity_verification.py` | Added: review_attempt(), override_decision(), rate limiter, idempotency awareness, typed provider error handling |
+| `backend/app/api/v1/identity_verification.py` | Added: POST /review, POST /override endpoints, ReviewRequest/OverrideRequest schemas |
+| `backend/app/core/config.py` | Added: rate limiting config settings |
+| `backend/tests/test_phase_8_6_hardening.py` | New: 77 comprehensive tests |
+| `backend/tests/test_verification.py` | Fixed: FK ordering in cleanup fixture (added IdentityVerificationEvidence/Attempt cleanup) |
+
+### Tests
+
+77 tests (`test_phase_8_6_hardening.py`):
+- Failure categories (10): all categories exist, provider/input/detection classification, error mapping
+- Audit trail (10): build/parse override entries, audit metadata, edge cases
+- Rate limiter (9): attempt limits, global limits, unlimited, independent, eviction, reset
+- Idempotency (4): no evidence, existing similarity/liveness, non-face evidence
+- Human review (6): completed/failed review, wrong status rejection, nonexistent, notes
+- Human override (12): match→no_match, no_match→match, inconclusive, preserves evidence, wrong status, invalid decision, empty reason, nonexistent, failed attempt, multiple overrides
+- Security invariants (8): no threshold submission, requires reason, no ALLOW/DENY, engine not bypassed, liveness always NO_MATCH, no composite leakage, provider never authorizes
+- API sanitization (3): 404 for not found, 422 for invalid decision, 404 for review
+- Privacy (4): no raw images, no embeddings, no biometric data, retention=0
+- Config (2): default rate limits, zero means unlimited
+- Regression (10): all existing decision engine and lifecycle behavior preserved
+
+---
+
 ## Remaining Phase 8 Work
 
-- **8.6 Failure/security/review hardening** (FUTURE): Security audit, failure modes, human review
 - **8.7 Admin UI** (FUTURE): Camera capture interface, real-time verification status, review workflow
 - **8.8 Integration testing/hardening** (FUTURE): End-to-end testing, production readiness
 

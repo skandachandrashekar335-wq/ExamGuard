@@ -1,6 +1,9 @@
 import json
 import logging
+import threading
+import time
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
@@ -402,6 +405,35 @@ def verify_face(
             f"not 'FACE'. Face verification requires FACE method."
         )
 
+    # 1b. Rate limiting
+    from app.core.config import get_settings as _get_settings
+    _settings = _get_settings()
+    limiter = get_rate_limiter()
+
+    if not limiter.check_global_limit(_settings.FACE_VERIFICATION_MAX_CALLS_PER_MINUTE):
+        raise ValueError(
+            "Face verification rate limit exceeded. "
+            "Please try again later."
+        )
+
+    if not limiter.check_attempt_limit(
+        attempt_id, _settings.FACE_VERIFICATION_MAX_CALLS_PER_ATTEMPT
+    ):
+        raise ValueError(
+            f"Face verification call limit exceeded for this attempt "
+            f"(max {_settings.FACE_VERIFICATION_MAX_CALLS_PER_ATTEMPT} calls)."
+        )
+
+    # 1c. Idempotency note: repeated verify_face calls on the same attempt
+    # are ALLOWED — evidence accumulates. This is by design: the decision
+    # engine processes ALL evidence. Blocking accumulation would break
+    # existing retry/re-verification workflows. Status checks above prevent
+    # calls on completed/failed/cancelled attempts.
+
+    # Record this call for rate limiting
+    limiter.record_attempt_call(attempt_id)
+    limiter.record_global_call()
+
     # 2. Validate input presence
     if not reference_image:
         raise ValueError("reference_image is required and must not be empty")
@@ -451,8 +483,35 @@ def verify_face(
     try:
         result = provider.verify(request)
     except ProviderUnavailableError as e:
-        fail_attempt(db, attempt_id, reason=f"Provider error: {e.error.message}")
+        from app.services.face_verification.audit import log_verification_event
+        from app.services.face_verification.failure_categories import (
+            categorize_provider_error,
+        )
+        category = categorize_provider_error(e.error.error_type.value)
+        fail_attempt(
+            db, attempt_id,
+            reason=f"Provider error [{category.value}]: {e.error.message}",
+        )
+        log_verification_event(
+            attempt_id=attempt_id,
+            event_type="provider_error",
+            category=category.value,
+            detail=f"error_type={e.error.error_type.value}",
+        )
         raise ValueError(f"Provider error: {e.error.message}") from e
+    except Exception as e:
+        from app.services.face_verification.audit import log_verification_event
+        fail_attempt(
+            db, attempt_id,
+            reason=f"Unexpected provider error: {type(e).__name__}",
+        )
+        log_verification_event(
+            attempt_id=attempt_id,
+            event_type="provider_unexpected_error",
+            category="PROVIDER_INTERNAL_ERROR",
+            detail=f"error_type={type(e).__name__}",
+        )
+        raise ValueError("Face verification provider encountered an error") from e
 
     # 6. Convert result → evidence records
     evidence_records = []
@@ -526,3 +585,286 @@ def verify_face(
     )
 
     return evidence_records
+
+
+# ---------------------------------------------------------------------------
+# Rate Limiter (in-memory, bounded, per-process)
+# ---------------------------------------------------------------------------
+
+
+class _RateLimiter:
+    """Simple in-memory rate limiter for face verification calls.
+
+    Tracks per-attempt call counts and global per-minute call counts.
+    Bounded: max 10,000 tracked attempt IDs, oldest evicted when full.
+    Thread-safe via threading.Lock.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._attempt_calls: dict[int, int] = {}
+        self._global_minute_calls: list[float] = []
+        self._max_attempt_ids = 10_000
+
+    def check_attempt_limit(
+        self, attempt_id: int, max_calls: int
+    ) -> bool:
+        """Check if an attempt has exceeded its per-attempt call limit.
+
+        Args:
+            attempt_id: The verification attempt ID.
+            max_calls: Maximum allowed calls per attempt (0 = unlimited).
+
+        Returns:
+            True if the call is allowed, False if rate limited.
+        """
+        if max_calls <= 0:
+            return True
+        with self._lock:
+            count = self._attempt_calls.get(attempt_id, 0)
+            return count < max_calls
+
+    def record_attempt_call(self, attempt_id: int) -> None:
+        """Record a face verification call for rate limiting.
+
+        Args:
+            attempt_id: The verification attempt ID.
+        """
+        with self._lock:
+            self._attempt_calls[attempt_id] = (
+                self._attempt_calls.get(attempt_id, 0) + 1
+            )
+            # Evict oldest entries if too many tracked
+            if len(self._attempt_calls) > self._max_attempt_ids:
+                # Remove half of entries (oldest by insertion order approximation)
+                keys = list(self._attempt_calls.keys())
+                for k in keys[: self._max_attempt_ids // 2]:
+                    del self._attempt_calls[k]
+
+    def check_global_limit(self, max_per_minute: int) -> bool:
+        """Check if the global per-minute limit has been exceeded.
+
+        Args:
+            max_per_minute: Maximum calls per minute (0 = unlimited).
+
+        Returns:
+            True if the call is allowed, False if rate limited.
+        """
+        if max_per_minute <= 0:
+            return True
+        now = time.time()
+        with self._lock:
+            # Prune entries older than 60 seconds
+            cutoff = now - 60.0
+            self._global_minute_calls = [
+                t for t in self._global_minute_calls if t > cutoff
+            ]
+            return len(self._global_minute_calls) < max_per_minute
+
+    def record_global_call(self) -> None:
+        """Record a global face verification call."""
+        with self._lock:
+            self._global_minute_calls.append(time.time())
+
+    def reset(self) -> None:
+        """Reset all rate limiter state. For testing only."""
+        with self._lock:
+            self._attempt_calls.clear()
+            self._global_minute_calls.clear()
+
+
+# Module-level singleton
+_rate_limiter = _RateLimiter()
+
+
+def get_rate_limiter() -> _RateLimiter:
+    """Get the module-level rate limiter instance."""
+    return _rate_limiter
+
+
+# ---------------------------------------------------------------------------
+# Idempotency
+# ---------------------------------------------------------------------------
+
+
+def _has_face_evidence(db: Session, attempt_id: int) -> bool:
+    """Check if an attempt already has face verification evidence.
+
+    Args:
+        db: Database session.
+        attempt_id: The verification attempt ID.
+
+    Returns:
+        True if similarity_score or liveness evidence already exists.
+    """
+    count = (
+        db.query(IdentityVerificationEvidence)
+        .filter(
+            IdentityVerificationEvidence.attempt_id == attempt_id,
+            IdentityVerificationEvidence.signal_type.in_([
+                "similarity_score", "liveness",
+            ]),
+        )
+        .count()
+    )
+    return count > 0
+
+
+# ---------------------------------------------------------------------------
+# Human Review & Override
+# ---------------------------------------------------------------------------
+
+# Valid decisions for override
+_VALID_OVERRIDE_DECISIONS = {
+    IdentityVerificationDecision.MATCH.value,
+    IdentityVerificationDecision.NO_MATCH.value,
+    IdentityVerificationDecision.INCONCLUSIVE.value,
+}
+
+
+def review_attempt(
+    db: Session,
+    attempt_id: int,
+    *,
+    reviewer_notes: str | None = None,
+) -> IdentityVerificationAttempt:
+    """Mark a completed/failed attempt as under human review.
+
+    This is a lightweight review marker — it does NOT change the decision.
+    The attempt must be in a terminal state (COMPLETED or FAILED) to be
+    reviewed.
+
+    Args:
+        db: Database session.
+        attempt_id: The verification attempt ID.
+        reviewer_notes: Optional notes from the reviewer.
+
+    Returns:
+        Updated IdentityVerificationAttempt.
+
+    Raises:
+        LookupError: If attempt not found.
+        ValueError: If attempt is not in a reviewable state.
+    """
+    from app.services.face_verification.audit import build_override_audit_entry
+
+    attempt = get_attempt(db, attempt_id)
+    if not attempt:
+        raise LookupError(f"Identity verification attempt {attempt_id} not found")
+
+    if attempt.status not in (
+        IdentityVerificationStatus.COMPLETED.value,
+        IdentityVerificationStatus.FAILED.value,
+    ):
+        raise ValueError(
+            f"Cannot review attempt in status '{attempt.status}'. "
+            f"Attempt must be COMPLETED or FAILED."
+        )
+
+    # Store review marker in failure_reason (does not change decision)
+    review_entry = json.dumps({
+        "audit_type": "review_requested",
+        "reviewer_notes": reviewer_notes or "",
+        "review_timestamp": datetime.now(timezone.utc).isoformat(),
+        "original_decision": attempt.decision,
+    }, ensure_ascii=False)
+
+    attempt.failure_reason = review_entry
+    db.commit()
+    db.refresh(attempt)
+
+    logger.info(
+        "VERIFICATION_AUDIT: attempt=%d event=review_requested "
+        "original_decision=%s",
+        attempt_id, attempt.decision,
+    )
+
+    return attempt
+
+
+def override_decision(
+    db: Session,
+    attempt_id: int,
+    *,
+    new_decision: str,
+    reason: str,
+    operator_id: str | None = None,
+) -> IdentityVerificationAttempt:
+    """Override the decision of a completed/failed verification attempt.
+
+    This is an authorized human override. It:
+    1. Validates the attempt is in a terminal state
+    2. Validates the new decision is valid
+    3. Records the override in the audit trail (failure_reason field)
+    4. Updates the decision to the new value
+    5. Does NOT erase original evidence
+
+    The audit trail preserves:
+    - Original automated decision
+    - New human-decided decision
+    - Reason for override
+    - Timestamp
+    - Operator ID (if provided)
+
+    Args:
+        db: Database session.
+        attempt_id: The verification attempt ID.
+        new_decision: The new decision (MATCH, NO_MATCH, INCONCLUSIVE).
+        reason: Human-provided reason for the override.
+        operator_id: Identifier of the operator performing the override.
+
+    Returns:
+        Updated IdentityVerificationAttempt.
+
+    Raises:
+        LookupError: If attempt not found.
+        ValueError: If attempt is not in overrideable state or decision is invalid.
+    """
+    from app.services.face_verification.audit import build_override_audit_entry
+
+    attempt = get_attempt(db, attempt_id)
+    if not attempt:
+        raise LookupError(f"Identity verification attempt {attempt_id} not found")
+
+    if attempt.status not in (
+        IdentityVerificationStatus.COMPLETED.value,
+        IdentityVerificationStatus.FAILED.value,
+    ):
+        raise ValueError(
+            f"Cannot override attempt in status '{attempt.status}'. "
+            f"Attempt must be COMPLETED or FAILED."
+        )
+
+    if new_decision not in _VALID_OVERRIDE_DECISIONS:
+        raise ValueError(
+            f"Invalid override decision '{new_decision}'. "
+            f"Must be one of: {sorted(_VALID_OVERRIDE_DECISIONS)}"
+        )
+
+    if not reason or not reason.strip():
+        raise ValueError("Override reason is required and must not be empty")
+
+    # Build audit entry preserving original decision
+    original_decision = attempt.decision
+    audit_entry = build_override_audit_entry(
+        original_decision=original_decision,
+        override_decision=new_decision,
+        reason=reason.strip(),
+        operator_id=operator_id,
+        previous_status=attempt.status,
+    )
+
+    # Update attempt — decision changes, status stays terminal
+    attempt.decision = new_decision
+    attempt.failure_reason = audit_entry
+    db.commit()
+    db.refresh(attempt)
+
+    logger.info(
+        "VERIFICATION_AUDIT: attempt=%d event=override_applied "
+        "original_decision=%s override_decision=%s operator=%s",
+        attempt_id, original_decision, new_decision,
+        operator_id or "unknown",
+    )
+
+    return attempt

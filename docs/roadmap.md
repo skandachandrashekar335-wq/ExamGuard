@@ -236,7 +236,7 @@ Focus:
 
 ## Phase 8 — Face Verification / UniFace Integration
 
-**Status: IN PROGRESS (Phase 8.1, 8.2, 8.3, 8.4, and 8.5 complete)**
+**Status: IN PROGRESS (Phase 8.1, 8.2, 8.3, 8.4, 8.5, and 8.6 complete)**
 
 ### 8.1 Face Verification Architecture & Provider Abstraction
 **Status: COMPLETE**
@@ -425,6 +425,46 @@ Enhanced the decision engine with configurable thresholds, near-threshold zone, 
 6. Liveness PASS without similarity → INCONCLUSIVE
 
 **Tests:** 87 tests (`test_decision_engine.py`) — boundary, near-zone, missing evidence, liveness, provider failure, quality, metadata, security invariants, config validation, edge cases, regression
+
+### 8.6 Failure/Security/Review Hardening
+**Status: COMPLETE**
+
+Hardened the complete verification pipeline with typed failure categories, provider failure handling, rate limiting, idempotency awareness, human review/override, audit trail, API error sanitization, and security invariants.
+
+**Failure Categories (`app/services/face_verification/failure_categories.py`):**
+- 20+ typed failure categories: INVALID_INPUT, PROVIDER_UNAVAILABLE, PROVIDER_TIMEOUT, NO_FACE_DETECTED, MULTIPLE_FACES, RECOGNITION_FAILED, LIVENESS_SPOOF_DETECTED, IDENTITY_MISMATCH, HUMAN_OVERRIDE, etc.
+- Clear separation: provider failures ≠ identity mismatch ≠ input validation
+
+**Audit Trail (`app/services/face_verification/audit.py`):**
+- `build_override_audit_entry()` / `parse_override_audit_entry()` — JSON-encoded human override records
+- `log_verification_event()` — safe verification event logging
+- No new DB tables — uses existing `failure_reason` field for override audit
+
+**Human Review (`POST /{attempt_id}/review`):**
+- Marks COMPLETED/FAILED attempts as under human review
+- Lightweight marker — does NOT change the decision
+
+**Human Override (`POST /{attempt_id}/override`):**
+- Overrides decision of COMPLETED/FAILED attempts
+- Requires: new_decision + reason; optional: operator_id
+- Records full audit; does NOT erase original evidence
+
+**Rate Limiting:**
+- Per-attempt: configurable via `FACE_VERIFICATION_MAX_CALLS_PER_ATTEMPT` (default 5)
+- Global per-minute: configurable via `FACE_VERIFICATION_MAX_CALLS_PER_MINUTE` (default 60)
+- Thread-safe via threading.Lock; bounded with eviction
+
+**Security Invariants:**
+- Client cannot submit threshold, decision, ALLOW, or DENY
+- Override requires non-empty reason; only on terminal states
+- Decision engine cannot be bypassed; no composite score leakage
+- Provider never directly authorizes
+
+**API Error Sanitization:**
+- 404 for not-found, 422 for validation errors
+- No filesystem paths, Python tracebacks, or internal module names exposed
+
+**Tests:** 77 tests (`test_phase_8_6_hardening.py`) — failure categories, audit trail, rate limiter, idempotency, human review, human override, security invariants, API sanitization, privacy, config, regression
 
 ---
 

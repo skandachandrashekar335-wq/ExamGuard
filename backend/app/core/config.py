@@ -62,6 +62,10 @@ class Settings(BaseSettings):
     FACE_VERIFICATION_MAX_IMAGE_SIZE_MB: int = 5
     # Retention: how long to keep raw verification images (days). 0 = never store.
     FACE_VERIFICATION_IMAGE_RETENTION_DAYS: int = 0
+    # Rate limiting: max verify-face calls per attempt (0 = unlimited)
+    FACE_VERIFICATION_MAX_CALLS_PER_ATTEMPT: int = 5
+    # Rate limiting: max verify-face calls per minute globally (0 = unlimited)
+    FACE_VERIFICATION_MAX_CALLS_PER_MINUTE: int = 60
 
     @model_validator(mode="after")
     def validate_decision_policy(self) -> "Settings":

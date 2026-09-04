@@ -36,6 +36,28 @@ class CancelRequest(BaseModel):
     reason: str | None = Field(default=None, description="Cancellation reason")
 
 
+class ReviewRequest(BaseModel):
+    """Request to mark an attempt as under human review."""
+    reviewer_notes: str | None = Field(
+        default=None, description="Notes from the reviewer"
+    )
+
+
+class OverrideRequest(BaseModel):
+    """Request to override a verification decision."""
+    new_decision: str = Field(
+        ..., description="New decision: MATCH, NO_MATCH, INCONCLUSIVE"
+    )
+    reason: str = Field(
+        ..., min_length=1,
+        description="Reason for the override (required)"
+    )
+    operator_id: str | None = Field(
+        default=None,
+        description="Identifier of the operator performing the override"
+    )
+
+
 class VerifyFaceRequest(BaseModel):
     """Request to run face verification on an attempt."""
     reference_image: str = Field(
@@ -412,6 +434,71 @@ def cancel_attempt(
 ):
     try:
         return iv_service.cancel_attempt(db, attempt_id, reason=body.reason)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.post(
+    "/{attempt_id}/review",
+    response_model=IdentityVerificationResponse,
+    summary="Mark a completed/failed attempt as under human review",
+)
+def review_attempt(
+    attempt_id: int,
+    body: ReviewRequest = ReviewRequest(),
+    db: Session = Depends(get_db),
+):
+    """Mark a verification attempt as under human review.
+
+    This is a lightweight review marker. It does NOT change the decision.
+    The attempt must be in a terminal state (COMPLETED or FAILED).
+    """
+    try:
+        return iv_service.review_attempt(
+            db, attempt_id, reviewer_notes=body.reviewer_notes,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.post(
+    "/{attempt_id}/override",
+    response_model=IdentityVerificationResponse,
+    summary="Override a verification decision (authorized human override)",
+)
+def override_decision(
+    attempt_id: int,
+    body: OverrideRequest,
+    db: Session = Depends(get_db),
+):
+    """Override the decision of a completed/failed verification attempt.
+
+    This is an authorized human override. It:
+    - Validates the attempt is in a terminal state
+    - Validates the new decision is valid
+    - Records the override in the audit trail
+    - Updates the decision to the new value
+    - Does NOT erase original evidence
+
+    The audit trail preserves:
+    - Original automated decision
+    - New human-decided decision
+    - Reason for override
+    - Timestamp
+    - Operator ID (if provided)
+    """
+    try:
+        return iv_service.override_decision(
+            db,
+            attempt_id,
+            new_decision=body.new_decision,
+            reason=body.reason,
+            operator_id=body.operator_id,
+        )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
