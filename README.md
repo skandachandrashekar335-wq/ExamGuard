@@ -4,9 +4,9 @@ AI-powered Examination Entry Verification, Anti-Proxy, Security, and Attendance 
 
 ## Project Status
 
-- **Phase:** 8 COMPLETE
-- **Backend:** 1103 tests passing (0 failures, 0 errors)
-- **Frontend:** 20 pages (Next.js 16.3.3, React 19, TypeScript, Tailwind v4)
+- **Phase:** 9 IN PROGRESS (9.1, 9.2, 9.3 complete)
+- **Backend:** 1198 tests passing (0 failures, 0 errors)
+- **Frontend:** 23 pages (Next.js 16.3.3, React 19, TypeScript, Tailwind v4)
 - **Tech stack:** FastAPI + SQLAlchemy + PostgreSQL (backend), Next.js + TypeScript + Tailwind (frontend)
 
 ### Phase 8 — Face Verification
@@ -19,6 +19,12 @@ AI-powered Examination Entry Verification, Anti-Proxy, Security, and Attendance 
 - **8.6** Failure/security/review hardening: Typed failure categories, rate limiting, human review/override, audit trail, API error sanitization, 77 comprehensive tests
 - **8.7** Admin face verification UI: Real browser camera capture, reference image upload, verify-face integration, evidence display, human review/override, audit trail
 - **8.8** Integration testing + final hardening: 107 integration tests covering full pipeline, providers, decision engine, lifecycle, evidence, concurrency, security invariants, failure matrix, API contracts, rate limiting, privacy audit
+
+### Phase 9 — Camera & Entry Point Management
+
+- **9.1** Domain foundation: Camera, EntryPoint, CameraEntryPointMapping models + migration 016 + 53 model tests
+- **9.2** CRUD API: 15 REST endpoints (cameras, entry-points, camera-entry-points) + 42 API integration tests + FK cleanup fixes
+- **9.3** Admin UI: Camera list/create/edit, entry point list/create/edit, mapping list/create/disable, API client, 23 frontend routes
 
 ## Development
 

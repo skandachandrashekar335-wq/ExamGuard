@@ -2,9 +2,9 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 IN PROGRESS (9.1, 9.2 complete)
+- **Phase:** 8 COMPLETE, 9 IN PROGRESS (9.1, 9.2, 9.3 complete)
 - **Tests:** 1198 passing, 0 failures, 0 errors
-- **Frontend:** 20 pages building successfully
+- **Frontend:** 23 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
 ---
@@ -708,6 +708,34 @@ Full REST API for managing cameras, entry points, and camera-to-entry-point mapp
 - `test_dashboard.py` — Same FK ordering fix
 
 **Tests:** 1198 total (1156 previous + 42 new), 0 failures, 0 errors
+
+---
+
+## Phase 9.3 — Camera & Entry Point Admin UI
+
+**Status: COMPLETE**
+
+Full frontend management UI for cameras, entry points, and camera↔entry point mappings.
+
+**New Files:**
+- `frontend/src/lib/camera-api.ts` — TypeScript API client for cameras, entry points, mappings, and exam halls
+- `frontend/src/app/cameras/page.tsx` — Camera management page (list, create, edit, deactivate, filters, pagination)
+- `frontend/src/app/entry-points/page.tsx` — Entry point management page (list, create, edit, deactivate, code auto-uppercasing)
+- `frontend/src/app/camera-entry-mappings/page.tsx` — Mapping management page (list, create, disable, camera↔entry-point pairing)
+
+**UI Features:**
+- Camera list with device identifier, type, manufacturer, status, connection info, and exam hall association
+- Entry point list with code, location detail, hall association
+- Mapping list showing camera and entry point pairing with enabled/disabled state
+- Create/edit modals for cameras (all fields including resolution/position) and entry points (name, code, description, location, hall)
+- Mapping creation via dropdowns (select active camera + active entry point)
+- Soft-delete via deactivate/disable with confirmation modal
+- Search, pagination, show-inactive/disabled toggle filters
+- Reference data pre-loading (exam halls for hall assignment dropdowns)
+- Graceful handling when no active cameras or entry points exist
+- Monochrome design system, consistent with existing admin pages
+
+**Tests:** 1198 total (no new backend tests — UI only), 0 failures, 0 errors
 
 ## Files Changed in Phase 8.2
 

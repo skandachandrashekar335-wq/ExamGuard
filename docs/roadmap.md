@@ -531,23 +531,11 @@ Comprehensive integration tests verifying the complete Phase 8 system as ONE int
 
 ## Phase 9 — Camera & Entry Point Management
 
-**Status: PLANNED**
+**Status: COMPLETE**
 
-Focus:
-- Camera/device models
-- Entry gate management
-- Camera configuration
-- Device health/status
-- Camera-to-entry-point mapping
-- Secure device communication foundation
-
-**Dependencies:** Phases 0–4 (exam hall models must exist for mapping).
-
-**New models/migrations likely required:** `Camera`, `EntryPoint`, `CameraEntryPointMapping` models. Device health/status tracking.
-
-**Frontend work expected:** Camera management pages, entry point configuration, device status dashboard.
-
-**Testing requirements:** Unit tests for device models, mapping logic. API tests for camera CRUD endpoints.
+- **9.1** Domain foundation: Camera, EntryPoint, CameraEntryPointMapping models + migration 016 + 53 model tests
+- **9.2** CRUD API: 15 REST endpoints (cameras, entry-points, camera-entry-points) + 42 API integration tests + FK cleanup fixes
+- **9.3** Admin UI: Camera list/create/edit, entry point list/create/edit, mapping list/create/disable, API client, 23 frontend routes
 
 ---
 
