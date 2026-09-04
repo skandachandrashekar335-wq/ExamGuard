@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10.1 COMPLETE, 10.2 COMPLETE, 10.3 COMPLETE, 10.4 COMPLETE
-- **Tests:** 1525 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE
+- **Tests:** 1601 passing, 0 failures, 0 errors
 - **Frontend:** 24 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -975,3 +975,60 @@ Administrative UI for the entry verification workflow — list, create, inspect,
 
 **Tests:** 1525 total (unchanged), 0 failures, 0 errors
 **Frontend:** 24 pages building successfully (was 23)
+
+---
+
+## Phase 10.5 — Entry Verification Integration & Hardening
+
+**Status: COMPLETE**
+
+Cross-component integration tests verifying the complete entry verification workflow behaves consistently across all related domains.
+
+**Integration Test Coverage (`test_phase_10_5_integration.py` — 76 new tests):**
+
+1. **Full Workflow E2E** (2 tests): Complete flow from creation through all checks to GRANTED, with and without optional fields.
+
+2. **Hall Ticket Integration** (7 tests): Verified ticket passes, auto-link from registration, no ticket fails, unverified ticket fails, matched-not-verified fails, hall ticket not mutated by entry verification, repeated check consistent.
+
+3. **Seat/Hall Integration** (5 tests): Correct hall passes, wrong hall fails, no seat fails, seat not mutated, cancelled seat fails.
+
+4. **Camera/Entry Point Integration** (7 tests): Camera mapped to entry point, not mapped rejected, inactive camera rejected, disabled camera → identity skipped, offline camera → identity skipped, unknown camera → identity pending, online camera without attempt → identity pending.
+
+5. **Identity Verification Integration** (4 tests): Match attempt passes, no match fails, pending attempt → pending, no biometric data in entry verification.
+
+6. **Decision Combinations** (8 tests): All pass-pass-pass → GRANTED, any fail → DENIED, pending → ESCALATED, skipped → ESCALATED.
+
+7. **State Machine Hardening** (11 tests): PENDING→IN_PROGRESS, PENDING→ESCALATED, terminal states cannot restart/escalate/evaluate, ESCALATED cannot begin, ESCALATED can resolve, resolve on non-escalated raises, exhaustive transition coverage.
+
+8. **Human Escalation** (4 tests): Reason persisted, check states preserved after escalation, resolve records timestamp, escalation requires reason.
+
+9. **Repeated Operations** (7 tests): Repeated begin, evaluate, escalation, hall ticket check, seat check, identity check, resolve — all idempotent.
+
+10. **Concurrency** (2 tests): Concurrent begin attempts — state machine prevents corruption; escalate-then-evaluate — state machine enforces valid transitions.
+
+11. **Data Integrity** (5 tests): Entry verification does not mutate Student, ExamRegistration, HallTicket, SeatAssignment; foreign keys valid after full workflow.
+
+12. **API/Service/DB Integration** (3 tests): Create via API persists to DB, list filter consistency, get returns None for missing.
+
+13. **Privacy/Security** (4 tests): No secrets in model, no biometric data persisted, no authentication introduced, escalation has no reviewer field.
+
+14. **List/Filter Integration** (5 tests): List returns created records, filter by status/student/entry_point, pagination works.
+
+15. **Edge Cases** (2 tests): Cancelled registration rejected, inactive entry point rejected.
+
+**Tests:** 1601 total (1525 previous + 76 new), 0 failures, 0 errors
+
+---
+
+## Phase 10 — COMPLETE
+
+All sub-phases complete:
+- 10.1 Entry Verification Domain Model ✅
+- 10.2 Entry Verification Service Layer ✅
+- 10.3 Entry Verification REST API ✅
+- 10.4 Entry Verification Admin UI ✅
+- 10.5 Integration & Hardening ✅
+
+**Total Phase 10 Tests:** 76 integration + 56 API + 71 service + 49 model = 252 Phase 10-specific tests
+**Total Backend Tests:** 1601 passing, 0 failures, 0 errors
+**Total Frontend Pages:** 24 routes building successfully
