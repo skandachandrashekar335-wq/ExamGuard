@@ -2,9 +2,9 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10.1 COMPLETE, 10.2 COMPLETE, 10.3 COMPLETE
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10.1 COMPLETE, 10.2 COMPLETE, 10.3 COMPLETE, 10.4 COMPLETE
 - **Tests:** 1525 passing, 0 failures, 0 errors
-- **Frontend:** 23 pages building successfully
+- **Frontend:** 24 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
 ---
@@ -943,3 +943,35 @@ REST API layer exposing entry verification service through 10 endpoints.
 **Security Audit:** Passed — client cannot set status/check states/resolved_at, no reviewer identity accepted, no biometric data exposed, no credential leakage, service remains authority.
 
 **Tests:** 1525 total (1469 previous + 56 new), 0 failures, 0 errors
+
+---
+
+## Phase 10.4 — Entry Verification Admin UI
+
+**Status: COMPLETE**
+
+Administrative UI for the entry verification workflow — list, create, inspect, progress, escalate, resolve.
+
+**New Files:**
+- `frontend/src/lib/entry-verification-api.ts` — API client (typed functions for all 10 endpoints)
+- `frontend/src/app/entry-verifications/page.tsx` — List page with filters (status, entry_point_id, student_id), pagination, create form
+- `frontend/src/app/entry-verifications/[id]/page.tsx` — Detail page with workflow actions, check status display, escalation UI, resolution UI
+
+**Features:**
+- List page: table with ID, student, registration, entry point, exam hall, status, ticket/identity/seat checks, created timestamp
+- Filters: status dropdown, student ID input, entry point ID input — server-side filtering via API
+- Create form: student_id, exam_registration_id, entry_point_id (required), camera_id, hall_ticket_id (optional)
+- Detail page: lifecycle status, all references, check states, timestamps
+- Workflow actions: begin, hall-ticket-check, seat-check, identity-check, evaluate (PENDING/IN_PROGRESS)
+- Escalation: reason textarea, confirm/cancel
+- Resolution: grant/deny buttons, optional reason, shows escalation reason
+- Error handling: inline errors from API, safe human-readable messages
+- Loading states, empty states, disabled buttons during requests
+- Responsive, accessible, monochrome design system
+
+**Routes:**
+- `/entry-verifications` — List + create (static)
+- `/entry-verifications/[id]` — Detail + actions (dynamic)
+
+**Tests:** 1525 total (unchanged), 0 failures, 0 errors
+**Frontend:** 24 pages building successfully (was 23)

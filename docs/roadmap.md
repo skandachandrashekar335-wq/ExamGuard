@@ -588,7 +588,7 @@ Cross-component integration tests and comprehensive domain audit.
 
 ## Phase 10 — Real-Time Examination Entry Verification
 
-**Status: IN PROGRESS (10.1 COMPLETE, 10.2 COMPLETE, 10.3 COMPLETE, 10.4+ PLANNED)**
+**Status: IN PROGRESS (10.1 COMPLETE, 10.2 COMPLETE, 10.3 COMPLETE, 10.4 COMPLETE, 10.5 PLANNED)**
 
 Focus:
 - Live entry workflow
@@ -606,7 +606,7 @@ Focus:
 - **10.1** Domain model: EntryVerification model, EntryVerificationStatus/HallTicketCheckStatus/IdentityCheckStatus/SeatCheckStatus enums, migration 019, 49 model tests — COMPLETE
 - **10.2** Service layer: entry verification service (create, begin_processing, process_hall_ticket_check, process_seat_check, process_identity_check, evaluate_entry, escalate_for_review, resolve_escalation), 71 service tests — COMPLETE
 - **10.3** API layer: 10 REST endpoints, 56 API tests — COMPLETE
-- **10.4** Admin UI: PLANNED
+- **10.4** Admin UI: list page, detail page, create form, workflow actions, escalation/resolve UI — COMPLETE
 - **10.5** Integration tests & hardening: PLANNED
 
 **Frontend work expected:** Live entry monitoring dashboard, verification status displays, human review escalation UI.
@@ -937,12 +937,12 @@ Focus:
 
 ## Current Project State
 
-- **Current phase:** Phase 10 IN PROGRESS (10.1–10.3 COMPLETE)
-- **Current completed step:** Phase 10.3 — Entry Verification API
+- **Current phase:** Phase 10 IN PROGRESS (10.1–10.4 COMPLETE)
+- **Current completed step:** Phase 10.4 — Entry Verification Admin UI
 - **Current tests:** 1525 passing (0 failures, 0 errors)
-- **Frontend pages:** 23 (all building successfully)
+- **Frontend pages:** 24 (all building successfully)
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono), zero border-radius, no neon colors
-- **Next step:** Phase 10.4 — Entry Verification Admin UI (PLANNED)
+- **Next step:** Phase 10.5 — Entry Verification Integration & Hardening (PLANNED)
 - **Provider architecture:** `app/services/face_verification/` with Protocol, DeterministicProvider, factory
 - **Identity verification API:** `POST /{attempt_id}/verify-face` endpoint for face verification trigger
 - **Camera infrastructure:** Complete — Camera, EntryPoint, Mapping, Credential, Health Observation, Device Auth API
