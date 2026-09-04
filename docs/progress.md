@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 IN PROGRESS (9.1, 9.2, 9.3, 9.4 complete)
-- **Tests:** 1251 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE, 9 IN PROGRESS (9.1, 9.2, 9.3, 9.4, 9.5 complete)
+- **Tests:** 1305 passing, 0 failures, 0 errors
 - **Frontend:** 23 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -784,6 +784,49 @@ Real device health/status foundation for physical Camera infrastructure. Separat
 **Security:** Status cannot be faked via camera CRUD. Health observations are the only path to change status. No credential/secret/biometric leakage.
 
 **Tests:** 1251 total (1198 previous + 53 new), 0 failures, 0 errors
+
+---
+
+## Phase 9.5 — Secure Device Communication Foundation
+
+**Status: COMPLETE**
+
+Secure credential provisioning, authentication, and revocation for physical camera devices. Device health endpoint authenticated via credential-based identity.
+
+**Key Design Decisions:**
+- Credentials are high-entropy 256-bit secrets (`secrets.token_hex(32)`)
+- SHA-256 hashing is appropriate for high-entropy bearer tokens (preimage-resistant; bcrypt adds zero security benefit against 256-bit random secrets)
+- Constant-time comparison via `hmac.compare_digest` prevents timing attacks
+- Raw secret returned ONCE at provisioning; never stored, logged, or returned again
+- Camera identity derived from authenticated credential — caller cannot override camera_id
+- Admin CRUD cannot change camera status; only `record_health_observation()` changes status
+- Revoked credentials immediately rejected
+- Inactive cameras cannot authenticate
+
+**New Files:**
+- `backend/app/models/camera_device_credential.py` — CameraDeviceCredential model (secret_hash, secret_prefix, status, camera_id FK)
+- `backend/app/schemas/device_credential.py` — DeviceCredentialCreate, DeviceCredentialResponse, DeviceCredentialProvisionResponse, DeviceHealthRequest, DeviceHealthResponse
+- `backend/app/services/device_credential.py` — create_device_credential(), authenticate_device(), revoke_device_credential(), list_device_credentials(), get_device_credential()
+- `backend/app/api/v1/device.py` — 5 endpoints: provision credential, list credentials, get credential, revoke credential, device health
+- `backend/alembic/versions/018_create_camera_device_credentials_table.py` — Migration
+- `backend/tests/test_phase_9_5_device_comm.py` — 38 service-level tests
+- `backend/tests/test_phase_9_5_device_api.py` — 16 API integration tests
+
+**Modified Files:**
+- `backend/app/models/camera.py` — Added device_credentials relationship with cascade delete
+- `backend/app/models/__init__.py` — Registered CameraDeviceCredential model
+- `backend/app/api/v1/router.py` — Registered device router
+
+**API Endpoints:**
+- `POST /api/v1/device/credentials` — Provision new credential (returns raw secret once)
+- `GET /api/v1/device/credentials?camera_id=` — List credentials (no secrets)
+- `GET /api/v1/device/credentials/{id}` — Get credential (no secret)
+- `POST /api/v1/device/credentials/{id}/revoke` — Revoke credential
+- `POST /api/v1/device/health` — Device health heartbeat (authenticated via X-Device-Credential header)
+
+**Security Audit:** Passed — no secrets in code, no leaks, no biometric data in device layer, constant-time comparison, identity binding correct.
+
+**Tests:** 1305 total (1251 previous + 54 new), 0 failures, 0 errors
 
 ## Files Changed in Phase 8.2
 

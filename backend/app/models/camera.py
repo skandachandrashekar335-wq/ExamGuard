@@ -131,6 +131,10 @@ class Camera(Base):
     entry_point_mappings: Mapped[list["CameraEntryPointMapping"]] = relationship(  # noqa: F821
         back_populates="camera",
     )
+    device_credentials: Mapped[list["CameraDeviceCredential"]] = relationship(  # noqa: F821
+        back_populates="camera",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         return f"<Camera id={self.id} name={self.name!r} status={self.status!r}>"

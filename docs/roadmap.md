@@ -527,17 +527,42 @@ Comprehensive integration tests verifying the complete Phase 8 system as ONE int
 
 **Results:** 1103 tests passing, 0 failures, 0 errors (two runs stable)
 
+### 9.5 Secure Device Communication Foundation
+**Status: COMPLETE**
+
+Secure credential provisioning, authentication, and revocation for physical camera devices.
+
+**Credential Design:**
+- High-entropy 256-bit secrets via `secrets.token_hex(32)`
+- SHA-256 hashed before storage (appropriate for high-entropy bearer tokens)
+- Constant-time comparison via `hmac.compare_digest`
+- Raw secret returned ONCE at provisioning; never stored/logged/returned again
+- Camera identity derived from authenticated credential (no user-supplied camera_id on health endpoint)
+
+**Security Properties:**
+- Raw credentials never stored
+- Raw credentials never logged
+- Hashes never exposed in API responses
+- Revoked credentials immediately rejected
+- Inactive cameras cannot authenticate
+- Credential cannot target another camera
+- Errors do not leak secrets
+- No biometric/video/student data in device layer
+- Status changes only through `record_health_observation()`
+
+**Tests:** 54 tests (38 service + 16 API)
+
 ---
 
 ## Phase 9 — Camera & Entry Point Management
 
-**Status: IN PROGRESS (9.1–9.4 complete, 9.5–9.6 future)**
+**Status: IN PROGRESS (9.1–9.5 complete, 9.6 future)**
 
 - **9.1** Domain foundation: Camera, EntryPoint, CameraEntryPointMapping models + migration 016 + 53 model tests — COMPLETE
 - **9.2** CRUD API: 15 REST endpoints (cameras, entry-points, camera-entry-points) + 42 API integration tests + FK cleanup fixes — COMPLETE
 - **9.3** Admin UI: Camera list/create/edit, entry point list/create/edit, mapping list/create/disable, API client, 23 frontend routes — COMPLETE
 - **9.4** Device health/status: Health observation boundary, last_seen_at/last_health_check_at/health_reason fields, health API endpoints, 53 tests — COMPLETE
-- **9.5** Secure communication — FUTURE
+- **9.5** Secure communication: Device credential provisioning, authentication, revocation, SHA-256 hashing, device health API (authenticated), 54 tests, security audit — COMPLETE
 - **9.6** Integration/hardening — FUTURE
 
 ---
@@ -887,11 +912,11 @@ Focus:
 
 ## Current Project State
 
-- **Current phase:** Phase 8 IN PROGRESS (8.1, 8.2, 8.3, 8.4, 8.5 complete)
-- **Current completed step:** Phase 8.5 — Threshold + Decision Integration
-- **Current tests:** 919 passing (0 failures, 0 errors)
-- **Frontend pages:** 20 (all building successfully)
+- **Current phase:** Phase 9 IN PROGRESS (9.1, 9.2, 9.3, 9.4, 9.5 complete)
+- **Current completed step:** Phase 9.5 — Secure Device Communication Foundation
+- **Current tests:** 1305 passing (0 failures, 0 errors)
+- **Frontend pages:** 23 (all building successfully)
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono), zero border-radius, no neon colors
-- **Next step:** Phase 8.6 — Failure/Security/Review Hardening (FUTURE)
+- **Next step:** Phase 9.6 — Integration/Hardening (FUTURE)
 - **Provider architecture:** `app/services/face_verification/` with Protocol, DeterministicProvider, factory
 - **Identity verification API:** `POST /{attempt_id}/verify-face` endpoint for face verification trigger
