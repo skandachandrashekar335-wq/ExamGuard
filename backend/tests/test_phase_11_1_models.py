@@ -185,8 +185,8 @@ class TestSecuritySignalTypeEnum:
         values = [e.value for e in SecuritySignalType]
         assert len(values) == len(set(values))
 
-    def test_has_ten_signal_types(self):
-        assert len(SecuritySignalType) == 10
+    def test_has_expected_signal_types(self):
+        assert len(SecuritySignalType) == 23
 
 
 # ---------------------------------------------------------------------------

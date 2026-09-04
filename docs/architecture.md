@@ -15,7 +15,8 @@ ExamGuard/
 │   │   │   ├── exam/         # Exam verification service
 │   │   │   ├── attendance/   # Attendance service
 │   │   │   ├── document/     # OCR, hall-ticket extraction
-│   │   │   └── erp/          # ERP integration abstraction
+│   │   │   ├── erp/          # ERP integration abstraction
+│   │   │   └── signal_detection.py  # Anti-proxy signal detection
 │   │   ├── ai/               # AI perception layer (face, UniFace wrappers)
 │   │   ├── storage/          # Storage abstraction (local, Cloudinary later)
 │   │   └── main.py           # FastAPI app factory
@@ -65,6 +66,7 @@ Storage         →  ABSTRACTED (swap providers without code changes)
 | OCR | `backend/app/services/document/` |
 | Seating | `backend/app/models/` + `services/` |
 | Cameras | `backend/app/models/` + `services/` |
+| Anti-Proxy Signals | `backend/app/services/signal_detection.py` |
 | Attendance | `backend/app/services/attendance/` |
 | Cloudinary | `backend/app/storage/cloudinary.py` |
 | ERP | `backend/app/services/erp/adapter.py` |

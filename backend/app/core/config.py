@@ -79,6 +79,8 @@ class Settings(BaseSettings):
     PROXY_RISK_CRITICAL_THRESHOLD: float = 80.0
     PROXY_RISK_MAX_SCORE: float = 100.0
     PROXY_RISK_POLICY_VERSION: str = "1.0"
+    # Signal detection: rapid sequential entry window (seconds)
+    PROXY_RISK_RAPID_ENTRY_WINDOW_SECONDS: int = 300
 
     @model_validator(mode="after")
     def validate_decision_policy(self) -> "Settings":

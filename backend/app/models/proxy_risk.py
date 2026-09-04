@@ -18,6 +18,19 @@ class SecuritySignalType(str, enum.Enum):
     BEHAVIORAL_ANOMALY = "BEHAVIORAL_ANOMALY"
     IDENTITY_MISMATCH = "IDENTITY_MISMATCH"
     MANUAL_FLAG = "MANUAL_FLAG"
+    LIVENESS_SPOOF_DETECTED = "LIVENESS_SPOOF_DETECTED"
+    WRONG_HALL_DETECTED = "WRONG_HALL_DETECTED"
+    IDENTITY_INCONCLUSIVE = "IDENTITY_INCONCLUSIVE"
+    DUPLICATE_ENTRY_SAME_EXAM = "DUPLICATE_ENTRY_SAME_EXAM"
+    REPEATED_FAILED_IDENTITY = "REPEATED_FAILED_IDENTITY"
+    HALL_TICKET_FIELD_MISMATCH = "HALL_TICKET_FIELD_MISMATCH"
+    WRONG_ENTRY_POINT = "WRONG_ENTRY_POINT"
+    MISSING_IDENTITY_CHECK = "MISSING_IDENTITY_CHECK"
+    NO_SEAT_ASSIGNMENT = "NO_SEAT_ASSIGNMENT"
+    NO_HALL_TICKET = "NO_HALL_TICKET"
+    CAMERA_OFFLINE_AT_ENTRY = "CAMERA_OFFLINE_AT_ENTRY"
+    LATE_ENTRY = "LATE_ENTRY"
+    RAPID_SEQUENTIAL_ENTRY = "RAPID_SEQUENTIAL_ENTRY"
 
 
 class SignalStrength(str, enum.Enum):
@@ -38,6 +51,19 @@ SIGNAL_STRENGTH_DEFAULTS: dict[str, SignalStrength] = {
     SecuritySignalType.BEHAVIORAL_ANOMALY.value: SignalStrength.MODERATE,
     SecuritySignalType.IDENTITY_MISMATCH.value: SignalStrength.STRONG,
     SecuritySignalType.MANUAL_FLAG.value: SignalStrength.MODERATE,
+    SecuritySignalType.LIVENESS_SPOOF_DETECTED.value: SignalStrength.STRONG,
+    SecuritySignalType.WRONG_HALL_DETECTED.value: SignalStrength.STRONG,
+    SecuritySignalType.IDENTITY_INCONCLUSIVE.value: SignalStrength.MODERATE,
+    SecuritySignalType.DUPLICATE_ENTRY_SAME_EXAM.value: SignalStrength.MODERATE,
+    SecuritySignalType.REPEATED_FAILED_IDENTITY.value: SignalStrength.MODERATE,
+    SecuritySignalType.HALL_TICKET_FIELD_MISMATCH.value: SignalStrength.MODERATE,
+    SecuritySignalType.WRONG_ENTRY_POINT.value: SignalStrength.MODERATE,
+    SecuritySignalType.MISSING_IDENTITY_CHECK.value: SignalStrength.INFORMATIONAL,
+    SecuritySignalType.NO_SEAT_ASSIGNMENT.value: SignalStrength.WEAK,
+    SecuritySignalType.NO_HALL_TICKET.value: SignalStrength.WEAK,
+    SecuritySignalType.CAMERA_OFFLINE_AT_ENTRY.value: SignalStrength.WEAK,
+    SecuritySignalType.LATE_ENTRY.value: SignalStrength.WEAK,
+    SecuritySignalType.RAPID_SEQUENTIAL_ENTRY.value: SignalStrength.WEAK,
 }
 
 

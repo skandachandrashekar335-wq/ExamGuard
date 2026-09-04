@@ -4,8 +4,8 @@ AI-powered Examination Entry Verification, Anti-Proxy, Security, and Attendance 
 
 ## Project Status
 
-- **Phase:** 11 IN PROGRESS (11.1 complete)
-- **Backend:** 1648 tests passing (0 failures, 0 errors)
+- **Phase:** 11 IN PROGRESS (11.1, 11.2 complete)
+- **Backend:** 1720 tests passing (0 failures, 0 errors)
 - **Frontend:** 24 pages (Next.js 16.3.3, React 19, TypeScript, Tailwind v4)
 - **Tech stack:** FastAPI + SQLAlchemy + PostgreSQL (backend), Next.js + TypeScript + Tailwind (frontend)
 
@@ -40,6 +40,7 @@ AI-powered Examination Entry Verification, Anti-Proxy, Security, and Attendance 
 ### Phase 11 — Anti-Proxy Detection (IN PROGRESS)
 
 - **11.1** Domain foundation: SecuritySignal + ProxyRiskAssessment models, 3 enums, 6 config settings, migration 020, 47 model tests
+- **11.2** Deterministic signal detection: 14 signal detectors, idempotent service, 72 tests, migration 021
 
 ## Development
 

@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11.1 IN PROGRESS
-- **Tests:** 1648 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11.1 COMPLETE, 11.2 IN PROGRESS
+- **Tests:** 1720 passing, 0 failures, 0 errors
 - **Frontend:** 24 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -1073,3 +1073,66 @@ Established the anti-proxy domain with SecuritySignal and ProxyRiskAssessment mo
 
 **Tests:** 1648 total (1601 previous + 47 new), 0 failures, 0 errors
 **Frontend:** 24 pages building successfully
+
+---
+
+## Phase 11.2 — Deterministic Anti-Proxy Signal Detection
+
+**Status: COMPLETE**
+
+Deterministic signal detection service that examines EntryVerification and related domain data to produce SecuritySignal records.
+
+**Service:** `backend/app/services/signal_detection.py`
+- `detect_signals(db, entry_verification_id) -> list[SecuritySignal]`
+- 14 private detector functions, one per signal type
+- Idempotent: deduplication via `(signal_type, dedup_key)` in evidence_json
+- Single transaction boundary with `db.flush()`
+- Exception-safe: individual detector failures logged but don't abort others
+
+**Signal Types Implemented (14):**
+
+| Signal | Strength | Condition |
+|---|---|---|
+| IDENTITY_MISMATCH | STRONG | Identity attempt decision = NO_MATCH |
+| LIVENESS_SPOOF_DETECTED | STRONG | Evidence signal_type="liveness", signal_value="FAIL" |
+| WRONG_HALL_DETECTED | STRONG | SeatAssignment hall ≠ EntryVerification exam_hall |
+| IDENTITY_INCONCLUSIVE | MODERATE | Identity attempt decision = INCONCLUSIVE |
+| DUPLICATE_ENTRY_SAME_EXAM | MODERATE | Other EntryVerification for same student + exam |
+| REPEATED_FAILED_IDENTITY | MODERATE | >1 NO_MATCH attempts for same exam_registration |
+| HALL_TICKET_FIELD_MISMATCH | MODERATE | HallTicketMatchSignal has matched=False fields |
+| WRONG_ENTRY_POINT | MODERATE | EntryPoint exam_hall ≠ SeatAssignment exam_hall |
+| MISSING_IDENTITY_CHECK | INFORMATIONAL | identity_check=SKIPPED with active camera mapped |
+| NO_SEAT_ASSIGNMENT | WEAK | No ASSIGNED SeatAssignment for registration |
+| NO_HALL_TICKET | WEAK | No VERIFIED/MATCHED HallTicket for registration |
+| CAMERA_OFFLINE_AT_ENTRY | WEAK | Camera status is OFFLINE or DISABLED |
+| LATE_ENTRY | WEAK | EntryVerification created after Exam.start_time |
+| RAPID_SEQUENTIAL_ENTRY | WEAK | Multiple entries within configurable window |
+
+**Configuration Added:**
+- `PROXY_RISK_RAPID_ENTRY_WINDOW_SECONDS: int = 300` — configurable window for rapid entry detection
+
+**SecuritySignalType Enum Expanded:** 10 → 23 values (13 new types added)
+
+**Migration:** 021 (`021_expand_security_signal_type_enum.py`) — documentation-only, SQLite accepts strings without ALTER TYPE
+
+**New Files:**
+- `backend/app/services/signal_detection.py` — signal detection service
+- `backend/tests/test_signal_detection.py` — 72 tests
+- `backend/alembic/versions/021_expand_security_signal_type_enum.py` — migration
+
+**Modified Files:**
+- `backend/app/models/proxy_risk.py` — expanded SecuritySignalType (10→23), SIGNAL_STRENGTH_DEFAULTS (10→23)
+- `backend/app/core/config.py` — added PROXY_RISK_RAPID_ENTRY_WINDOW_SECONDS
+- `backend/tests/test_phase_11_1_models.py` — updated enum count assertion (10→23)
+
+**Tests:** 1720 total (1648 previous + 72 new), 0 failures, 0 errors
+**Frontend:** 24 pages building successfully
+
+**What Phase 11.2 does NOT do:**
+- Does NOT calculate risk scores (Phase 11.3)
+- Does NOT create ProxyRiskAssessment records
+- Does NOT modify EntryVerification status
+- Does NOT authorize or deny entry
+- Does NOT create API endpoints (Phase 11.4)
+- Does NOT create frontend UI (Phase 11.5)
+- Does NOT implement review workflow (Phase 11.6)
