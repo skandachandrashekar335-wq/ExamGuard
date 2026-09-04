@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE
-- **Tests:** 1601 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11.1 IN PROGRESS
+- **Tests:** 1648 passing, 0 failures, 0 errors
 - **Frontend:** 24 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -1032,3 +1032,44 @@ All sub-phases complete:
 **Total Phase 10 Tests:** 76 integration + 56 API + 71 service + 49 model = 252 Phase 10-specific tests
 **Total Backend Tests:** 1601 passing, 0 failures, 0 errors
 **Total Frontend Pages:** 24 routes building successfully
+
+---
+
+## Phase 11.1 — Anti-Proxy Domain & Database Foundation
+
+**Status: COMPLETE**
+
+Established the anti-proxy domain with SecuritySignal and ProxyRiskAssessment models, enums, risk scoring configuration, and database migration.
+
+**Models:**
+- `SecuritySignal` — immutable, append-only signal record (entry_verification FK, signal_type, strength, source, description, evidence_json, created_at)
+- `ProxyRiskAssessment` — historical risk assessment (entry_verification FK, risk_level, risk_score, signals_summary_json, assessed_at, policy_version)
+
+**Enums:**
+- `SecuritySignalType` — 10 types: DUPLICATE_ENTRY, UNUSUAL_ENTRY_POINT, UNUSUAL_TIME, SEAT_MISMATCH, MULTIPLE_REGISTRATIONS, RAPID_ENTRY, DOCUMENT_ANOMALY, BEHAVIORAL_ANOMALY, IDENTITY_MISMATCH, MANUAL_FLAG
+- `SignalStrength` — 4 levels: STRONG, MODERATE, WEAK, INFORMATIONAL
+- `RiskLevel` — 4 levels: LOW, ELEVATED, HIGH, CRITICAL
+- `SIGNAL_STRENGTH_DEFAULTS` — predefined strength defaults per signal type
+
+**Configuration (`app/core/config.py`):**
+- `PROXY_RISK_WEIGHTS` — comma-separated signal type:weight pairs (default: DUPLICATE_ENTRY:30, UNUSUAL_ENTRY_POINT:15, etc.)
+- `PROXY_RISK_ELEVATED_THRESHOLD: float = 30.0`
+- `PROXY_RISK_HIGH_THRESHOLD: float = 60.0`
+- `PROXY_RISK_CRITICAL_THRESHOLD: float = 80.0`
+- `PROXY_RISK_MAX_SCORE: float = 100.0`
+- `PROXY_RISK_POLICY_VERSION: str = "1.0"`
+- `model_validator` enforces threshold ordering: 0 <= ELEVATED < HIGH < CRITICAL <= MAX_SCORE
+
+**Migration:** 020 (`020_create_proxy_risk_tables.py`)
+
+**New Files:**
+- `backend/app/models/proxy_risk.py` — SecuritySignal + ProxyRiskAssessment models + 3 enums + defaults dict
+- `backend/alembic/versions/020_create_proxy_risk_tables.py` — Migration
+- `backend/tests/test_phase_11_1_models.py` — 47 model tests
+
+**Modified Files:**
+- `backend/app/core/config.py` — Added 6 proxy risk config settings + validator
+- `backend/app/models/__init__.py` — Registered SecuritySignal, ProxyRiskAssessment
+
+**Tests:** 1648 total (1601 previous + 47 new), 0 failures, 0 errors
+**Frontend:** 24 pages building successfully

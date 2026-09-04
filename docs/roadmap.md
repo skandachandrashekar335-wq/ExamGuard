@@ -600,24 +600,14 @@ Cross-component integration tests and comprehensive domain audit.
 
 ## Phase 11 — Anti-Proxy Detection
 
-**Status: PLANNED**
+**Status: IN PROGRESS**
 
-Focus:
-- Proxy-risk signals
-- Identity mismatch detection
-- Duplicate identity/entry detection
-- Suspicious verification patterns
-- Risk scoring based on evidence
-- Human review workflow
-- Auditability
-
-**Dependencies:** Phase 10 (real-time entry verification must exist to generate proxy-risk signals).
-
-**New models/migrations likely required:** `ProxyRiskAssessment` or `SecuritySignal` model. Risk scoring evidence storage.
-
-**Frontend work expected:** Risk assessment dashboard, suspicious activity review pages.
-
-**Testing requirements:** Unit tests for risk scoring logic, duplicate detection, mismatch detection. API tests for risk assessment endpoints.
+- **11.1** Domain foundation: SecuritySignal + ProxyRiskAssessment models, 3 enums (SecuritySignalType, SignalStrength, RiskLevel), SIGNAL_STRENGTH_DEFAULTS, 6 config settings with validation, migration 020, 47 model tests — COMPLETE
+- **11.2** Service layer: PLANNED
+- **11.3** Risk scoring engine: PLANNED
+- **11.4** API layer: PLANNED
+- **11.5** Admin UI: PLANNED
+- **11.6** Integration tests & hardening: PLANNED
 
 ---
 
@@ -919,12 +909,12 @@ Focus:
 
 ## Current Project State
 
-- **Current phase:** Phase 10 COMPLETE
-- **Current completed step:** Phase 10.5 — Entry Verification Integration & Hardening
-- **Current tests:** 1601 passing (0 failures, 0 errors)
+- **Current phase:** Phase 11 — Anti-Proxy Detection (IN PROGRESS: 11.1 complete)
+- **Current completed step:** Phase 11.1 — Anti-Proxy Domain & Database Foundation
+- **Current tests:** 1648 passing (0 failures, 0 errors)
 - **Frontend pages:** 24 (all building successfully)
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono), zero border-radius, no neon colors
-- **Next step:** Phase 11 — Anti-Proxy Detection (PLANNED)
+- **Next step:** Phase 11.2 — Anti-Proxy Service Layer
 - **Provider architecture:** `app/services/face_verification/` with Protocol, DeterministicProvider, factory
 - **Identity verification API:** `POST /{attempt_id}/verify-face` endpoint for face verification trigger
 - **Camera infrastructure:** Complete — Camera, EntryPoint, Mapping, Credential, Health Observation, Device Auth API

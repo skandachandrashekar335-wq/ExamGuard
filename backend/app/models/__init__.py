@@ -23,3 +23,4 @@ from app.models.camera_device_credential import CameraDeviceCredential  # noqa: 
 from app.models.entry_point import EntryPoint  # noqa: E402, F401
 from app.models.camera_entry_point import CameraEntryPointMapping  # noqa: E402, F401
 from app.models.entry_verification import EntryVerification  # noqa: E402, F401
+from app.models.proxy_risk import SecuritySignal, ProxyRiskAssessment  # noqa: E402, F401

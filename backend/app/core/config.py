@@ -67,6 +67,19 @@ class Settings(BaseSettings):
     # Rate limiting: max verify-face calls per minute globally (0 = unlimited)
     FACE_VERIFICATION_MAX_CALLS_PER_MINUTE: int = 60
 
+    # Proxy risk scoring settings
+    PROXY_RISK_WEIGHTS: str = (
+        "DUPLICATE_ENTRY:30,UNUSUAL_ENTRY_POINT:15,UNUSUAL_TIME:10,"
+        "SEAT_MISMATCH:40,MULTIPLE_REGISTRATIONS:40,RAPID_ENTRY:20,"
+        "DOCUMENT_ANOMALY:35,BEHAVIORAL_ANOMALY:25,IDENTITY_MISMATCH:45,"
+        "MANUAL_FLAG:15"
+    )
+    PROXY_RISK_ELEVATED_THRESHOLD: float = 30.0
+    PROXY_RISK_HIGH_THRESHOLD: float = 60.0
+    PROXY_RISK_CRITICAL_THRESHOLD: float = 80.0
+    PROXY_RISK_MAX_SCORE: float = 100.0
+    PROXY_RISK_POLICY_VERSION: str = "1.0"
+
     @model_validator(mode="after")
     def validate_decision_policy(self) -> "Settings":
         """Validate decision policy configuration values."""
@@ -77,8 +90,25 @@ class Settings(BaseSettings):
             )
         if not (0.0 < self.IDENTITY_VERIFICATION_NEAR_THRESHOLD_FACTOR <= 1.0):
             raise ValueError(
-                f"IDENTITY_VERIFICATION_NEAR_THRESHOLD_FACTOR must be in (0.0, 1.0], "
+                f"IDENTITY_VERIFICATION_NEAR_THRESHOLD_FACTOR must in (0.0, 1.0], "
                 f"got {self.IDENTITY_VERIFICATION_NEAR_THRESHOLD_FACTOR}"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def validate_proxy_risk_thresholds(self) -> "Settings":
+        """Validate proxy risk threshold ordering and ranges."""
+        if not (0.0 <= self.PROXY_RISK_ELEVATED_THRESHOLD < self.PROXY_RISK_HIGH_THRESHOLD < self.PROXY_RISK_CRITICAL_THRESHOLD):
+            raise ValueError(
+                f"Proxy risk thresholds must satisfy: 0 <= ELEVATED < HIGH < CRITICAL, "
+                f"got ELEVATED={self.PROXY_RISK_ELEVATED_THRESHOLD}, "
+                f"HIGH={self.PROXY_RISK_HIGH_THRESHOLD}, "
+                f"CRITICAL={self.PROXY_RISK_CRITICAL_THRESHOLD}"
+            )
+        if not (self.PROXY_RISK_CRITICAL_THRESHOLD <= self.PROXY_RISK_MAX_SCORE):
+            raise ValueError(
+                f"PROXY_RISK_CRITICAL_THRESHOLD ({self.PROXY_RISK_CRITICAL_THRESHOLD}) "
+                f"must be <= PROXY_RISK_MAX_SCORE ({self.PROXY_RISK_MAX_SCORE})"
             )
         return self
 
