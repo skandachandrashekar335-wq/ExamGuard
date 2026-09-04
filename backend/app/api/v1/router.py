@@ -6,6 +6,7 @@ from app.api.v1.camera_health import router as camera_health_router
 from app.api.v1.cameras import router as cameras_router
 from app.api.v1.device import router as device_router
 from app.api.v1.entry_points import router as entry_points_router
+from app.api.v1.entry_verification import router as entry_verification_router
 from app.api.v1.hall_tickets import router as hall_tickets_router
 from app.api.v1.identity_verification import router as identity_verification_router
 from app.api.v1.import_audit_log import router as import_audit_log_router
@@ -31,6 +32,7 @@ router.include_router(camera_health_router)
 router.include_router(cameras_router)
 router.include_router(device_router)
 router.include_router(entry_points_router)
+router.include_router(entry_verification_router)
 router.include_router(hall_tickets_router)
 router.include_router(identity_verification_router)
 router.include_router(import_audit_log_router)

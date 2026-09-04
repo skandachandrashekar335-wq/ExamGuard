@@ -18,6 +18,7 @@ from app.models.identity_verification import (
 from app.models.seat_assignment import SeatAssignment, SeatAssignmentStatus
 from app.models.verification import VerificationDecision, VerificationOutcome
 from app.models.hall_ticket import HallTicket
+from app.models.entry_verification import EntryVerification
 from app.services import dashboard
 
 
@@ -41,6 +42,7 @@ def cleanup():
         db.execute(delete(HallTicket))
         db.execute(delete(IdentityVerificationEvidence))
         db.execute(delete(IdentityVerificationAttempt))
+        db.execute(delete(EntryVerification))
         db.execute(delete(ExamRegistration))
         from app.models.camera_entry_point import CameraEntryPointMapping
         from app.models.camera import Camera

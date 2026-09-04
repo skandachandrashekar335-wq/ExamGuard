@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10.1 COMPLETE, 10.2 COMPLETE
-- **Tests:** 1469 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10.1 COMPLETE, 10.2 COMPLETE, 10.3 COMPLETE
+- **Tests:** 1525 passing, 0 failures, 0 errors
 - **Frontend:** 23 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -879,3 +879,67 @@ All sub-phases complete:
 **Total Phase 9 Tests:** 44 integration + 54 device comm + 53 health + 42 API + 53 model = 246 Phase 9-specific tests
 **Total Backend Tests:** 1349 passing, 0 failures, 0 errors
 **Total Frontend Pages:** 23 routes building successfully
+
+---
+
+## Phase 10.1 — Entry Verification Domain Model
+
+**Status: COMPLETE**
+
+Entry verification domain model with 4 enums, state machine, and migration.
+
+**New Files:**
+- `backend/app/models/entry_verification.py` — EntryVerification model + 4 enums + state machine
+- `backend/alembic/versions/019_create_entry_verifications_table.py` — Migration
+- `backend/tests/test_phase_10_1_models.py` — 49 model tests
+
+**Tests:** 1398 total (1349 previous + 49 new), 0 failures, 0 errors
+
+---
+
+## Phase 10.2 — Entry Verification Service Layer
+
+**Status: COMPLETE**
+
+Entry verification service with 10 functions orchestrating Student, ExamRegistration, HallTicket, SeatAssignment, EntryPoint, Camera, IdentityVerificationAttempt.
+
+**New Files:**
+- `backend/app/services/entry_verification.py` — 10 service functions (719 lines)
+- `backend/tests/test_phase_10_2_service.py` — 71 service tests
+
+**Tests:** 1469 total (1398 previous + 71 new), 0 failures, 0 errors
+
+---
+
+## Phase 10.3 — Entry Verification API
+
+**Status: COMPLETE**
+
+REST API layer exposing entry verification service through 10 endpoints.
+
+**New Files:**
+- `backend/app/schemas/entry_verification.py` — Request/response schemas (EntryVerificationCreate, EntryVerificationResponse, EntryVerificationListResponse, EscalateRequest, ResolveRequest)
+- `backend/app/api/v1/entry_verification.py` — 10 API endpoints (245 lines)
+- `backend/tests/test_phase_10_3_api.py` — 56 API tests
+
+**Modified Files:**
+- `backend/app/api/v1/router.py` — Registered entry_verification router
+- `backend/tests/test_verification.py` — Added EntryVerification to cleanup fixture
+- `backend/tests/test_batch_verification.py` — Added EntryVerification to cleanup fixture
+- `backend/tests/test_dashboard.py` — Added EntryVerification to cleanup fixture
+
+**API Endpoints:**
+- `POST /api/v1/entry-verifications` — Create entry verification (201)
+- `GET /api/v1/entry-verifications` — List with pagination + filters (status, entry_point_id, student_id)
+- `GET /api/v1/entry-verifications/{id}` — Get by ID (200/404)
+- `POST /api/v1/entry-verifications/{id}/begin` — Begin processing (PENDING → IN_PROGRESS)
+- `POST /api/v1/entry-verifications/{id}/hall-ticket-check` — Run hall ticket validation
+- `POST /api/v1/entry-verifications/{id}/seat-check` — Run seat assignment validation
+- `POST /api/v1/entry-verifications/{id}/identity-check` — Run identity verification orchestration
+- `POST /api/v1/entry-verifications/{id}/evaluate` — Evaluate entry authorization (GRANTED/DENIED/ESCALATED)
+- `POST /api/v1/entry-verifications/{id}/escalate` — Escalate for human review
+- `POST /api/v1/entry-verifications/{id}/resolve` — Resolve escalation (GRANTED/DENIED)
+
+**Security Audit:** Passed — client cannot set status/check states/resolved_at, no reviewer identity accepted, no biometric data exposed, no credential leakage, service remains authority.
+
+**Tests:** 1525 total (1469 previous + 56 new), 0 failures, 0 errors
