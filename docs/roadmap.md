@@ -604,7 +604,7 @@ Focus:
 **New models/migrations:** `EntryVerification` model (migration 019) capturing live verification attempts.
 
 - **10.1** Domain model: EntryVerification model, EntryVerificationStatus/HallTicketCheckStatus/IdentityCheckStatus/SeatCheckStatus enums, migration 019, 49 model tests — COMPLETE
-- **10.2** Service layer: PLANNED
+- **10.2** Service layer: entry verification service (create, begin_processing, process_hall_ticket_check, process_seat_check, process_identity_check, evaluate_entry, escalate_for_review, resolve_escalation), 71 service tests — COMPLETE
 - **10.3** API layer: PLANNED
 - **10.4** Admin UI: PLANNED
 - **10.5** Integration tests & hardening: PLANNED
