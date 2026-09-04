@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE (8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8 complete)
-- **Tests:** 1103 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE, 9 IN PROGRESS (9.1, 9.2 complete)
+- **Tests:** 1198 passing, 0 failures, 0 errors
 - **Frontend:** 20 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -630,6 +630,84 @@ All sub-phases complete:
 - 8.8 Integration Testing + Final Hardening ✅
 
 **Total Phase 8 Tests:** 1103 backend + 20 frontend routes
+
+---
+
+## Phase 9.1 — Camera & Entry Point Domain Foundation
+
+**Status: COMPLETE**
+
+Established the physical infrastructure domain with Camera, EntryPoint, and CameraEntryPointMapping models.
+
+**Models:**
+- `Camera` — physical/institutional camera device (name, device_identifier, camera_type, manufacturer, model_name, resolution, exam_hall FK, status, connection_info, is_active)
+- `EntryPoint` — physical examination entry gate (name, code, description, location_detail, exam_hall FK, is_active)
+- `CameraEntryPointMapping` — camera↔entry point relationship (camera FK, entry point FK, is_enabled)
+
+**Design Decisions:**
+- Camera ↔ ExamHall: many-to-one (many cameras per hall, hall FK on camera)
+- EntryPoint ↔ ExamHall: many-to-one (many entry points per hall, hall FK on entry point)
+- Camera ↔ EntryPoint: many-to-many via mapping table (unique constraint prevents duplicate active mappings)
+- Deactivation: `is_active` soft-delete pattern (consistent with existing models)
+- Status: `CameraStatus` enum (ONLINE, OFFLINE, UNKNOWN, DISABLED)
+- No biometric data, no credentials, no secrets in any model
+- Connection metadata stored as plain text (IP/URL only, no credentials)
+
+**Migration:** 016 (`016_create_camera_entry_point_tables.py`)
+
+**Files:**
+- `backend/app/models/camera.py` — Camera model + CameraStatus enum
+- `backend/app/models/entry_point.py` — EntryPoint model
+- `backend/app/models/camera_entry_point.py` — CameraEntryPointMapping model
+- `backend/app/models/exam_hall.py` — Added cameras and entry_points relationships
+- `backend/app/models/__init__.py` — Registered new models
+- `backend/alembic/versions/016_create_camera_entry_point_tables.py` — Migration
+- `backend/tests/test_phase_9_1_models.py` — 53 model tests
+
+**Tests:** 1156 total (1103 previous + 53 new), 0 failures, 0 errors
+
+---
+
+## Phase 9.2 — Camera & Entry Point CRUD API
+
+**Status: COMPLETE**
+
+Full REST API for managing cameras, entry points, and camera-to-entry-point mappings.
+
+**New Files:**
+- `backend/app/schemas/camera.py` — CameraCreate, CameraUpdate, CameraResponse, CameraListResponse
+- `backend/app/schemas/entry_point.py` — EntryPointCreate, EntryPointUpdate, EntryPointResponse, EntryPointListResponse
+- `backend/app/schemas/camera_entry_point.py` — CameraEntryPointMappingCreate, CameraEntryPointMappingUpdate, CameraEntryPointMappingResponse, CameraEntryPointMappingListResponse
+- `backend/app/services/camera.py` — CRUD operations with duplicate detection, search, pagination
+- `backend/app/services/entry_point.py` — CRUD operations with code normalization, search, pagination
+- `backend/app/services/camera_entry_point.py` — CRUD operations with duplicate mapping prevention
+- `backend/app/api/v1/cameras.py` — REST endpoints (POST, GET list, GET one, PATCH, DELETE)
+- `backend/app/api/v1/entry_points.py` — REST endpoints (POST, GET list, GET one, PATCH, DELETE)
+- `backend/app/api/v1/camera_entry_points.py` — REST endpoints (POST, GET list, GET one, PATCH, DELETE)
+- `backend/tests/test_phase_9_2_api.py` — 42 API integration tests
+
+**API Endpoints:**
+- `POST /api/v1/cameras` — Create camera (201)
+- `GET /api/v1/cameras` — List cameras (paginated, searchable, filterable by hall/status)
+- `GET /api/v1/cameras/{id}` — Get camera (404 if not found)
+- `PATCH /api/v1/cameras/{id}` — Update camera (404/409)
+- `DELETE /api/v1/cameras/{id}` — Soft-delete camera (404)
+- `POST /api/v1/entry-points` — Create entry point (201, code auto-uppercased)
+- `GET /api/v1/entry-points` — List entry points (paginated, searchable)
+- `GET /api/v1/entry-points/{id}` — Get entry point (404)
+- `PATCH /api/v1/entry-points/{id}` — Update entry point (404/409)
+- `DELETE /api/v1/entry-points/{id}` — Soft-delete entry point (404)
+- `POST /api/v1/camera-entry-points` — Create mapping (201)
+- `GET /api/v1/camera-entry-points` — List mappings (paginated, filterable)
+- `GET /api/v1/camera-entry-points/{id}` — Get mapping (404)
+- `PATCH /api/v1/camera-entry-points/{id}` — Update mapping (404)
+- `DELETE /api/v1/camera-entry-points/{id}` — Disable mapping (404)
+
+**Fixes to Existing Tests:**
+- `test_verification.py` — Added Camera/EntryPoint/CameraEntryPointMapping cleanup before ExamHall delete
+- `test_dashboard.py` — Same FK ordering fix
+
+**Tests:** 1198 total (1156 previous + 42 new), 0 failures, 0 errors
 
 ## Files Changed in Phase 8.2
 

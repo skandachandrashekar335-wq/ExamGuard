@@ -42,6 +42,12 @@ def cleanup():
         db.execute(delete(IdentityVerificationEvidence))
         db.execute(delete(IdentityVerificationAttempt))
         db.execute(delete(ExamRegistration))
+        from app.models.camera_entry_point import CameraEntryPointMapping
+        from app.models.camera import Camera
+        from app.models.entry_point import EntryPoint
+        db.execute(delete(CameraEntryPointMapping))
+        db.execute(delete(Camera))
+        db.execute(delete(EntryPoint))
         db.execute(delete(ExamHall))
         db.execute(delete(Exam))
         db.execute(delete(Subject))

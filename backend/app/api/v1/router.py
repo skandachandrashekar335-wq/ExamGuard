@@ -1,6 +1,9 @@
 from fastapi import APIRouter
 
 from app.api.v1.batch_verification import router as batch_verification_router
+from app.api.v1.camera_entry_points import router as camera_entry_points_router
+from app.api.v1.cameras import router as cameras_router
+from app.api.v1.entry_points import router as entry_points_router
 from app.api.v1.hall_tickets import router as hall_tickets_router
 from app.api.v1.identity_verification import router as identity_verification_router
 from app.api.v1.import_audit_log import router as import_audit_log_router
@@ -21,6 +24,9 @@ from app.api.v1.subjects import router as subjects_router
 router = APIRouter()
 
 router.include_router(batch_verification_router)
+router.include_router(camera_entry_points_router)
+router.include_router(cameras_router)
+router.include_router(entry_points_router)
 router.include_router(hall_tickets_router)
 router.include_router(identity_verification_router)
 router.include_router(import_audit_log_router)

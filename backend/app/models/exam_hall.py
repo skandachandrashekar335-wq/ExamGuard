@@ -63,6 +63,12 @@ class ExamHall(Base):
     seat_assignments: Mapped[list["SeatAssignment"]] = relationship(  # noqa: F821
         back_populates="hall",
     )
+    cameras: Mapped[list["Camera"]] = relationship(  # noqa: F821
+        back_populates="hall",
+    )
+    entry_points: Mapped[list["EntryPoint"]] = relationship(  # noqa: F821
+        back_populates="hall",
+    )
 
     def __repr__(self) -> str:
         return f"<ExamHall id={self.id} building={self.building!r} room={self.room_number!r}>"

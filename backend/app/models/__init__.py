@@ -18,3 +18,6 @@ from app.models.hall_ticket import HallTicket  # noqa: E402, F401
 from app.models.verification import VerificationOutcome  # noqa: E402, F401
 from app.models.identity_verification import IdentityVerificationAttempt, IdentityVerificationEvidence  # noqa: E402, F401
 from app.models.import_audit_log import ImportAuditLog  # noqa: E402, F401
+from app.models.camera import Camera  # noqa: E402, F401
+from app.models.entry_point import EntryPoint  # noqa: E402, F401
+from app.models.camera_entry_point import CameraEntryPointMapping  # noqa: E402, F401
