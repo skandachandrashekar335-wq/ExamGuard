@@ -899,12 +899,12 @@ Focus:
 
 ## Current Project State
 
-- **Current phase:** Phase 20 — Security Hardening & Compliance (COMPLETE)
-- **Completed phases:** 0–20
+- **Current phase:** Phase 21 — Reliability, Performance & Scale (COMPLETE)
+- **Completed phases:** 0–21
 - **Current tests:** 2466 passing, 0 failures, 0 errors
 - **Frontend pages:** 32 (all building successfully)
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono), zero border-radius, no neon colors
-- **Next step:** Phase 21 — Reliability, Performance & Scale
+- **Next step:** Phase 22 — Production Deployment & Observability
 - **Provider architecture:** `app/services/face_verification/` with Protocol, DeterministicProvider, factory
 - **Identity verification API:** `POST /{attempt_id}/verify-face` endpoint for face verification trigger
 - **Camera infrastructure:** Complete — Camera, EntryPoint, Mapping, Credential, Health Observation, Device Auth API
