@@ -1,8 +1,9 @@
-"""Real-time monitoring infrastructure (Phase 13.1 + 13.2).
+"""Real-time monitoring infrastructure (Phase 13.1–13.4).
 
-Ephemeral event types, buffers, connection management, and event publishing.
+Ephemeral event types, buffers, connection management, event publishing,
+and domain publication wiring.
+
 No database persistence. No ORM dependency.
-
 Existing domain audit/history tables remain authoritative.
 """
 
@@ -18,6 +19,11 @@ from app.services.monitoring.events import (
     MonitoringFilter,
     severity_order,
 )
+from app.services.monitoring.publisher import (
+    get_monitoring_publisher,
+    init_monitoring_publisher,
+    publish,
+)
 
 __all__ = [
     "Alert",
@@ -30,5 +36,8 @@ __all__ = [
     "EventType",
     "MonitoringEvent",
     "MonitoringFilter",
+    "get_monitoring_publisher",
+    "init_monitoring_publisher",
+    "publish",
     "severity_order",
 ]

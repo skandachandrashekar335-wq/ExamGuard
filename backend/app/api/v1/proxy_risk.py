@@ -25,6 +25,13 @@ from app.schemas.proxy_risk import (
     SecuritySignalResponse,
 )
 from app.services import proxy_risk
+from app.services.monitoring.publisher import (
+    publish_risk_assessed,
+    publish_risk_critical,
+    publish_risk_elevated,
+    publish_risk_high,
+    publish_signal_detected,
+)
 from app.services.signal_detection import detect_signals
 
 logger = logging.getLogger(__name__)
@@ -103,6 +110,14 @@ def detect_security_signals(
         new_signals = detect_signals(db, entry_verification_id)
         if new_signals:
             db.commit()
+            # Publish monitoring events for each new signal
+            for signal in new_signals:
+                publish_signal_detected(
+                    signal_id=signal.id,
+                    entry_verification_id=entry_verification_id,
+                    signal_type=signal.signal_type,
+                    strength=signal.strength,
+                )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception:
@@ -192,6 +207,32 @@ def assess_risk(
         raise HTTPException(
             status_code=500,
             detail="Risk assessment failed due to an internal error",
+        )
+    # Publish risk assessment events after successful commit
+    publish_risk_assessed(
+        assessment_id=assessment.id,
+        entry_verification_id=entry_verification_id,
+        risk_level=assessment.risk_level,
+        risk_score=assessment.risk_score,
+    )
+    # Publish level-specific events based on the newly-created assessment
+    if assessment.risk_level == "ELEVATED":
+        publish_risk_elevated(
+            assessment_id=assessment.id,
+            entry_verification_id=entry_verification_id,
+            risk_score=assessment.risk_score,
+        )
+    elif assessment.risk_level == "HIGH":
+        publish_risk_high(
+            assessment_id=assessment.id,
+            entry_verification_id=entry_verification_id,
+            risk_score=assessment.risk_score,
+        )
+    elif assessment.risk_level == "CRITICAL":
+        publish_risk_critical(
+            assessment_id=assessment.id,
+            entry_verification_id=entry_verification_id,
+            risk_score=assessment.risk_score,
         )
     return _assessment_to_response(assessment)
 

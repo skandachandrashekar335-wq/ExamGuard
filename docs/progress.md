@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, 12 COMPLETE, **13.1 COMPLETE, 13.2 COMPLETE, 13.3 IN PROGRESS**
-- **Tests:** 2204 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, 12 COMPLETE, **13.1 COMPLETE, 13.2 COMPLETE, 13.3 COMPLETE, 13.4 IN PROGRESS**
+- **Tests:** 2235 passing, 0 failures, 0 errors
 - **Frontend:** 27 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -1803,3 +1803,91 @@ Cleanup on: normal disconnect, network failure, timeout, heartbeat failure, prot
 
 **Total tests:** 2204 (2167 previous + 37 new), 0 failures, 0 errors
 **Consecutive full-suite runs:** 2 (both 2204 passed)
+
+---
+
+## Phase 13.4 — Event Publication Wiring
+
+**Status: COMPLETE**
+
+### Implementation
+
+Connected existing domain operations (Phases 9-12) to the EventPublisher.
+Events are published AFTER successful database commit in each router.
+
+### Architecture Decision: Post-Commit Publication
+
+All service functions commit internally (service commits, router does not).
+Therefore publication happens in routers AFTER the service call returns.
+
+```
+Router endpoint
+    ↓
+Service call (commits internally)
+    ↓
+Service returns committed ORM object
+    ↓
+Router publishes monitoring event
+    ↓
+EventPublisher → EventBuffer → AlertBuffer → ConnectionManager
+```
+
+Exception: `detect_security_signals` in `proxy_risk.py` — the service flushes only, the router commits. Publication happens after router commit.
+
+### Domain → Event Mappings
+
+| Domain Operation | Event Type | Severity | Alert |
+|---|---|---|---|
+| `create_entry_verification` | ENTRY_CREATED | INFO | No |
+| `begin_processing` | ENTRY_BEGAN | INFO | No |
+| `evaluate_entry` (GRANTED) | ENTRY_GRANTED | INFO | No |
+| `evaluate_entry` (DENIED) | ENTRY_DENIED | INFO | No |
+| `evaluate_entry` (ESCALATED) | ENTRY_ESCALATED | WARNING | Yes |
+| `escalate_for_review` | ENTRY_ESCALATED | WARNING | Yes |
+| `resolve_escalation` | ENTRY_RESOLVED | INFO | No |
+| `detect_signals` | SIGNAL_DETECTED | INFO | No |
+| `assess_risk` | RISK_ASSESSED | INFO | No |
+| `assess_risk` (ELEVATED) | RISK_ELEVATED | WARNING | Yes |
+| `assess_risk` (HIGH) | RISK_HIGH | WARNING | Yes |
+| `assess_risk` (CRITICAL) | RISK_CRITICAL | CRITICAL | Yes |
+| `record_attendance` | ATTENDANCE_RECORDED | INFO | No |
+| `mark_manual_attendance` | ATTENDANCE_CORRECTED | INFO | No |
+| `record_health_observation` (ONLINE) | CAMERA_ONLINE | INFO | No |
+| `record_health_observation` (OFFLINE) | CAMERA_OFFLINE | WARNING | Yes |
+
+### Event Payloads
+
+All events use operational, non-sensitive payloads:
+- entity_id, student_id, exam_id, hall_id, entry_point_id
+- status, decision, risk_level, risk_score, signal_type, strength
+- reason, escalation_reason, resolution
+- No biometric data, no credentials, no raw OCR, no filesystem paths
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `backend/app/services/monitoring/publisher.py` | **New:** 17 publication helper functions |
+| `backend/app/api/v1/entry_verification.py` | **Modified:** publishes ENTRY_CREATED, ENTRY_BEGAN, ENTRY_GRANTED, ENTRY_DENIED, ENTRY_ESCALATED, ENTRY_RESOLVED |
+| `backend/app/api/v1/proxy_risk.py` | **Modified:** publishes SIGNAL_DETECTED, RISK_ASSESSED, RISK_ELEVATED, RISK_HIGH, RISK_CRITICAL |
+| `backend/app/api/v1/attendance.py` | **Modified:** publishes ATTENDANCE_RECORDED, ATTENDANCE_CORRECTED |
+| `backend/app/api/v1/camera_health.py` | **Modified:** publishes CAMERA_ONLINE, CAMERA_OFFLINE |
+| `backend/app/main.py` | **Modified:** initializes EventPublisher at app startup |
+| `backend/app/services/monitoring/__init__.py` | **Modified:** exports publisher module |
+| `backend/tests/test_phase_13_4_wiring.py` | **New:** 31 tests |
+
+### Tests
+
+31 tests covering:
+- Entry verification: ENTRY_CREATED, ENTRY_BEGAN, ENTRY_GRANTED, ENTRY_DENIED, ENTRY_ESCALATED, ENTRY_RESOLVED
+- Risk: SIGNAL_DETECTED, RISK_ASSESSED, RISK_ELEVATED, RISK_HIGH, RISK_CRITICAL
+- Attendance: ATTENDANCE_RECORDED, ATTENDANCE_CORRECTED
+- Camera: CAMERA_ONLINE, CAMERA_OFFLINE
+- Publication safety: no publish when publisher is None, sensitive payload rejection (biometrics, credentials, stack traces)
+- Idempotency: duplicate event_id skipped
+- Alert generation: INFO no alert, WARNING generates alert, CRITICAL generates alert
+- WebSocket integration: event reaches ConnectionManager, filtered client receives, non-matching rejected, multiple clients, failed client isolation
+- Publisher initialization and reset
+
+**Total tests:** 2235 (2204 previous + 31 new), 0 failures, 0 errors
+**Consecutive full-suite runs:** 2 (both 2235 passed)

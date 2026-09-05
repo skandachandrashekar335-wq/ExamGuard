@@ -23,6 +23,10 @@ from app.schemas.attendance import (
     AttendanceSummaryResponse,
 )
 from app.services.attendance import service as att_service
+from app.services.monitoring.publisher import (
+    publish_attendance_corrected,
+    publish_attendance_recorded,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +63,15 @@ def record_attendance(
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    # Publish monitoring event after successful commit
+    if result is not None:
+        publish_attendance_recorded(
+            attendance_record_id=result.id,
+            entry_verification_id=entry_verification_id,
+            student_id=result.student_id,
+            exam_id=result.exam_id,
+            hall_id=result.hall_id,
+        )
     return result
 
 
@@ -179,13 +192,23 @@ def correct_attendance(
     Server remains authoritative — does not fabricate EntryVerification.
     """
     try:
-        return att_service.mark_manual_attendance(
+        result = att_service.mark_manual_attendance(
             db,
             exam_registration_id,
             status=body.status,
             reason=body.reason,
             recorded_by=body.recorded_by,
         )
+        publish_attendance_corrected(
+            attendance_record_id=result.id,
+            exam_registration_id=exam_registration_id,
+            student_id=result.student_id,
+            exam_id=result.exam_id,
+            hall_id=result.hall_id,
+            reason=body.reason,
+            recorded_by=body.recorded_by,
+        )
+        return result
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:

@@ -11,6 +11,14 @@ from app.schemas.entry_verification import (
     ResolveRequest,
 )
 from app.services import entry_verification as ev_service
+from app.services.monitoring.publisher import (
+    publish_entry_began,
+    publish_entry_created,
+    publish_entry_denied,
+    publish_entry_escalated,
+    publish_entry_granted,
+    publish_entry_resolved,
+)
 
 router = APIRouter(prefix="/entry-verifications", tags=["Entry Verifications"])
 
@@ -33,7 +41,7 @@ def create_entry_verification(
     db: Session = Depends(get_db),
 ):
     try:
-        return ev_service.create_entry_verification(
+        ev = ev_service.create_entry_verification(
             db,
             student_id=data.student_id,
             exam_registration_id=data.exam_registration_id,
@@ -41,6 +49,13 @@ def create_entry_verification(
             camera_id=data.camera_id,
             hall_ticket_id=data.hall_ticket_id,
         )
+        publish_entry_created(
+            entry_verification_id=ev.id,
+            student_id=ev.student_id,
+            exam_registration_id=ev.exam_registration_id,
+            entry_point_id=ev.entry_point_id,
+        )
+        return ev
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -105,7 +120,9 @@ def begin_processing(
     db: Session = Depends(get_db),
 ):
     try:
-        return ev_service.begin_processing(db, entry_verification_id)
+        ev = ev_service.begin_processing(db, entry_verification_id)
+        publish_entry_began(entry_verification_id=ev.id)
+        return ev
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -178,7 +195,34 @@ def evaluate_entry(
     db: Session = Depends(get_db),
 ):
     try:
-        return ev_service.evaluate_entry(db, entry_verification_id)
+        ev = ev_service.evaluate_entry(db, entry_verification_id)
+        # Publish the appropriate event based on the decision
+        if ev.status == "GRANTED":
+            publish_entry_granted(
+                entry_verification_id=ev.id,
+                student_id=ev.student_id,
+                exam_id=None,
+                hall_id=ev.exam_hall_id,
+                entry_point_id=ev.entry_point_id,
+            )
+        elif ev.status == "DENIED":
+            publish_entry_denied(
+                entry_verification_id=ev.id,
+                student_id=ev.student_id,
+                exam_id=None,
+                hall_id=ev.exam_hall_id,
+                entry_point_id=ev.entry_point_id,
+            )
+        elif ev.status == "ESCALATED":
+            publish_entry_escalated(
+                entry_verification_id=ev.id,
+                student_id=ev.student_id,
+                reason=ev.escalation_reason,
+                exam_id=None,
+                hall_id=ev.exam_hall_id,
+                entry_point_id=ev.entry_point_id,
+            )
+        return ev
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -196,9 +240,18 @@ def escalate_for_review(
     db: Session = Depends(get_db),
 ):
     try:
-        return ev_service.escalate_for_review(
+        ev = ev_service.escalate_for_review(
             db, entry_verification_id, reason=body.reason,
         )
+        publish_entry_escalated(
+            entry_verification_id=ev.id,
+            student_id=ev.student_id,
+            reason=ev.escalation_reason,
+            exam_id=None,
+            hall_id=ev.exam_hall_id,
+            entry_point_id=ev.entry_point_id,
+        )
+        return ev
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -216,12 +269,22 @@ def resolve_escalation(
     db: Session = Depends(get_db),
 ):
     try:
-        return ev_service.resolve_escalation(
+        ev = ev_service.resolve_escalation(
             db,
             entry_verification_id,
             granted=body.granted,
             reason=body.reason,
         )
+        publish_entry_resolved(
+            entry_verification_id=ev.id,
+            student_id=ev.student_id,
+            granted=body.granted,
+            reason=body.reason,
+            exam_id=None,
+            hall_id=ev.exam_hall_id,
+            entry_point_id=ev.entry_point_id,
+        )
+        return ev
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:

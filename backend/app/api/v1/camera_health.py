@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.schemas.camera_health import HealthObservationCreate, HealthResponse
 from app.services import camera_health
+from app.services.monitoring.publisher import publish_camera_offline, publish_camera_online
 
 router = APIRouter(prefix="/cameras", tags=["Camera Health"])
 
@@ -39,6 +40,11 @@ def record_health_observation(
     db: Session = Depends(get_db),
 ):
     try:
+        # Capture previous status before the observation
+        from app.models.camera import Camera
+        existing = db.query(Camera).filter(Camera.id == camera_id).first()
+        previous_status = existing.status if existing else None
+
         camera = camera_health.record_health_observation(
             db,
             camera_id,
@@ -50,6 +56,19 @@ def record_health_observation(
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    # Publish camera status event after successful commit
+    if data.status.strip().upper() == "ONLINE":
+        publish_camera_online(
+            camera_id=camera_id,
+            previous_status=previous_status,
+        )
+    elif data.status.strip().upper() == "OFFLINE":
+        publish_camera_offline(
+            camera_id=camera_id,
+            reason=data.reason,
+            previous_status=previous_status,
+        )
 
     return HealthResponse(
         camera_id=camera.id,
