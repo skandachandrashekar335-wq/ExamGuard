@@ -15,6 +15,14 @@ import {
   type EntryVerification,
   ApiError,
 } from "@/lib/entry-verification-api";
+import {
+  listSignals,
+  listAssessments,
+  detectSignals,
+  assessRisk,
+  type SecuritySignal,
+  type ProxyRiskAssessment,
+} from "@/lib/proxy-risk-api";
 
 const STATUS_CLASSES: Record<string, string> = {
   PENDING: "border-white/20 text-[var(--text-secondary)]",
@@ -46,6 +54,13 @@ export default function EntryVerificationDetailPage() {
   const [showResolve, setShowResolve] = useState(false);
   const [resolveReason, setResolveReason] = useState("");
 
+  const [signals, setSignals] = useState<SecuritySignal[]>([]);
+  const [signalsTotal, setSignalsTotal] = useState(0);
+  const [assessment, setAssessment] = useState<ProxyRiskAssessment | null>(null);
+  const [assessments, setAssessments] = useState<ProxyRiskAssessment[]>([]);
+  const [riskAction, setRiskAction] = useState("");
+  const [riskError, setRiskError] = useState("");
+
   const fetchEntry = useCallback(async () => {
     try {
       const data = await getEntryVerification(id);
@@ -58,9 +73,32 @@ export default function EntryVerificationDetailPage() {
     }
   }, [id]);
 
+  const fetchRiskData = useCallback(async () => {
+    try {
+      const [signalsRes, assessmentsRes] = await Promise.all([
+        listSignals(id, { page_size: 100 }).catch(() => ({ items: [], total: 0 })),
+        listAssessments(id, { page_size: 50 }).catch(() => ({ items: [], total: 0 })),
+      ]);
+      setSignals(signalsRes.items);
+      setSignalsTotal(signalsRes.total);
+      setAssessments(assessmentsRes.items);
+      if (assessmentsRes.items.length > 0) {
+        setAssessment(assessmentsRes.items[assessmentsRes.items.length - 1]);
+      }
+    } catch {
+      // Risk data unavailable — non-fatal
+    }
+  }, [id]);
+
   useEffect(() => {
     fetchEntry();
   }, [fetchEntry]);
+
+  useEffect(() => {
+    if (!loading && !error && ev) {
+      fetchRiskData();
+    }
+  }, [loading, error, ev, fetchRiskData]);
 
   async function runAction(
     label: string,
@@ -80,6 +118,51 @@ export default function EntryVerificationDetailPage() {
     } finally {
       setActionLoading("");
     }
+  }
+
+  async function runRiskAction(label: string, fn: () => Promise<unknown>) {
+    setRiskError("");
+    setRiskAction(label);
+    try {
+      await fn();
+      await fetchRiskData();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setRiskError(err.message);
+      } else {
+        setRiskError(`${label} failed`);
+      }
+    } finally {
+      setRiskAction("");
+    }
+  }
+
+  function renderRiskLevelBadge(level: string) {
+    const cls: Record<string, string> = {
+      LOW: "border-white/20 text-[var(--text-secondary)]",
+      ELEVATED: "border-white/30 text-white",
+      HIGH: "border-white/40 text-white",
+      CRITICAL: "border-white/40 text-white",
+    };
+    return (
+      <span className={`text-[10px] eg-mono border px-2 py-0.5 ${cls[level] || "border-white/10 text-[var(--text-muted)]"}`}>
+        {level}
+      </span>
+    );
+  }
+
+  function renderStrengthBadge(strength: string) {
+    const cls: Record<string, string> = {
+      STRONG: "border-white/40 text-white",
+      MODERATE: "border-white/30 text-white",
+      WEAK: "border-white/20 text-[var(--text-secondary)]",
+      INFORMATIONAL: "border-white/10 text-[var(--text-muted)]",
+    };
+    return (
+      <span className={`text-[10px] eg-mono border px-2 py-0.5 ${cls[strength] || "border-white/10 text-[var(--text-muted)]"}`}>
+        {strength}
+      </span>
+    );
   }
 
   if (loading) {
@@ -488,7 +571,7 @@ export default function EntryVerificationDetailPage() {
           </div>
         </div>
 
-        <div className="border border-white/10 bg-[var(--bg-raised)] p-6">
+        <div className="border border-white/10 bg-[var(--bg-raised)] p-6 mb-8">
           <h2 className="eg-mono text-sm text-[var(--text-secondary)] mb-4">
             Timestamps
           </h2>
@@ -506,6 +589,168 @@ export default function EntryVerificationDetailPage() {
               </dd>
             </div>
           </dl>
+        </div>
+
+        <div className="border border-white/10 bg-[var(--bg-raised)] p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="eg-mono text-sm text-[var(--text-secondary)]">
+              Proxy Risk Assessment
+            </h2>
+            <div className="flex gap-3">
+              <button
+                onClick={() =>
+                  runRiskAction("Detect signals", () => detectSignals(ev.id))
+                }
+                disabled={riskAction !== ""}
+                className="eg-btn px-4 py-2 text-sm disabled:opacity-30"
+              >
+                {riskAction === "Detect signals" ? "Working..." : "Detect Signals"}
+              </button>
+              <button
+                onClick={() =>
+                  runRiskAction("Assess risk", () => assessRisk(ev.id))
+                }
+                disabled={riskAction !== ""}
+                className="eg-btn px-4 py-2 text-sm disabled:opacity-30"
+              >
+                {riskAction === "Assess risk" ? "Working..." : "Assess Risk"}
+              </button>
+            </div>
+          </div>
+
+          {riskError && (
+            <div className="border border-white/10 bg-[var(--bg-base)] p-3 mb-4">
+              <span className="eg-mono text-sm text-red-400">{riskError}</span>
+            </div>
+          )}
+
+          {assessment && (
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+              <div className="border border-white/10 bg-[var(--bg-base)] p-4">
+                <span className="eg-mono-sm text-[var(--text-muted)] block mb-1">
+                  Risk Level
+                </span>
+                {renderRiskLevelBadge(assessment.risk_level)}
+              </div>
+              <div className="border border-white/10 bg-[var(--bg-base)] p-4">
+                <span className="eg-mono-sm text-[var(--text-muted)] block mb-1">
+                  Score
+                </span>
+                <span className="eg-display text-lg">
+                  {assessment.risk_score.toFixed(1)}
+                </span>
+              </div>
+              <div className="border border-white/10 bg-[var(--bg-base)] p-4">
+                <span className="eg-mono-sm text-[var(--text-muted)] block mb-1">
+                  Signals
+                </span>
+                <span className="eg-display text-lg">
+                  {assessment.signal_count ?? "—"}
+                </span>
+                {assessment.strong_signal_count !== null && (
+                  <span className="eg-mono-sm text-[var(--text-muted)] ml-2">
+                    ({assessment.strong_signal_count} strong)
+                  </span>
+                )}
+              </div>
+              <div className="border border-white/10 bg-[var(--bg-base)] p-4">
+                <span className="eg-mono-sm text-[var(--text-muted)] block mb-1">
+                  Assessed
+                </span>
+                <span className="font-mono text-sm">
+                  {new Date(assessment.assessed_at).toLocaleString()}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {assessment?.explanation && (
+            <div className="border border-white/10 bg-[var(--bg-base)] p-4 mb-6">
+              <h3 className="eg-mono-sm text-[var(--text-muted)] mb-2">
+                Explanation
+              </h3>
+              <p className="eg-body text-sm">{assessment.explanation}</p>
+            </div>
+          )}
+
+          {signals.length > 0 && (
+            <div className="mb-6">
+              <h3 className="eg-mono-sm text-[var(--text-muted)] mb-3">
+                Detected Signals ({signalsTotal})
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10">
+                      <th className="eg-mono-sm text-left text-[var(--text-muted)] py-2 pr-4">
+                        Type
+                      </th>
+                      <th className="eg-mono-sm text-left text-[var(--text-muted)] py-2 pr-4">
+                        Strength
+                      </th>
+                      <th className="eg-mono-sm text-left text-[var(--text-muted)] py-2 pr-4">
+                        Source
+                      </th>
+                      <th className="eg-mono-sm text-left text-[var(--text-muted)] py-2">
+                        Description
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {signals.map((s) => (
+                      <tr key={s.id} className="border-b border-white/5">
+                        <td className="py-2 pr-4 font-mono">{s.signal_type}</td>
+                        <td className="py-2 pr-4">{renderStrengthBadge(s.strength)}</td>
+                        <td className="py-2 pr-4 font-mono text-[var(--text-secondary)]">
+                          {s.source}
+                        </td>
+                        <td className="py-2 text-[var(--text-secondary)]">
+                          {s.description || "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {assessments.length > 1 && (
+            <div>
+              <h3 className="eg-mono-sm text-[var(--text-muted)] mb-3">
+                Assessment History ({assessments.length})
+              </h3>
+              <div className="space-y-2">
+                {assessments.map((a) => (
+                  <div
+                    key={a.id}
+                    className="border border-white/10 bg-[var(--bg-base)] p-3 flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      {renderRiskLevelBadge(a.risk_level)}
+                      <span className="font-mono text-sm">
+                        {a.risk_score.toFixed(1)}
+                      </span>
+                      {a.policy_version && (
+                        <span className="eg-mono-sm text-[var(--text-muted)]">
+                          v{a.policy_version}
+                        </span>
+                      )}
+                    </div>
+                    <span className="font-mono text-sm text-[var(--text-secondary)]">
+                      {new Date(a.assessed_at).toLocaleString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!assessment && signals.length === 0 && riskAction === "" && (
+            <p className="eg-body text-sm text-[var(--text-secondary)]">
+              No risk data yet. Click Detect Signals or Assess Risk to begin analysis.
+            </p>
+          )}
         </div>
       </div>
     </div>

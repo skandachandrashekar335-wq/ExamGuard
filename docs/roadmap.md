@@ -606,7 +606,7 @@ Cross-component integration tests and comprehensive domain audit.
 - **11.2** Deterministic signal detection: 14 signal detectors, idempotent detection service, 72 tests, migration 021 — COMPLETE
 - **11.3** Risk scoring engine: COMPLETE
 - **11.4** API layer: COMPLETE — 5 endpoints, 40 tests
-- **11.5** Admin UI: PLANNED
+- **11.5** Admin UI: COMPLETE — proxy-risk-api.ts client, risk panel on EV detail page (signals table, assessment summary/history, detect/assess buttons)
 - **11.6** Integration tests & hardening: PLANNED
 
 ---
@@ -909,8 +909,8 @@ Focus:
 
 ## Current Project State
 
-- **Current phase:** Phase 11 — Anti-Proxy Detection (IN PROGRESS: 11.1 complete, 11.2 complete, 11.3 complete, 11.4 complete)
-- **Current completed step:** Phase 11.4 — Proxy Risk REST API
+- **Current phase:** Phase 11 — Anti-Proxy Detection (IN PROGRESS: 11.1 complete, 11.2 complete, 11.3 complete, 11.4 complete, 11.5 complete)
+- **Current completed step:** Phase 11.5 — Admin Risk UI
 - **Current tests:** 1803 passing (0 failures, 0 errors)
 - **Frontend pages:** 24 (all building successfully)
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono), zero border-radius, no neon colors

@@ -2,7 +2,7 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11.1 COMPLETE, 11.2 COMPLETE, 11.3 COMPLETE, 11.4 COMPLETE
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11.1 COMPLETE, 11.2 COMPLETE, 11.3 COMPLETE, 11.4 COMPLETE, 11.5 COMPLETE
 - **Tests:** 1803 passing, 0 failures, 0 errors
 - **Frontend:** 24 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
@@ -1240,4 +1240,46 @@ Thin REST API layer exposing signal detection and risk assessment through existi
 - `backend/app/api/v1/router.py` — registered proxy_risk router
 
 **Tests:** 1803 total (1763 previous + 40 new), 0 failures, 0 errors
+**Frontend:** 24 pages building successfully
+
+---
+
+## Phase 11.5 — Admin Risk UI
+
+**Status: COMPLETE**
+
+Frontend integration for the proxy risk detection and assessment system. Provides admin visibility into security signals and risk assessments through the existing entry verification detail page.
+
+### Implementation
+
+**API Client (`frontend/src/lib/proxy-risk-api.ts`):**
+- TypeScript API client with typed interfaces matching backend schemas: `SecuritySignal`, `SecuritySignalListResponse`, `ProxyRiskAssessment`, `ProxyRiskAssessmentListResponse`
+- 5 functions: `detectSignals()`, `listSignals()`, `assessRisk()`, `listAssessments()`, `getLatestAssessment()`
+- Shared `ApiError` class for typed error handling
+- Uses same `request()` pattern as existing API clients
+
+**Risk Panel on Entry Verification Detail Page (`frontend/src/app/entry-verifications/[id]/page.tsx`):**
+- New "Proxy Risk Assessment" section appended after existing content
+- Risk summary grid: risk level badge, score, signal count (with strong count), assessed timestamp
+- Deterministic explanation text displayed when available
+- Signals table: type, strength badge, source, description — paginated (100 items per load)
+- Assessment history timeline (most recent 50) — shown when multiple assessments exist
+- "Detect Signals" and "Assess Risk" buttons — advisory actions that call backend endpoints
+- Empty state when no risk data exists yet
+- Loading/error states with inline error display
+
+**Security/Privacy Audit Passed:**
+- Renders only deterministic labels, numeric scores, and text explanations
+- No biometric data, face images, embeddings, similarity scores, or provider secrets displayed
+- All endpoints are advisory-only (no EntryVerification status mutation)
+- Risk level badges use monochrome design tokens only
+
+**Files Changed:**
+
+| File | Change |
+|---|---|
+| `frontend/src/lib/proxy-risk-api.ts` | New: TypeScript API client for Phase 11.4 proxy risk endpoints |
+| `frontend/src/app/entry-verifications/[id]/page.tsx` | Extended: added risk panel with signals, assessments, detect/assess buttons |
+
+**Tests:** 1803 total (unchanged), 0 failures, 0 errors
 **Frontend:** 24 pages building successfully
