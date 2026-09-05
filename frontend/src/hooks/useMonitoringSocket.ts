@@ -34,6 +34,7 @@ export function useMonitoringSocket(opts: UseMonitoringSocketOptions) {
   const reconnectAttempts = useRef(0);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  const connectingRef = useRef(false);
   const optsRef = useRef(opts);
   optsRef.current = opts;
 
@@ -59,8 +60,28 @@ export function useMonitoringSocket(opts: UseMonitoringSocketOptions) {
     });
   }, []);
 
+  const scheduleReconnect = useCallback(() => {
+    if (!mountedRef.current) return;
+    if (reconnectAttempts.current >= MAX_RECONNECT_ATTEMPTS) {
+      setStatus("ERROR");
+      return;
+    }
+    const delay = Math.min(
+      BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempts.current),
+      MAX_RECONNECT_DELAY,
+    );
+    reconnectAttempts.current += 1;
+    reconnectTimer.current = setTimeout(() => {
+      reconnectTimer.current = null;
+      connect();
+    }, delay);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const connect = useCallback(() => {
     if (!mountedRef.current) return;
+    if (connectingRef.current) return;
+    connectingRef.current = true;
 
     const existing = wsRef.current;
     if (existing) {
@@ -76,6 +97,7 @@ export function useMonitoringSocket(opts: UseMonitoringSocketOptions) {
     try {
       ws = new WebSocket(buildWsUrl());
     } catch {
+      connectingRef.current = false;
       setStatus("ERROR");
       scheduleReconnect();
       return;
@@ -84,6 +106,7 @@ export function useMonitoringSocket(opts: UseMonitoringSocketOptions) {
 
     ws.onopen = () => {
       if (!mountedRef.current) return;
+      connectingRef.current = false;
       reconnectAttempts.current = 0;
       setStatus("CONNECTED");
     };
@@ -109,6 +132,7 @@ export function useMonitoringSocket(opts: UseMonitoringSocketOptions) {
 
     ws.onclose = () => {
       if (!mountedRef.current) return;
+      connectingRef.current = false;
       wsRef.current = null;
       setStatus("DISCONNECTED");
       scheduleReconnect();
@@ -116,26 +140,11 @@ export function useMonitoringSocket(opts: UseMonitoringSocketOptions) {
 
     ws.onerror = () => {
       if (!mountedRef.current) return;
+      connectingRef.current = false;
       setStatus("ERROR");
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buildWsUrl, addEvent]);
-
-  const scheduleReconnect = useCallback(() => {
-    if (!mountedRef.current) return;
-    if (reconnectAttempts.current >= MAX_RECONNECT_ATTEMPTS) {
-      setStatus("ERROR");
-      return;
-    }
-    const delay = Math.min(
-      BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempts.current),
-      MAX_RECONNECT_DELAY,
-    );
-    reconnectAttempts.current += 1;
-    reconnectTimer.current = setTimeout(() => {
-      reconnectTimer.current = null;
-      connect();
-    }, delay);
-  }, [connect]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimer.current) {

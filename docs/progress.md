@@ -2,7 +2,7 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, 12 COMPLETE, **13.1 COMPLETE, 13.2 COMPLETE, 13.3 COMPLETE, 13.4 COMPLETE, 13.5 COMPLETE, 13.6 COMPLETE, 13.7 IN PROGRESS**
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, 12 COMPLETE, **13.1 COMPLETE, 13.2 COMPLETE, 13.3 COMPLETE, 13.4 COMPLETE, 13.5 COMPLETE, 13.6 COMPLETE, 13.7 COMPLETE, 13.8 IN PROGRESS**
 - **Tests:** 2346 passing, 0 failures, 0 errors
 - **Frontend:** 28 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
@@ -2143,3 +2143,43 @@ Alerts: severity, event_type, limit
 - No migration created
 - No fake data introduced
 - No existing tests weakened
+
+---
+
+## Phase 13.8 — Integration & Hardening
+
+**Status: COMPLETE**
+
+### Implementation
+
+Final integration and hardening pass for the monitoring system (Phases 13.1-13.7).
+WebSocket hook improvements: double-connect guard, better cleanup, reconnect safety.
+Frontend TypeScript validation clean. Backend test suite stable.
+
+- `frontend/src/hooks/useMonitoringSocket.ts` — **Modified:** Added `connectingRef` guard against double-connect, improved `scheduleReconnect` stability
+- `docs/progress.md` — **Modified:** Added Phase 13.8 section
+- `docs/roadmap.md` — **Modified:** Updated current step to Phase 14
+
+### Hardening Changes
+
+- WebSocket `connectingRef` prevents concurrent connect attempts
+- `scheduleReconnect` separated from `connect` to break circular dependency
+- `mountedRef` checked in all WebSocket callbacks
+- Cleanup on unmount guaranteed: timer cleared, socket closed
+
+### Phase 13 Summary
+
+| Sub-Phase | Description | Tests |
+|---|---|---|
+| 13.1 | Event domain (MonitoringEvent, 16 types, severity) | 40 |
+| 13.2 | ConnectionManager + EventPublisher | 34 |
+| 13.3 | WebSocket API | 37 |
+| 13.4 | Event publication wiring | 31 |
+| 13.5 | Alerting (classification, messages, filtering) | 52 |
+| 13.6 | Monitoring REST API (4 endpoints) | 59 |
+| 13.7 | Monitoring Admin UI (frontend) | N/A (build validated) |
+| 13.8 | Integration & hardening | N/A |
+
+**Total Phase 13 tests:** 253 (13.1-13.6 backend only)
+**Total project tests:** 2346
+**Total frontend routes:** 28
