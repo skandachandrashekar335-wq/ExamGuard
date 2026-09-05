@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11.1 COMPLETE, 11.2 COMPLETE, 11.3 COMPLETE, 11.4 COMPLETE, 11.5 COMPLETE
-- **Tests:** 1803 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11.1 COMPLETE, 11.2 COMPLETE, 11.3 COMPLETE, 11.4 COMPLETE, 11.5 COMPLETE, 11.6 COMPLETE, **PHASE 11 COMPLETE**
+- **Tests:** 1889 passing, 0 failures, 0 errors
 - **Frontend:** 24 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -1283,3 +1283,93 @@ Frontend integration for the proxy risk detection and assessment system. Provide
 
 **Tests:** 1803 total (unchanged), 0 failures, 0 errors
 **Frontend:** 24 pages building successfully
+
+---
+
+## Phase 11.6 — Integration & Hardening
+
+**Status: COMPLETE**
+
+Comprehensive integration, correctness, security, privacy, data-integrity, API, migration, concurrency, and regression audit of the COMPLETE Phase 11 implementation (11.1–11.5).
+
+### Audit Results (all passed)
+
+- **Signal Detection Correctness:** All 14 detectors verified — produce correct signal types, correct strengths from SIGNAL_STRENGTH_DEFAULTS, correct sources. No unintended signal types produced.
+- **Enum Audit:** 23 SecuritySignalType values exist. 14 are implemented (produced by detectors). 9 are planned/future (no detectors). All planned types have zero weight in scoring — no accidental contribution.
+- **Deduplication/Idempotency:** Triple call produces no duplicates. Existing signals preserved. Unrelated EVs unaffected. Multiple signal types dedup independently.
+- **Risk Scoring:** Weights from configuration. Unknown signal types → weight 0. Score capped by MAX_SCORE. Thresholds from configuration. Deterministic. Policy version persisted. No probability/confidence terminology.
+- **Historical Assessment Integrity:** Multiple assessments create distinct rows. No overwrite. No unique constraint blocking history. Chronological ordering preserved. Each retains own score and policy version.
+- **API Integration:** All 5 endpoints tested together. Correct HTTP codes. Correct schemas. Ownership by EntryVerification. Pagination. 404 handling. No accidental implicit assessment.
+- **API Security/Privacy:** No face images, embeddings, biometric data, provider credentials, API keys, or secrets in responses. Error responses sanitized — no tracebacks, no database info.
+- **EntryVerification Isolation:** ALL Phase 11 operations (detect, assess) preserve all EV authorization fields. Status, check states, escalation fields unchanged.
+- **Concurrency:** Interleaved detect/assess operations produce correct results. Idempotency maintained. Historical assessments distinct.
+- **Configuration Audit:** All settings validated, typed, loaded via get_settings(). Not duplicated in service code. Thresholds ordered correctly.
+- **Code Quality:** No bare exceptions. Routers thin. Scoring pure (no DB side effects). Detection deterministic (no random/sleep/uuid). No dead code. No unused imports.
+- **Migration Audit:** 020 creates tables with String(50) columns (not native ENUM). 021 is a no-op by design — correct for String columns. Downgrades drop tables. Indexes and foreign keys correct.
+- **Frontend Audit:** No fake data, no hardcoded signal arrays, no fake timestamps, no fake charts. All data from real API. No console.log/debug. No localStorage/sessionStorage. Monochrome design tokens.
+- **Security/Privacy Audit:** No passwords, API keys, tokens, embeddings, base64 face data, raw OCR payloads, TODO claims, or unsupported AI claims in Phase 11 code.
+
+### Bugs/Issues Discovered
+
+None. All implementation is correct as designed.
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `backend/tests/test_phase_11_6_integration.py` | New: 86 integration/hardening tests |
+
+### Tests
+
+86 new tests (`test_phase_11_6_integration.py`):
+- End-to-end integration (12): clean entry, identity mismatch (4), liveness spoof (2), wrong hall (2), multiple signals (1), inconclusive identity (2), missing evidence (3)
+- Signal detection correctness (17): all 14 detector names, 14 strength assertions, no EV mutation, detector failure isolation, no unintended types
+- Enum audit (5): all values exist, all have strength defaults, used vs planned types, weights verification
+- Deduplication/idempotency (4): triple call, preserved signals, unrelated EVs, multiple signal types
+- Risk scoring boundary (11): all boundary values, MAX_SCORE, config weights, config ordering, config types
+- Historical assessment integrity (7): three rows, no overwrite, chronological, own score, policy version, unchanged previous, no unique constraint
+- API integration (3): full flow, no EV mutation, repeated assessment history
+- API security/privacy (4): no biometric data in explanations/descriptions/evidence, no API keys in config
+- EntryVerification isolation (3): all fields preserved, assess preserves, granted status preserved
+- Concurrency (3): sequential detect idempotent, sequential assess distinct, interleaved detect+assess
+- Configuration audit (4): settings loaded, not None, not duplicated, uses get_settings
+- Code quality (7): no bare exceptions, thin routers, pure scoring, deterministic detection, no unused imports, no DB commits in scoring
+
+**Total tests:** 1889 (1803 previous + 86 new), 0 failures, 0 errors
+**Consecutive full-suite runs:** 2 (both 1889 passed)
+**Frontend:** 24 pages building successfully
+
+---
+
+## Phase 11 — COMPLETE
+
+All sub-phases complete:
+- 11.1 Domain foundation ✅ (47 tests)
+- 11.2 Signal detection ✅ (72 tests)
+- 11.3 Risk scoring ✅ (43 tests)
+- 11.4 REST API ✅ (40 tests)
+- 11.5 Admin UI ✅ (frontend)
+- 11.6 Integration & hardening ✅ (86 tests)
+
+**Total Phase 11 backend tests:** 288 (47 + 72 + 43 + 40 + 86)
+**Total backend tests:** 1889 passing, 0 failures, 0 errors
+**Frontend:** 24 pages, all building successfully
+
+### Limitations
+
+Phase 11 is advisory-only by design. It does NOT:
+- Grant or deny exam entry (Phase 10 owns authorization)
+- Automatically escalate entry verifications
+- Perform 1:N face identification
+- Confirm proxy fraud (it produces evidence signals, not decisions)
+- Real-time stream monitoring (Phase 13)
+- Authentication/authorization (Phase 19)
+- Store biometric data or face images
+
+### SecuritySignalType Enum — Planned vs Implemented
+
+**Implemented (14 — produced by detectors):**
+IDENTITY_MISMATCH, LIVENESS_SPOOF_DETECTED, WRONG_HALL_DETECTED, IDENTITY_INCONCLUSIVE, DUPLICATE_ENTRY_SAME_EXAM, REPEATED_FAILED_IDENTITY, HALL_TICKET_FIELD_MISMATCH, WRONG_ENTRY_POINT, MISSING_IDENTITY_CHECK, NO_SEAT_ASSIGNMENT, NO_HALL_TICKET, CAMERA_OFFLINE_AT_ENTRY, LATE_ENTRY, RAPID_SEQUENTIAL_ENTRY
+
+**Planned (9 — no detectors, zero weight, future implementation):**
+DUPLICATE_ENTRY, UNUSUAL_ENTRY_POINT, UNUSUAL_TIME, SEAT_MISMATCH, MULTIPLE_REGISTRATIONS, RAPID_ENTRY, DOCUMENT_ANOMALY, BEHAVIORAL_ANOMALY, MANUAL_FLAG

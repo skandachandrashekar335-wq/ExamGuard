@@ -4,8 +4,8 @@ AI-powered Examination Entry Verification, Anti-Proxy, Security, and Attendance 
 
 ## Project Status
 
-- **Phase:** 11 IN PROGRESS (11.1, 11.2, 11.3, 11.4, 11.5 complete)
-- **Backend:** 1803 tests passing (0 failures, 0 errors)
+- **Phase:** 11 COMPLETE
+- **Backend:** 1889 tests passing (0 failures, 0 errors)
 - **Frontend:** 24 pages (Next.js 16.3.3, React 19, TypeScript, Tailwind v4)
 - **Tech stack:** FastAPI + SQLAlchemy + PostgreSQL (backend), Next.js + TypeScript + Tailwind (frontend)
 
@@ -37,13 +37,14 @@ AI-powered Examination Entry Verification, Anti-Proxy, Security, and Attendance 
 - **10.4** Admin UI: List page, detail page, workflow actions, escalation/resolve UI
 - **10.5** Integration tests: 76 cross-component integration tests
 
-### Phase 11 — Anti-Proxy Detection (IN PROGRESS)
+### Phase 11 — Anti-Proxy Detection (COMPLETE)
 
 - **11.1** Domain foundation: SecuritySignal + ProxyRiskAssessment models, 3 enums, 6 config settings, migration 020, 47 model tests
 - **11.2** Deterministic signal detection: 14 signal detectors, idempotent service, 72 tests, migration 021
 - **11.3** Proxy risk scoring: Pure deterministic scoring engine, risk assessment persistence, 43 tests
 - **11.4** REST API: 5 endpoints (detect signals, list signals, assess risk, list assessments, get latest), 40 API tests
 - **11.5** Admin risk UI: proxy-risk-api.ts client, risk panel on entry verification detail page with signals table, assessment summary/history, detect/assess buttons
+- **11.6** Integration & hardening: 86 integration tests, security/privacy audit, 2 consecutive full suite runs (1889 passed)
 
 ## Development
 

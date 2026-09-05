@@ -600,14 +600,14 @@ Cross-component integration tests and comprehensive domain audit.
 
 ## Phase 11 — Anti-Proxy Detection
 
-**Status: IN PROGRESS**
+**Status: COMPLETE**
 
 - **11.1** Domain foundation: SecuritySignal + ProxyRiskAssessment models, 3 enums (SecuritySignalType, SignalStrength, RiskLevel), SIGNAL_STRENGTH_DEFAULTS, 6 config settings with validation, migration 020, 47 model tests — COMPLETE
 - **11.2** Deterministic signal detection: 14 signal detectors, idempotent detection service, 72 tests, migration 021 — COMPLETE
 - **11.3** Risk scoring engine: COMPLETE
 - **11.4** API layer: COMPLETE — 5 endpoints, 40 tests
 - **11.5** Admin UI: COMPLETE — proxy-risk-api.ts client, risk panel on EV detail page (signals table, assessment summary/history, detect/assess buttons)
-- **11.6** Integration tests & hardening: PLANNED
+- **11.6** Integration tests & hardening: COMPLETE — 86 tests, 2 full suite runs, security/privacy audit passed
 
 ---
 
@@ -909,12 +909,12 @@ Focus:
 
 ## Current Project State
 
-- **Current phase:** Phase 11 — Anti-Proxy Detection (IN PROGRESS: 11.1 complete, 11.2 complete, 11.3 complete, 11.4 complete, 11.5 complete)
-- **Current completed step:** Phase 11.5 — Admin Risk UI
-- **Current tests:** 1803 passing (0 failures, 0 errors)
+- **Current phase:** Phase 11 — Anti-Proxy Detection — COMPLETE
+- **Current completed step:** Phase 11.6 — Integration & Hardening
+- **Current tests:** 1889 passing (0 failures, 0 errors)
 - **Frontend pages:** 24 (all building successfully)
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono), zero border-radius, no neon colors
-- **Next step:** Phase 11.5 — Admin UI
+- **Next step:** Phase 12 — Attendance Management
 - **Provider architecture:** `app/services/face_verification/` with Protocol, DeterministicProvider, factory
 - **Identity verification API:** `POST /{attempt_id}/verify-face` endpoint for face verification trigger
 - **Camera infrastructure:** Complete — Camera, EntryPoint, Mapping, Credential, Health Observation, Device Auth API
