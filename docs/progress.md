@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, 12 COMPLETE, **13.1 IN PROGRESS**
-- **Tests:** 2133 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, 12 COMPLETE, **13.1 COMPLETE, 13.2 COMPLETE, 13.3 IN PROGRESS**
+- **Tests:** 2204 passing, 0 failures, 0 errors
 - **Frontend:** 27 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -1668,3 +1668,138 @@ Pure event-domain foundation for real-time monitoring. No database persistence, 
 
 **Total tests:** 2133 (2093 previous + 40 new), 0 failures, 0 errors
 **Consecutive full-suite runs:** 2 (both 2133 passed)
+
+---
+
+## Phase 13.2 — Connection Manager + Event Publisher
+
+**Status: COMPLETE**
+
+### Implementation
+
+In-process real-time infrastructure: bounded buffers, connection management, event publishing.
+
+- `backend/app/services/monitoring/event_buffer.py` — Bounded ring buffer for MonitoringEvents (default 1000 capacity)
+- `backend/app/services/monitoring/alert_buffer.py` — Bounded buffer for alerts (default 200 capacity) + Alert dataclass
+- `backend/app/services/monitoring/connection_manager.py` — ConnectionManager with transport-agnostic MessageTransport protocol
+- `backend/app/services/monitoring/event_publisher.py` — EventPublisher: event→buffer→alert→broadcast pipeline
+- `backend/app/core/config.py` — Added MONITORING_EVENT_BUFFER_SIZE, MONITORING_ALERT_BUFFER_SIZE, MONITORING_MAX_CONNECTIONS with validation
+
+### Design
+
+- **EventBuffer**: Thread-safe deque with maxlen. FIFO eviction. Query by MonitoringFilter.
+- **AlertBuffer**: Thread-safe deque with maxlen. Alert links to event via event_id.
+- **ConnectionManager**: Thread-safe dict. Transport-agnostic (MessageTransport protocol). Failed clients silently removed.
+- **EventPublisher**: Idempotent by event_id. Generates alerts for WARNING/CRITICAL. Broadcasts to matching clients.
+
+### Alert Behavior
+
+- INFO events: stored in event buffer only, no alert
+- WARNING events: stored + alert generated
+- CRITICAL events: stored + alert generated
+- Deduplication: by event_id (idempotent publication)
+
+### Configuration
+
+| Setting | Default | Description |
+|---|---|---|
+| `MONITORING_EVENT_BUFFER_SIZE` | 1000 | Max events in ring buffer |
+| `MONITORING_ALERT_BUFFER_SIZE` | 200 | Max alerts in buffer |
+| `MONITORING_MAX_CONNECTIONS` | 100 | Max concurrent WebSocket connections |
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `backend/app/services/monitoring/event_buffer.py` | New: bounded ring buffer for events |
+| `backend/app/services/monitoring/alert_buffer.py` | New: bounded alert buffer + Alert dataclass |
+| `backend/app/services/monitoring/connection_manager.py` | New: ConnectionManager + MessageTransport protocol |
+| `backend/app/services/monitoring/event_publisher.py` | New: EventPublisher pipeline |
+| `backend/app/services/monitoring/__init__.py` | Updated: exports new components |
+| `backend/app/core/config.py` | Updated: 3 monitoring config settings + validator |
+| `backend/tests/test_phase_13_2_infra.py` | New: 34 tests |
+
+### Tests
+
+34 tests covering:
+- EventBuffer: append, recent, FIFO eviction, capacity, query, limit, invalid capacity, empty
+- AlertBuffer: append, recent, FIFO eviction, event linkage, serialization, invalid capacity
+- ConnectionManager: register, unregister, duplicate handling, max connections, broadcast filtering, cross-filter leakage, failed client removal, no-filter matches all
+- EventPublisher: event storage, total_published counter, idempotency, INFO/WARNING/CRITICAL alert behavior, alert message content, no domain mutation, status method
+- Configuration: default values, validation
+
+**Total tests:** 2167 (2133 previous + 34 new), 0 failures, 0 errors
+**Consecutive full-suite runs:** 2 (both 2167 passed)
+
+---
+
+## Phase 13.3 — WebSocket API
+
+**Status: COMPLETE**
+
+### Implementation
+
+FastAPI WebSocket endpoint for real-time monitoring connections.
+
+- `backend/app/api/v1/ws_monitoring.py` — WebSocket endpoint at `/ws/monitoring`
+- `backend/app/api/v1/router.py` — Registered WebSocket router
+- `backend/app/core/config.py` — Added MONITORING_HEARTBEAT_INTERVAL, MONITORING_STALE_TIMEOUT
+
+### Design
+
+- **Endpoint:** `WS /api/v1/ws/monitoring`
+- **Filter parsing:** Query parameters validated on connect (exam_id, hall_id, category, event_type, min_severity)
+- **Subscription updates:** Client sends `{"type": "subscribe", ...}` to dynamically change filters
+- **Heartbeat:** Server pings every 30s, expects pong, disconnects stale clients after 60s
+- **Connection manager:** Uses shared Phase 13.2 ConnectionManager (no duplicate)
+- **Authentication:** NOT implemented (Phase 19); endpoint accepts unauthenticated connections
+- **Error handling:** No stack traces, no secrets, no credentials, safe protocol messages only
+
+### Connection Lifecycle
+
+```
+CONNECT → VALIDATE FILTER → REGISTER → CONNECTED → HEARTBEAT/RECEIVE → DISCONNECT → UNREGISTER
+```
+
+Cleanup on: normal disconnect, network failure, timeout, heartbeat failure, protocol errors, unexpected exceptions.
+
+### Client Messages
+
+| Type | Direction | Description |
+|---|---|---|
+| `connected` | Server→Client | Welcome message with client_id and filters |
+| `ping` | Either | Heartbeat ping |
+| `pong` | Either | Heartbeat response |
+| `subscribe` | Client→Server | Dynamic filter update |
+| `subscribed` | Server→Client | Filter update confirmation |
+| `error` | Server→Client | Safe error message |
+
+### Configuration
+
+| Setting | Default | Description |
+|---|---|---|
+| `MONITORING_HEARTBEAT_INTERVAL` | 30 | Seconds between pings |
+| `MONITORING_STALE_TIMEOUT` | 60 | Seconds before stale disconnect |
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `backend/app/api/v1/ws_monitoring.py` | New: WebSocket endpoint + filter parsing + heartbeat |
+| `backend/app/api/v1/router.py` | Updated: registered ws_monitoring_router |
+| `backend/app/core/config.py` | Updated: 2 heartbeat config settings + validator |
+| `backend/tests/test_phase_13_3_websocket.py` | New: 37 tests |
+
+### Tests
+
+37 tests covering:
+- Filter parsing: no filters, exam_id, hall_id, category, event_type, severity, combined, invalid category/event_type/severity, negative IDs
+- Client message parsing: valid JSON, malformed JSON, non-object, array, None
+- Connection: successful, valid filters, invalid filter rejection
+- Registration: manager registration, disconnect unregisters
+- Client messages: ping/pong, subscribe update, malformed JSON response, unknown message type, invalid subscribe data
+- Security: no stack traces, no secrets, no database paths
+- Heartbeat config: reasonable intervals
+
+**Total tests:** 2204 (2167 previous + 37 new), 0 failures, 0 errors
+**Consecutive full-suite runs:** 2 (both 2204 passed)

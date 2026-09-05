@@ -82,6 +82,13 @@ class Settings(BaseSettings):
     # Signal detection: rapid sequential entry window (seconds)
     PROXY_RISK_RAPID_ENTRY_WINDOW_SECONDS: int = 300
 
+    # Monitoring settings (Phase 13.2 + 13.3)
+    MONITORING_EVENT_BUFFER_SIZE: int = 1000
+    MONITORING_ALERT_BUFFER_SIZE: int = 200
+    MONITORING_MAX_CONNECTIONS: int = 100
+    MONITORING_HEARTBEAT_INTERVAL: int = 30
+    MONITORING_STALE_TIMEOUT: int = 60
+
     @model_validator(mode="after")
     def validate_decision_policy(self) -> "Settings":
         """Validate decision policy configuration values."""
@@ -111,6 +118,36 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"PROXY_RISK_CRITICAL_THRESHOLD ({self.PROXY_RISK_CRITICAL_THRESHOLD}) "
                 f"must be <= PROXY_RISK_MAX_SCORE ({self.PROXY_RISK_MAX_SCORE})"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def validate_monitoring_settings(self) -> "Settings":
+        """Validate monitoring buffer and connection settings."""
+        if self.MONITORING_EVENT_BUFFER_SIZE < 1:
+            raise ValueError(
+                f"MONITORING_EVENT_BUFFER_SIZE must be >= 1, "
+                f"got {self.MONITORING_EVENT_BUFFER_SIZE}"
+            )
+        if self.MONITORING_ALERT_BUFFER_SIZE < 1:
+            raise ValueError(
+                f"MONITORING_ALERT_BUFFER_SIZE must be >= 1, "
+                f"got {self.MONITORING_ALERT_BUFFER_SIZE}"
+            )
+        if self.MONITORING_MAX_CONNECTIONS < 1:
+            raise ValueError(
+                f"MONITORING_MAX_CONNECTIONS must be >= 1, "
+                f"got {self.MONITORING_MAX_CONNECTIONS}"
+            )
+        if self.MONITORING_HEARTBEAT_INTERVAL < 1:
+            raise ValueError(
+                f"MONITORING_HEARTBEAT_INTERVAL must be >= 1, "
+                f"got {self.MONITORING_HEARTBEAT_INTERVAL}"
+            )
+        if self.MONITORING_STALE_TIMEOUT < 1:
+            raise ValueError(
+                f"MONITORING_STALE_TIMEOUT must be >= 1, "
+                f"got {self.MONITORING_STALE_TIMEOUT}"
             )
         return self
 

@@ -1,11 +1,15 @@
-"""Real-time monitoring event domain (Phase 13.1).
+"""Real-time monitoring infrastructure (Phase 13.1 + 13.2).
 
-Ephemeral event types for real-time monitoring delivery.
+Ephemeral event types, buffers, connection management, and event publishing.
 No database persistence. No ORM dependency.
 
 Existing domain audit/history tables remain authoritative.
 """
 
+from app.services.monitoring.alert_buffer import Alert, AlertBuffer
+from app.services.monitoring.connection_manager import ConnectionManager
+from app.services.monitoring.event_buffer import EventBuffer
+from app.services.monitoring.event_publisher import EventPublisher
 from app.services.monitoring.events import (
     EventCategory,
     EventSeverity,
@@ -16,7 +20,12 @@ from app.services.monitoring.events import (
 )
 
 __all__ = [
+    "Alert",
+    "AlertBuffer",
+    "ConnectionManager",
+    "EventBuffer",
     "EventCategory",
+    "EventPublisher",
     "EventSeverity",
     "EventType",
     "MonitoringEvent",

@@ -25,6 +25,7 @@ from app.api.v1.import_subjects_exams import router as import_subjects_exams_rou
 from app.api.v1.seat_assignments import router as seat_assignments_router
 from app.api.v1.students import router as students_router
 from app.api.v1.subjects import router as subjects_router
+from app.api.v1.ws_monitoring import router as ws_monitoring_router
 
 router = APIRouter()
 
@@ -53,6 +54,7 @@ router.include_router(import_subjects_exams_router)
 router.include_router(seat_assignments_router)
 router.include_router(students_router)
 router.include_router(subjects_router)
+router.include_router(ws_monitoring_router)
 
 
 @router.get("/ping")
