@@ -2364,3 +2364,153 @@ Links Exam to ExamHall for running sessions. Integrates with EntryVerification a
 | `frontend/src/app/examination-sessions/[id]/page.tsx` | **New:** Session detail page |
 | `frontend/src/app/dashboard/page.tsx` | **Modified:** Added navigation link |
 | `frontend/src/app/page.tsx` | **Modified:** Added footer link |
+
+## Phase 16 — Attendance & Examination Analytics
+
+**Status: COMPLETE (Backend + Frontend complete)**
+
+### Implementation
+
+Analytics service layer with read-only aggregation over existing domain models. SQL-level aggregation. No business logic mutations. Observational/reporting only.
+
+### Services (Phase 16.1)
+
+- ackend/app/services/analytics/__init__.py — **New:** Package init
+- ackend/app/services/analytics/attendance.py — **New:** Expanded exam summary, list attendance, hall utilization, student history, timeline exports
+- ackend/app/services/analytics/verification.py — **New:** Enhanced verification summary, distribution analytics, OCR confidence, match status, decision trends, exports
+- ackend/app/services/analytics/proxy_risk.py — **New:** Signal type counts, strength distribution, risk level distribution, average risk scores, per-type breakdown, exports
+- ackend/app/services/analytics/hall_utilization.py — **New:** Hall capacity and utilization, utilization trends, exam capacity, exports
+- ackend/app/services/analytics/exam_statistics.py — **New:** Comprehensive exam statistics, filtered listings, department stats, full report exports
+
+### API Routes (Phase 16.2)
+
+- ackend/app/api/v1/analytics.py — **New:** REST router with 30+ endpoints
+- ackend/app/api/v1/router.py — **Modified:** Registered analytics router
+
+### API Endpoints
+
+#### Attendance
+
+| Method | Path | Description |
+
+|---|---|---|
+
+| GET | /api/v1/analytics/attendance/summary/{exam_id} | Attendance summary |
+
+| GET | /api/v1/analytics/attendance/list | List with filters |
+
+| GET | /api/v1/analytics/attendance/excused/{exam_id} | Excused records |
+
+| GET | /api/v1/analytics/attendance/timeline/{exam_id} | Daily timeline |
+
+| GET | /api/v1/analytics/attendance/status-timeline/{exam_id} | Status breakdown by date |
+
+| GET | /api/v1/analytics/attendance/export/{exam_id} | Export data |
+
+#### Verification
+
+| Method | Path | Description |
+
+|---|---|---|
+
+| GET | /api/v1/analytics/verification/summary/{document_id} | Verification summary |
+
+| GET | /api/v1/analytics/verification/distribution/{exam_id} | Decision distribution |
+
+| GET | /api/v1/analytics/verification/ocr-distribution/{exam_id} | OCR confidence |
+
+| GET | /api/v1/analytics/verification/match-distribution/{exam_id} | Match status |
+
+| GET | /api/v1/analytics/verification/decision-trend | Decision trend over time |
+
+| GET | /api/v1/analytics/verification/export/{document_id} | Export data |
+
+#### Proxy-Risk
+
+| Method | Path | Description |
+
+|---|---|---|
+
+| GET | /api/v1/analytics/proxy-risk/average/{exam_id} | Average risk score |
+
+| GET | /api/v1/analytics/proxy-risk/signal-types/{exam_id} | Signal type counts |
+
+| GET | /api/v1/analytics/proxy-risk/strength-distribution/{exam_id} | Strength distribution |
+
+| GET | /api/v1/analytics/proxy-risk/risk-levels/{exam_id} | Risk level distribution |
+
+| GET | /api/v1/analytics/proxy-risk/breakdown/{exam_id} | Per-type breakdown |
+
+| GET | /api/v1/analytics/proxy-risk/export/{exam_id} | Export data |
+
+#### Hall Utilization
+
+| Method | Path | Description |
+
+|---|---|---|
+
+| GET | /api/v1/analytics/hall-utilization/{exam_id} | Hall utilization |
+
+| GET | /api/v1/analytics/hall-utilization/export/{exam_id} | Export data |
+
+#### Examination Statistics
+
+| Method | Path | Description |
+
+|---|---|---|
+
+| GET | /api/v1/analytics/statistics/{exam_id} | Comprehensive statistics |
+
+| GET | /api/v1/analytics/statistics/list | List with filters |
+
+| GET | /api/v1/analytics/statistics/department | Department stats |
+
+| GET | /api/v1/analytics/statistics/report/{exam_id} | Full report export |
+
+### Tests (Phase 16.3)
+
+- ackend/tests/test_analytics*.py — **New:** Analytics service layer tests covering normal datasets, empty datasets, zero registrations, all present, mixed present/excused/absent, verification status distributions, exam filtering, hall filtering, entry-point filtering, student filtering, date boundaries, proxy-risk levels, multiple historical assessments, latest-assessment selection, signal aggregation, hall utilization, zero capacity handling, sessions with and without linked attendance, composite exam statistics
+
+### Files Changed
+
+| File | Change |
+
+|---|---|
+
+| ackend/app/services/analytics/__init__.py | **New:** Package init |
+
+| ackend/app/services/analytics/attendance.py | **New:** Attendance analytics |
+
+| ackend/app/services/analytics/verification.py | **New:** Verification analytics |
+
+| ackend/app/services/analytics/proxy_risk.py | **New:** Proxy-risk analytics |
+
+| ackend/app/services/analytics/hall_utilization.py | **New:** Hall utilization analytics |
+
+| ackend/app/services/analytics/exam_statistics.py | **New:** Examination statistics |
+
+| ackend/app/api/v1/analytics.py | **New:** API routes (30+ endpoints) |
+
+| ackend/app/api/v1/router.py | **Modified:** Registered analytics router |
+
+---
+## Current Project State
+
+- **Current phase:** Phase 15 — Examination Session Management (COMPLETE)
+
+- **Completed phases:** 0–15
+
+- **Current tests:** 2262 passing, 1 pre-existing failure, 203 pre-existing errors
+
+- **Frontend pages:** 32 (all building successfully)
+
+- **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono), zero border-radius, no neon colors
+
+- **Next step:** Phase 16 — Attendance & Examination Analytics
+
+- **Provider architecture:** pp/services/face_verification/ with Protocol, DeterministicProvider, factory
+
+- **Identity verification API:** POST /{attempt_id}/verify-face endpoint for face verification trigger
+
+- **Camera infrastructure:** Complete — Camera, EntryPoint, Mapping, Credential, Health Observation, Device Auth API
+
