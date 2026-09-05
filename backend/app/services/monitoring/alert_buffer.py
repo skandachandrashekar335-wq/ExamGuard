@@ -53,6 +53,35 @@ class Alert:
         return result
 
 
+class AlertFilter:
+    """Optional filter criteria for alert retrieval."""
+
+    def __init__(
+        self,
+        *,
+        severity: EventSeverity | None = None,
+        event_type: EventType | None = None,
+        exam_id: int | None = None,
+        hall_id: int | None = None,
+    ) -> None:
+        self.severity = severity
+        self.event_type = event_type
+        self.exam_id = exam_id
+        self.hall_id = hall_id
+
+    def matches(self, alert: Alert) -> bool:
+        """Return True if the alert passes all active filters."""
+        if self.severity is not None and alert.severity != self.severity:
+            return False
+        if self.event_type is not None and alert.event_type != self.event_type:
+            return False
+        if self.exam_id is not None and alert.exam_id != self.exam_id:
+            return False
+        if self.hall_id is not None and alert.hall_id != self.hall_id:
+            return False
+        return True
+
+
 class AlertBuffer:
     """Bounded ring buffer for recent alerts.
 
@@ -79,6 +108,27 @@ class AlertBuffer:
         """Return the most recent alerts, newest first."""
         with self._lock:
             items = list(self._buffer)
+        items.reverse()
+        return items[:limit]
+
+    def query(self, alert_filter: AlertFilter, limit: int = 50) -> list[Alert]:
+        """Return recent alerts matching the filter, newest first."""
+        with self._lock:
+            items = [a for a in self._buffer if alert_filter.matches(a)]
+        items.reverse()
+        return items[:limit]
+
+    def by_severity(self, severity: EventSeverity, limit: int = 50) -> list[Alert]:
+        """Return recent alerts of a specific severity, newest first."""
+        with self._lock:
+            items = [a for a in self._buffer if a.severity == severity]
+        items.reverse()
+        return items[:limit]
+
+    def by_event_type(self, event_type: EventType, limit: int = 50) -> list[Alert]:
+        """Return recent alerts for a specific event type, newest first."""
+        with self._lock:
+            items = [a for a in self._buffer if a.event_type == event_type]
         items.reverse()
         return items[:limit]
 

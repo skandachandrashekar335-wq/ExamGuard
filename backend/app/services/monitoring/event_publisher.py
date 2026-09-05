@@ -14,6 +14,7 @@ import uuid
 from datetime import datetime, timezone
 
 from app.services.monitoring.alert_buffer import Alert, AlertBuffer
+from app.services.monitoring.alerting import alert_message, should_alert
 from app.services.monitoring.connection_manager import ConnectionManager
 from app.services.monitoring.event_buffer import EventBuffer
 from app.services.monitoring.events import EventSeverity, MonitoringEvent
@@ -52,7 +53,7 @@ class EventPublisher:
         1. Validate (payload safety already enforced by MonitoringEvent)
         2. Idempotent by event_id — duplicate event_ids are silently skipped
         3. Store in event buffer
-        4. Generate alert if severity >= WARNING
+        4. Generate alert if alert classification says so
         5. Broadcast to connected clients (best-effort, non-blocking)
         """
         # Idempotent by event_id
@@ -69,13 +70,13 @@ class EventPublisher:
         # Store in event buffer
         self._event_buffer.append(event)
 
-        # Generate alert for WARNING/CRITICAL
-        if event.severity in (EventSeverity.WARNING, EventSeverity.CRITICAL):
+        # Generate alert if classified as alert-worthy
+        if should_alert(event):
             alert = Alert(
                 event_id=event.event_id,
                 event_type=event.event_type,
                 severity=event.severity,
-                message=_alert_message(event),
+                message=alert_message(event),
                 entity_type=event.entity_type,
                 entity_id=event.entity_id,
                 exam_id=event.exam_id,
@@ -110,21 +111,3 @@ class EventPublisher:
             "buffered_alerts": len(self._alert_buffer),
             "total_published": self.total_published,
         }
-
-
-def _alert_message(event: MonitoringEvent) -> str:
-    """Generate a human-readable alert message from an event."""
-    entity = f"{event.entity_type} #{event.entity_id}"
-    if event.event_type.value.startswith("ENTRY_"):
-        action = event.event_type.value.replace("ENTRY_", "").replace("_", " ").title()
-        return f"{entity}: Entry {action}"
-    if event.event_type.value.startswith("RISK_"):
-        level = event.event_type.value.replace("RISK_", "").title()
-        return f"{entity}: Risk level {level}"
-    if event.event_type.value.startswith("ATTENDANCE_"):
-        action = event.event_type.value.replace("ATTENDANCE_", "").replace("_", " ").title()
-        return f"{entity}: Attendance {action}"
-    if event.event_type.value.startswith("CAMERA_"):
-        status = event.event_type.value.replace("CAMERA_", "").title()
-        return f"{entity}: Camera {status}"
-    return f"{event.event_type.value}: {entity}"

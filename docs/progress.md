@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, 12 COMPLETE, **13.1 COMPLETE, 13.2 COMPLETE, 13.3 COMPLETE, 13.4 IN PROGRESS**
-- **Tests:** 2235 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, 12 COMPLETE, **13.1 COMPLETE, 13.2 COMPLETE, 13.3 COMPLETE, 13.4 COMPLETE, 13.5 IN PROGRESS**
+- **Tests:** 2287 passing, 0 failures, 0 errors
 - **Frontend:** 27 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -1891,3 +1891,92 @@ All events use operational, non-sensitive payloads:
 
 **Total tests:** 2235 (2204 previous + 31 new), 0 failures, 0 errors
 **Consecutive full-suite runs:** 2 (both 2235 passed)
+
+---
+
+## Phase 13.5 — Alerting
+
+**Status: COMPLETE**
+
+### Implementation
+
+Hardened and completed the alerting layer with deterministic classification,
+safe messages, and AlertBuffer filtering.
+
+- `backend/app/services/monitoring/alerting.py` — **New:** Deterministic alert classification module
+- `backend/app/services/monitoring/alert_buffer.py` — **Modified:** Added AlertFilter, query(), by_severity(), by_event_type()
+- `backend/app/services/monitoring/event_publisher.py` — **Modified:** Uses alerting module for classification and messages
+- `backend/app/services/monitoring/__init__.py` — **Modified:** Exports alerting module
+- `backend/tests/test_phase_13_5_alerting.py` — **New:** 52 tests
+- `backend/tests/test_phase_13_2_infra.py` — **Modified:** Updated alert message test for new format
+
+### Alert Classification (alerting.py)
+
+Deterministic, stateless module that answers:
+- `should_alert(event)` — True if event should create an alert
+- `alert_message(event)` — Safe, concise operational summary
+- `alert_payload(event)` — Minimal operational payload
+
+Alert-worthy event types (5 total):
+- ENTRY_ESCALATED → WARNING
+- RISK_ELEVATED → WARNING
+- RISK_HIGH → WARNING
+- RISK_CRITICAL → CRITICAL
+- CAMERA_OFFLINE → WARNING
+
+### Alert Messages
+
+| Event Type | Message |
+|---|---|
+| ENTRY_ESCALATED | Entry verification requires review. |
+| RISK_ELEVATED | Elevated proxy-risk assessment detected. |
+| RISK_HIGH | High proxy-risk assessment detected. |
+| RISK_CRITICAL | Critical proxy-risk assessment detected. |
+| CAMERA_OFFLINE | Camera reported offline. |
+
+Messages are deterministic, safe, and contain no sensitive data.
+
+### AlertBuffer Enhancements
+
+- `AlertFilter` class for multi-criteria filtering (severity, event_type, exam_id, hall_id)
+- `query(filter, limit)` — Filtered retrieval
+- `by_severity(severity, limit)` — Severity-based retrieval
+- `by_event_type(event_type, limit)` — Type-based retrieval
+
+### Deduplication
+
+EventPublisher deduplicates by event_id (existing Phase 13.2 behavior).
+Different event_ids always create separate alerts.
+
+### Lifecycle
+
+```
+EVENT → MonitoringEvent → should_alert() → Alert → AlertBuffer → WebSocket
+```
+
+NO: acknowledgement, resolution, dismissal, assignment, persistence.
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `backend/app/services/monitoring/alerting.py` | **New:** Alert classification module |
+| `backend/app/services/monitoring/alert_buffer.py` | **Modified:** Added AlertFilter, query, by_severity, by_event_type |
+| `backend/app/services/monitoring/event_publisher.py` | **Modified:** Uses alerting module |
+| `backend/app/services/monitoring/__init__.py` | **Modified:** Exports alerting module |
+| `backend/tests/test_phase_13_5_alerting.py` | **New:** 52 tests |
+| `backend/tests/test_phase_13_2_infra.py` | **Modified:** Updated alert message test |
+
+### Tests
+
+52 tests covering:
+- Classification (19): INFO no alert, WARNING/CRITICAL alert, each alert-worthy event type, alert-worthy set completeness
+- Messages (7): Deterministic messages for all alert types, safe summaries, no sensitive data
+- Identity (3): Unique alert_id, event_id linkage, serialization
+- Buffer filtering (5): by_severity, by_event_type, AlertFilter query, no match, limit
+- Buffer FIFO (3): Eviction, capacity, invalid capacity
+- Publisher integration (9): WARNING/CRITICAL creates alert, INFO no alert, deduplication, separate events, camera_offline, risk_elevated, risk_high, context preservation
+- Security (6): MonitoringEvent rejects biometrics/credentials/stack_traces/raw_ocr at creation, no filesystem paths in messages, no database URLs
+
+**Total tests:** 2287 (2235 previous + 52 new), 0 failures, 0 errors
+**Consecutive full-suite runs:** 2 (both 2287 passed)

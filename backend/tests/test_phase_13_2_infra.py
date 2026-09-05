@@ -357,8 +357,7 @@ class TestEventPublisher:
         )
         pub.publish(event)
         alert = abuf.recent()[0]
-        assert "EntryVerification #42" in alert.message
-        assert "Entry" in alert.message
+        assert "Entry verification requires review" in alert.message
 
     def test_publisher_does_not_mutate_domain(self):
         """Publisher does not change the event object."""
