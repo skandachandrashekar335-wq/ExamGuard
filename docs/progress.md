@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, 12 COMPLETE, **13.1 COMPLETE, 13.2 COMPLETE, 13.3 COMPLETE, 13.4 COMPLETE, 13.5 COMPLETE, 13.6 COMPLETE, 13.7 COMPLETE, 13.8 IN PROGRESS**
-- **Tests:** 2346 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, 12 COMPLETE, 13 COMPLETE, **14 IN PROGRESS**
+- **Tests:** 2382 passing, 0 failures, 0 errors
 - **Frontend:** 28 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -2181,5 +2181,74 @@ Frontend TypeScript validation clean. Backend test suite stable.
 | 13.8 | Integration & hardening | N/A |
 
 **Total Phase 13 tests:** 253 (13.1-13.6 backend only)
-**Total project tests:** 2346
+**Total project tests:** 2382
 **Total frontend routes:** 28
+
+---
+
+## Phase 14 — Security Event Management
+
+**Status: IN PROGRESS (Backend complete, frontend pending)**
+
+### Implementation
+
+Persistent, immutable security event records and lifecycle-managed security alerts.
+Replaces the ephemeral monitoring-only approach with durable audit history.
+
+### Models (Phase 14.1)
+
+- `backend/app/models/security_event.py` — **New:** SecurityEvent (immutable, append-only) + SecurityAlert (lifecycle: OPEN → ACKNOWLEDGED → RESOLVED/DISMISSED)
+- `backend/alembic/versions/024_create_security_event_tables.py` — **New:** Migration
+- `backend/app/models/__init__.py` — **Modified:** Registered models
+
+### Enums
+
+- `SecurityEventType`: SIGNAL_DETECTED, RISK_THRESHOLD_EXCEEDED, ENTRY_ESCALATED, DUPLICATE_ENTRY_DETECTED, IDENTITY_MISMATCH_DETECTED, MANUAL_FLAG, ATTENDANCE_CORRECTED, CAMERA_OFFLINE_DURING_EXAM, UNUSUAL_PATTERN, PROXY_RISK_CRITICAL
+- `SecurityEventSeverity`: INFO, LOW, MEDIUM, HIGH, CRITICAL
+- `SecurityAlertStatus`: OPEN, ACKNOWLEDGED, RESOLVED, DISMISSED
+
+### Services (Phase 14.2-14.3)
+
+- `backend/app/services/security_event.py` — **New:** create_security_event, list_security_events, get_security_event, count_security_events, count_by_severity
+- `backend/app/services/security_alert.py` — **New:** create_security_alert, acknowledge_alert, resolve_alert, dismiss_alert, list_security_alerts, get_security_alert, count_by_status
+
+### Schemas (Phase 14.2-14.3)
+
+- `backend/app/schemas/security_event.py` — **New:** SecurityEventResponse, SecurityEventListResponse, SecurityAlertResponse, SecurityAlertListResponse, AcknowledgeAlertRequest, ResolveAlertRequest, DismissAlertRequest
+
+### API (Phase 14.4-14.5)
+
+- `backend/app/api/v1/security_events.py` — **New:** GET /security-events (list+filter), GET /security-events/{id}
+- `backend/app/api/v1/security_alerts.py` — **New:** GET /security-alerts (list+filter), GET /security-alerts/{id}, POST /{id}/acknowledge, POST /{id}/resolve, POST /{id}/dismiss
+- `backend/app/api/v1/router.py` — **Modified:** Registered both routers
+
+### API Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/security-events` | List with filtering (event_type, severity, entity_type, student_id, exam_id, hall_id, source) |
+| `GET` | `/api/v1/security-events/{id}` | Get by ID |
+| `GET` | `/api/v1/security-alerts` | List with filtering (status, severity, security_event_id) |
+| `GET` | `/api/v1/security-alerts/{id}` | Get by ID |
+| `POST` | `/api/v1/security-alerts/{id}/acknowledge` | Acknowledge alert |
+| `POST` | `/api/v1/security-alerts/{id}/resolve` | Resolve alert |
+| `POST` | `/api/v1/security-alerts/{id}/dismiss` | Dismiss alert |
+
+### Tests (Phase 14)
+
+- `backend/tests/test_phase_14_security_events.py` — **New:** 36 tests
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `backend/app/models/security_event.py` | **New:** SecurityEvent + SecurityAlert models |
+| `backend/app/models/__init__.py` | **Modified:** Registered models |
+| `backend/alembic/versions/024_create_security_event_tables.py` | **New:** Migration |
+| `backend/app/schemas/security_event.py` | **New:** Response + request schemas |
+| `backend/app/services/security_event.py` | **New:** Event service |
+| `backend/app/services/security_alert.py` | **New:** Alert service |
+| `backend/app/api/v1/security_events.py` | **New:** REST API |
+| `backend/app/api/v1/security_alerts.py` | **New:** REST API |
+| `backend/app/api/v1/router.py` | **Modified:** Registered routers |
+| `backend/tests/test_phase_14_security_events.py` | **New:** 36 tests |

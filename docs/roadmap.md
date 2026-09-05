@@ -899,12 +899,12 @@ Focus:
 
 ## Current Project State
 
-- **Current phase:** Phase 14 — Security Event Management (PLANNED)
-- **Current completed step:** Phase 13.8 — Integration & Hardening (COMPLETE)
-- **Current tests:** 2346 passing, 0 failures, 0 errors
+- **Current phase:** Phase 14 — Security Event Management (IN PROGRESS: backend complete, frontend pending)
+- **Current completed step:** Phase 14.5 — Security Alert REST API (COMPLETE)
+- **Current tests:** 2382 passing, 0 failures, 0 errors
 - **Frontend pages:** 28 (all building successfully)
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono), zero border-radius, no neon colors
-- **Next step:** Phase 14 — Security Event Management
+- **Next step:** Phase 14.7 — Security Events Frontend
 - **Provider architecture:** `app/services/face_verification/` with Protocol, DeterministicProvider, factory
 - **Identity verification API:** `POST /{attempt_id}/verify-face` endpoint for face verification trigger
 - **Camera infrastructure:** Complete — Camera, EntryPoint, Mapping, Credential, Health Observation, Device Auth API

@@ -25,3 +25,4 @@ from app.models.camera_entry_point import CameraEntryPointMapping  # noqa: E402,
 from app.models.entry_verification import EntryVerification  # noqa: E402, F401
 from app.models.proxy_risk import SecuritySignal, ProxyRiskAssessment  # noqa: E402, F401
 from app.models.attendance import AttendanceRecord, AttendanceEvent  # noqa: E402, F401
+from app.models.security_event import SecurityEvent, SecurityAlert  # noqa: E402, F401
