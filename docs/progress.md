@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11.1 COMPLETE, 11.2 COMPLETE, 11.3 COMPLETE, 11.4 COMPLETE, 11.5 COMPLETE, 11.6 COMPLETE, **PHASE 11 COMPLETE**
-- **Tests:** 1889 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, **12.1 IN PROGRESS**
+- **Tests:** 1931 passing, 0 failures, 0 errors
 - **Frontend:** 24 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -1373,3 +1373,67 @@ IDENTITY_MISMATCH, LIVENESS_SPOOF_DETECTED, WRONG_HALL_DETECTED, IDENTITY_INCONC
 
 **Planned (9 — no detectors, zero weight, future implementation):**
 DUPLICATE_ENTRY, UNUSUAL_ENTRY_POINT, UNUSUAL_TIME, SEAT_MISMATCH, MULTIPLE_REGISTRATIONS, RAPID_ENTRY, DOCUMENT_ANOMALY, BEHAVIORAL_ANOMALY, MANUAL_FLAG
+
+---
+
+## Phase 12.1 — Attendance Domain Models & Database
+
+**Status: COMPLETE**
+
+Domain foundation for attendance tracking. Creates two models:
+- `AttendanceRecord` — current attendance state per ExamRegistration (one record per registration)
+- `AttendanceEvent` — append-only event history (idempotent per EntryVerification)
+
+### Models Created
+
+- `AttendanceRecord` — current attendance state per ExamRegistration
+  - `student_id`, `exam_id`, `exam_registration_id`, `status`, `entry_verification_id`, `entry_method`, `entry_time`, `hall_id`, `seat_number` (nullable)
+  - UniqueConstraint on `exam_registration_id` — exactly one current record per registration
+  - Relationships: student, exam, registration, entry_verification, hall
+
+- `AttendanceEvent` — append-only event history
+  - `student_id`, `exam_id`, `exam_registration_id`, `entry_verification_id`, `event_type`, `status_snapshot`, `recorded_by` (nullable), `reason` (nullable)
+  - UniqueConstraint on `entry_verification_id` — idempotent, no duplicate events per EV
+  - Relationships: student, exam, registration, entry_verification
+
+### Enums
+
+- `AttendanceStatus`: PRESENT, ABSENT, EXCUSED
+- `EntryMethod`: VERIFIED_ENTRY, MANUAL_ENTRY
+- `AttendanceEventType`: ENTRY_GRANTED, ENTRY_DENIED, ENTRY_ESCALATED, ATTENDANCE_RECORDED, ATTENDANCE_CORRECTED, ATTENDANCE_EXCUSED
+
+### Migration
+
+- `022_create_attendance_tables.py` — creates `attendance_records` and `attendance_events` tables
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `backend/app/models/attendance.py` | New: AttendanceRecord, AttendanceEvent models, 3 enums |
+| `backend/app/models/__init__.py` | Modified: registered AttendanceRecord, AttendanceEvent |
+| `backend/alembic/versions/022_create_attendance_tables.py` | New: creates both tables |
+| `backend/tests/test_phase_12_1_models.py` | New: 42 model tests |
+
+### Tests
+
+42 tests covering:
+- Enum value persistence (3 enums, 10 values)
+- AttendanceRecord creation, defaults, timestamps, repr
+- AttendanceRecord relationships (5 FK relationships)
+- AttendanceRecord uniqueness (one per registration, different registrations valid)
+- AttendanceRecord status values
+- AttendanceRecord snapshot semantics
+- AttendanceEvent creation, defaults, timestamps, repr, nullable fields
+- AttendanceEvent relationships (4 FK relationships)
+- AttendanceEvent idempotency (one per EV, different EVs valid)
+- AttendanceEvent type values (6 event types)
+- Multiple events across registrations
+- Privacy (no biometric/credential fields)
+- Model registration (2 tables, correct columns)
+- Index verification (6 record indexes, 6 event indexes)
+- Constraint verification (2 unique constraints)
+- History preservation (multiple EVs same registration)
+
+**Total tests:** 1931 (1889 previous + 42 new), 0 failures, 0 errors
+**Consecutive full-suite runs:** 2 (both 1931 passed)

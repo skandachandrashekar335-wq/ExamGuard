@@ -613,23 +613,13 @@ Cross-component integration tests and comprehensive domain audit.
 
 ## Phase 12 — Attendance Management
 
-**Status: PLANNED**
+**Status: IN PROGRESS**
 
-Focus:
-- Attendance models
-- Attendance state management
-- Entry-based attendance
-- Manual attendance correction
-- Attendance audit trail
-- Attendance reports
-
-**Dependencies:** Phase 10 (entry verification events are the source of attendance records).
-
-**New models/migrations likely required:** `Attendance` model with state machine (absent → present → corrected). `AttendanceCorrection` audit model. `backend/app/services/attendance/` implementation.
-
-**Frontend work expected:** Attendance dashboard, manual correction UI, attendance reports.
-
-**Testing requirements:** Unit tests for attendance state transitions, correction logic. API tests for attendance endpoints.
+- **12.1** Domain foundation: AttendanceRecord + AttendanceEvent models, 3 enums, migration 022, 42 model tests — COMPLETE
+- **12.2** Service layer: PLANNED
+- **12.3** API layer: PLANNED
+- **12.4** Admin UI: PLANNED
+- **12.5** Integration tests & hardening: PLANNED
 
 ---
 
@@ -909,12 +899,12 @@ Focus:
 
 ## Current Project State
 
-- **Current phase:** Phase 11 — Anti-Proxy Detection — COMPLETE
-- **Current completed step:** Phase 11.6 — Integration & Hardening
-- **Current tests:** 1889 passing (0 failures, 0 errors)
+- **Current phase:** Phase 12 — Attendance Management (IN PROGRESS: 12.1 complete)
+- **Current completed step:** Phase 12.1 — Attendance Domain Models & Database
+- **Current tests:** 1931 passing (0 failures, 0 errors)
 - **Frontend pages:** 24 (all building successfully)
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono), zero border-radius, no neon colors
-- **Next step:** Phase 12 — Attendance Management
+- **Next step:** Phase 12.2 — Attendance Service Layer
 - **Provider architecture:** `app/services/face_verification/` with Protocol, DeterministicProvider, factory
 - **Identity verification API:** `POST /{attempt_id}/verify-face` endpoint for face verification trigger
 - **Camera infrastructure:** Complete — Camera, EntryPoint, Mapping, Credential, Health Observation, Device Auth API
