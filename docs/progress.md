@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, **12.1 IN PROGRESS**
-- **Tests:** 1931 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, **12.1 COMPLETE, 12.2 IN PROGRESS**
+- **Tests:** 1986 passing, 0 failures, 0 errors
 - **Frontend:** 24 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -1437,3 +1437,66 @@ Domain foundation for attendance tracking. Creates two models:
 
 **Total tests:** 1931 (1889 previous + 42 new), 0 failures, 0 errors
 **Consecutive full-suite runs:** 2 (both 1931 passed)
+
+---
+
+## Phase 12.2 — Attendance Service Layer
+
+**Status: COMPLETE**
+
+Service layer implementing all attendance business logic. 7 functions covering recording, querying, manual correction, and summaries.
+
+### Service Functions
+
+| Function | Purpose |
+|---|---|
+| `record_attendance(db, entry_verification_id)` | Record attendance from resolved EV (GRANTED→PRESENT, DENIED→event only, ESCALATED/PENDING→reject) |
+| `get_attendance(db, exam_id, student_id)` | Get current attendance for a student in an exam |
+| `list_attendance(db, exam_id, *, hall_id, status, page, page_size)` | List attendance records with filters |
+| `get_entry_events(db, entry_verification_id, *, page, page_size)` | Get attendance events for an EV |
+| `mark_manual_attendance(db, exam_registration_id, *, status, reason, recorded_by)` | Manual attendance correction (PRESENT/EXCUSED only) |
+| `get_exam_summary(db, exam_id)` | Attendance summary with counts and by-hall breakdown |
+| `list_student_attendance_history(db, student_id, *, page, page_size)` | Student attendance across exams |
+
+### Business Rules Implemented
+
+- EntryVerification is the sole source of authorization — Phase 12 does NOT independently authorize entry
+- GRANTED EVs create/update AttendanceRecord → PRESENT + ENTRY_GRANTED event
+- DENIED EVs create ENTRY_DENIED event only, no AttendanceRecord
+- ESCALATED/PENDING/IN_PROGRESS EVs rejected with ValueError
+- Idempotent: same EV processed twice returns existing state, no duplicate events
+- Re-entry: multiple GRANTED EVs for same registration update existing record, create separate events
+- Hall/seat snapshot from SeatAssignment at entry time (nullable seat_number if missing)
+- Manual correction: PRESENT/EXCUSED only, validates registration not cancelled, requires reason/recorded_by
+- Manual correction uses latest EV for registration as FK reference
+- Absent is computed (registered - present - excused), never stored as record
+- Exam summary includes by-hall breakdown with building+room names
+- Deterministic ordering: by ID for records/events, desc by ID for student history
+
+### Schema Limitation Handled
+
+The `attendance_events.entry_verification_id` UNIQUE constraint means each EV can produce only ONE event. When `mark_manual_attendance` is called after `record_attendance` for the same EV, the service skips event creation (the EV already has an event) and updates only the AttendanceRecord. This is a graceful degradation, not data corruption.
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `backend/app/services/attendance/service.py` | New: 7 service functions with validation, idempotency, snapshot semantics |
+| `backend/tests/test_phase_12_2_service.py` | New: 55 service tests |
+
+### Tests
+
+55 tests covering:
+- record_attendance: GRANTED (7 tests), DENIED (3 tests), invalid status (3 tests), missing EV (1 test), idempotency (4 tests), re-entry (1 test)
+- get_attendance (2 tests)
+- list_attendance (6 tests)
+- get_entry_events (3 tests)
+- mark_manual_attendance (9 tests): PRESENT, EXCUSED, event creation, invalid status, cancelled registration, empty reason, empty recorded_by, no EV, update existing record
+- get_exam_summary (5 tests): empty exam, present, absent computation, by-hall, missing exam
+- list_student_attendance_history (4 tests)
+- concurrency (1 test)
+- architectural safety (4 tests): no EV status mutation, no biometric data
+- privacy (2 tests): no credentials
+
+**Total tests:** 1986 (1931 previous + 55 new), 0 failures, 0 errors
+**Consecutive full-suite runs:** 2 (both 1986 passed)

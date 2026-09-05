@@ -616,7 +616,7 @@ Cross-component integration tests and comprehensive domain audit.
 **Status: IN PROGRESS**
 
 - **12.1** Domain foundation: AttendanceRecord + AttendanceEvent models, 3 enums, migration 022, 42 model tests — COMPLETE
-- **12.2** Service layer: PLANNED
+- **12.2** Service layer: 7 service functions (record, get, list, events, manual, summary, history), 55 service tests — COMPLETE
 - **12.3** API layer: PLANNED
 - **12.4** Admin UI: PLANNED
 - **12.5** Integration tests & hardening: PLANNED
@@ -899,12 +899,12 @@ Focus:
 
 ## Current Project State
 
-- **Current phase:** Phase 12 — Attendance Management (IN PROGRESS: 12.1 complete)
-- **Current completed step:** Phase 12.1 — Attendance Domain Models & Database
-- **Current tests:** 1931 passing (0 failures, 0 errors)
+- **Current phase:** Phase 12 — Attendance Management (IN PROGRESS: 12.1 complete, 12.2 complete)
+- **Current completed step:** Phase 12.2 — Attendance Service Layer
+- **Current tests:** 1986 passing (0 failures, 0 errors)
 - **Frontend pages:** 24 (all building successfully)
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono), zero border-radius, no neon colors
-- **Next step:** Phase 12.2 — Attendance Service Layer
+- **Next step:** Phase 12.3 — Attendance REST API
 - **Provider architecture:** `app/services/face_verification/` with Protocol, DeterministicProvider, factory
 - **Identity verification API:** `POST /{attempt_id}/verify-face` endpoint for face verification trigger
 - **Camera infrastructure:** Complete — Camera, EntryPoint, Mapping, Credential, Health Observation, Device Auth API

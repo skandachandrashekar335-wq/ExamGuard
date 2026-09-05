@@ -4,8 +4,8 @@ AI-powered Examination Entry Verification, Anti-Proxy, Security, and Attendance 
 
 ## Project Status
 
-- **Phase:** 12 IN PROGRESS (12.1 complete)
-- **Backend:** 1931 tests passing (0 failures, 0 errors)
+- **Phase:** 12 IN PROGRESS (12.1, 12.2 complete)
+- **Backend:** 1986 tests passing (0 failures, 0 errors)
 - **Frontend:** 24 pages (Next.js 16.3.3, React 19, TypeScript, Tailwind v4)
 - **Tech stack:** FastAPI + SQLAlchemy + PostgreSQL (backend), Next.js + TypeScript + Tailwind (frontend)
 
@@ -49,6 +49,7 @@ AI-powered Examination Entry Verification, Anti-Proxy, Security, and Attendance 
 ### Phase 12 — Attendance Management (IN PROGRESS)
 
 - **12.1** Domain foundation: AttendanceRecord + AttendanceEvent models, 3 enums (AttendanceStatus, EntryMethod, AttendanceEventType), migration 022, 42 model tests
+- **12.2** Service layer: 7 service functions (record, get, list, events, manual, summary, history), 55 service tests
 
 ## Development
 
