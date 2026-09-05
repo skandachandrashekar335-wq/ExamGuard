@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11.1 COMPLETE, 11.2 COMPLETE, 11.3 COMPLETE
-- **Tests:** 1763 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11.1 COMPLETE, 11.2 COMPLETE, 11.3 COMPLETE, 11.4 COMPLETE
+- **Tests:** 1803 passing, 0 failures, 0 errors
 - **Frontend:** 24 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -1191,4 +1191,53 @@ Pure, deterministic risk-scoring engine that evaluates security signals and prod
 - None (no existing files changed)
 
 **Tests:** 1763 total (1720 previous + 43 new), 0 failures, 0 errors
+**Frontend:** 24 pages building successfully
+
+---
+
+## Phase 11.4 — Proxy Risk REST API
+
+**Status: COMPLETE**
+
+Thin REST API layer exposing signal detection and risk assessment through existing service functions.
+
+**Endpoints (5):**
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/entry-verifications/{id}/risk/signals/detect` | Detect security signals (idempotent) |
+| GET | `/entry-verifications/{id}/risk/signals` | List security signals (paginated) |
+| POST | `/entry-verifications/{id}/risk/assess` | Assess proxy risk (historical) |
+| GET | `/entry-verifications/{id}/risk/assessments` | List historical risk assessments (paginated) |
+| GET | `/entry-verifications/{id}/risk` | Get latest risk assessment |
+
+**Schemas:** `backend/app/schemas/proxy_risk.py`
+- `SecuritySignalResponse` — signal record with type, strength, source, description, created_at
+- `SecuritySignalListResponse` — paginated signals
+- `ProxyRiskAssessmentResponse` — assessment with audit fields (signal_count, strong_signal_count, explanation from signals_summary_json)
+- `ProxyRiskAssessmentListResponse` — paginated assessments
+
+**Router:** `backend/app/api/v1/proxy_risk.py`
+- Registered in `app/api/v1/router.py`
+- Prefix: `/entry-verifications`, tags: `["Proxy Risk Assessment"]`
+- Thin routes: validates, calls services, translates errors, returns schemas
+- No scoring or detection logic in router
+
+**Design Decisions:**
+- Phase 11 remains ADVISORY — no EntryVerification mutation
+- detect endpoint commits signals (service only flushes)
+- Assessment fields (signal_count, strong_signal_count, explanation) extracted from signals_summary_json
+- 404 for nonexistent entry verification or missing assessment
+- No 404 manufacture of LOW-risk result
+- Error sanitization: no tracebacks, no database info
+
+**Files:**
+- `backend/app/schemas/proxy_risk.py` — response schemas
+- `backend/app/api/v1/proxy_risk.py` — API router (5 endpoints)
+- `backend/tests/test_phase_11_4_api.py` — 40 tests
+
+**Modified Files:**
+- `backend/app/api/v1/router.py` — registered proxy_risk router
+
+**Tests:** 1803 total (1763 previous + 40 new), 0 failures, 0 errors
 **Frontend:** 24 pages building successfully
