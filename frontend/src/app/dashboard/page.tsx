@@ -209,6 +209,18 @@ export default function DashboardPage() {
           >
             Monitoring &rarr;
           </Link>
+          <Link
+            href="/security-events"
+            className="text-xs font-mono uppercase tracking-wider text-[#666] hover:text-white transition-colors"
+          >
+            Security Events &rarr;
+          </Link>
+          <Link
+            href="/security-alerts"
+            className="text-xs font-mono uppercase tracking-wider text-[#666] hover:text-white transition-colors"
+          >
+            Security Alerts &rarr;
+          </Link>
         </div>
 
         <div className="flex gap-4 mb-8">
