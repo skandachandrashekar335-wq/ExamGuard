@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, **12.1 COMPLETE, 12.2 COMPLETE, 12.3 COMPLETE, 12.4 COMPLETE**
-- **Tests:** 2048 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, **12.1 COMPLETE, 12.2 COMPLETE, 12.3 COMPLETE, 12.4 COMPLETE, 12.5 COMPLETE**
+- **Tests:** 2093 passing, 0 failures, 0 errors
 - **Frontend:** 27 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -1536,3 +1536,74 @@ The `attendance_events.entry_verification_id` UNIQUE constraint means each EV ca
 
 **Total tests:** 2048 (unchanged), 0 failures, 0 errors
 **Consecutive full-suite runs:** 3 (all 2048 passed)
+
+---
+
+## Phase 12.5 — Integration & Hardening
+
+**Status: COMPLETE**
+
+### Bugs Discovered & Fixed
+
+1. **Frontend `attendance_rate` double-multiply** — Backend returns 0-100 percentage, frontend multiplied by 100 again (showing 5000% instead of 50%). Fixed in both `/attendance/page.tsx` and `/attendance/[examId]/page.tsx`.
+
+2. **`attendance_events.entry_verification_id` UNIQUE constraint** — Prevented creation of correction events when an EV already had an auto-recorded event. Manual correction audit trail was silently lost. Fixed by dropping the constraint (migration 023) and updating service to always create correction events.
+
+3. **React Fragment keys** — `/attendance/[examId]/page.tsx` used `<>` fragments in `.map()` without keys. Fixed by using `<Fragment key={r.id}>`.
+
+### Migration 023
+
+- Drops `uq_attendance_event_per_entry_verification` UNIQUE constraint from `attendance_events`
+- Allows multiple events per entry verification for complete audit trail
+- Preserves all existing data
+- Downgrade recreates the constraint
+
+### Service Changes
+
+- `record_attendance`: Idempotency check now only matches ENTRY_GRANTED and ENTRY_DENIED events (not ATTENDANCE_CORRECTED)
+- `mark_manual_attendance`: Always creates ATTENDANCE_CORRECTED event (removed silent skip when EV already had an event)
+
+### Tests Added
+
+45 integration/hardening tests in `test_phase_12_5_integration.py`:
+- End-to-end workflows (GRANTED, DENIED, ESCALATED→GRANTED, ESCALATED→DENIED, RE-ENTRY)
+- Idempotency (record_attendance called twice)
+- Concurrency (same EV twice, different EVs same registration)
+- Event history audit (correction events always created, original events preserved)
+- State machine (PRESENT↔EXCUSED, invalid transitions rejected)
+- Summary correctness (empty exam, absent computation, by_hall, rate range, no negative counts)
+- Snapshot integrity (seat/hall preserved after source changes)
+- API integration (list filters, pagination, student history)
+- Privacy (no biometric fields in record/event)
+- Architectural safety (attendance never mutates EntryVerification)
+- Edge cases (missing EV, empty reason, empty recorded_by, cancelled registration, PENDING/IN_PROGRESS EVs)
+
+### Model Test Updates
+
+- `TestAttendanceEventMultiEvent`: Replaced `TestAttendanceEventIdempotency` — verifies multiple events per EV are now allowed
+- `test_event_no_unique_constraint_on_ev_id`: Replaced `test_event_unique_constraint_exists` — verifies constraint was dropped
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `backend/alembic/versions/023_drop_attendance_event_ev_unique.py` | New: drops UNIQUE constraint |
+| `backend/app/models/attendance.py` | Removed UniqueConstraint from AttendanceEvent |
+| `backend/app/services/attendance/service.py` | Updated idempotency check + always create correction events |
+| `backend/tests/test_phase_12_5_integration.py` | New: 45 integration/hardening tests |
+| `backend/tests/test_phase_12_1_models.py` | Updated 2 tests for new constraint behavior |
+| `frontend/src/app/attendance/page.tsx` | Fixed attendance_rate display |
+| `frontend/src/app/attendance/[examId]/page.tsx` | Fixed attendance_rate display + Fragment keys |
+
+### Verification
+
+- Backend: **2093 passed**, 0 failures, 0 errors
+- Full-suite run #1: 2093 passed
+- Full-suite run #2: 2093 passed
+- Frontend build: **27 routes** clean
+- Migration 023: Applied and validated
+- Privacy/security audit: No sensitive data exposed
+- No fake data, no dead buttons, no hardcoded secrets
+
+**Total tests:** 2093 (2048 previous + 45 new), 0 failures, 0 errors
+**Consecutive full-suite runs:** 2 (both 2093 passed)

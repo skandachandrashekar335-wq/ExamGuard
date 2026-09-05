@@ -139,7 +139,13 @@ def record_attendance(
     # Check for existing event (idempotency)
     existing_event = (
         db.query(AttendanceEvent)
-        .filter(AttendanceEvent.entry_verification_id == ev.id)
+        .filter(
+            AttendanceEvent.entry_verification_id == ev.id,
+            AttendanceEvent.event_type.in_([
+                AttendanceEventType.ENTRY_GRANTED.value,
+                AttendanceEventType.ENTRY_DENIED.value,
+            ]),
+        )
         .first()
     )
     if existing_event is not None:
@@ -472,28 +478,18 @@ def mark_manual_attendance(
             f"— cannot create attendance event without an entry verification reference"
         )
 
-    # Check if this EV already has an event (from record_attendance or prior manual)
-    with db.no_autoflush:
-        existing_ev_event = (
-            db.query(AttendanceEvent)
-            .filter(AttendanceEvent.entry_verification_id == latest_ev.id)
-            .first()
-        )
-
-    # Create attendance event only if the EV doesn't already have one
-    # (UNIQUE constraint on entry_verification_id prevents duplicates)
-    if existing_ev_event is None:
-        event = AttendanceEvent(
-            student_id=reg.student_id,
-            exam_id=reg.exam_id,
-            exam_registration_id=exam_registration_id,
-            entry_verification_id=latest_ev.id,
-            event_type=AttendanceEventType.ATTENDANCE_CORRECTED.value,
-            status_snapshot=status,
-            recorded_by=recorded_by.strip(),
-            reason=reason.strip(),
-        )
-        db.add(event)
+    # Create attendance event — always create for audit trail
+    event = AttendanceEvent(
+        student_id=reg.student_id,
+        exam_id=reg.exam_id,
+        exam_registration_id=exam_registration_id,
+        entry_verification_id=latest_ev.id,
+        event_type=AttendanceEventType.ATTENDANCE_CORRECTED.value,
+        status_snapshot=status,
+        recorded_by=recorded_by.strip(),
+        reason=reason.strip(),
+    )
+    db.add(event)
 
     # Upsert AttendanceRecord
     with db.no_autoflush:

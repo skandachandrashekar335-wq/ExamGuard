@@ -125,12 +125,6 @@ class AttendanceRecord(Base):
 
 class AttendanceEvent(Base):
     __tablename__ = "attendance_events"
-    __table_args__ = (
-        UniqueConstraint(
-            "entry_verification_id",
-            name="uq_attendance_event_per_entry_verification",
-        ),
-    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     student_id: Mapped[int] = mapped_column(

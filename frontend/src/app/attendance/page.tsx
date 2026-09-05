@@ -159,7 +159,7 @@ export default function AttendancePage() {
                         {s ? s.total_present : "—"}
                       </td>
                       <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">
-                        {s ? `${Math.round(s.attendance_rate * 100)}%` : "—"}
+                        {s ? `${Math.round(s.attendance_rate)}%` : "—"}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <Link

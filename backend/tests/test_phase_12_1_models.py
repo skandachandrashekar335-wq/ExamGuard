@@ -567,8 +567,9 @@ class TestAttendanceEventRelationships:
         assert event.entry_verification.id == entry_verification.id
 
 
-class TestAttendanceEventIdempotency:
-    def test_one_event_per_entry_verification(self, db, student, exam, registration, entry_verification):
+class TestAttendanceEventMultiEvent:
+    def test_multiple_events_allowed_for_same_ev(self, db, student, exam, registration, entry_verification):
+        """Multiple events per EV are now allowed for audit trail (corrections, etc.)."""
         event1 = AttendanceEvent(
             student_id=student.id,
             exam_id=exam.id,
@@ -585,13 +586,16 @@ class TestAttendanceEventIdempotency:
             exam_id=exam.id,
             exam_registration_id=registration.id,
             entry_verification_id=entry_verification.id,
-            event_type=AttendanceEventType.ATTENDANCE_RECORDED.value,
-            status_snapshot=AttendanceStatus.PRESENT.value,
+            event_type=AttendanceEventType.ATTENDANCE_CORRECTED.value,
+            status_snapshot=AttendanceStatus.EXCUSED.value,
         )
         db.add(event2)
-        with pytest.raises(IntegrityError):
-            db.commit()
-        db.rollback()
+        db.commit()
+
+        events = db.query(AttendanceEvent).filter(
+            AttendanceEvent.entry_verification_id == entry_verification.id
+        ).all()
+        assert len(events) == 2
 
     def test_different_evs_can_have_events(
         self, db, student, exam, registration, entry_verification, entry_verification_2
@@ -781,10 +785,12 @@ class TestConstraints:
         constraint_names = [uc.name for uc in table.constraints if uc.name and "uq" in uc.name]
         assert "uq_attendance_record_per_registration" in constraint_names
 
-    def test_event_unique_constraint_exists(self):
+    def test_event_no_unique_constraint_on_ev_id(self):
+        """UNIQUE constraint on entry_verification_id was dropped in migration 023
+        to allow multiple events per EV for audit trail."""
         table = Base.metadata.tables["attendance_events"]
         constraint_names = [uc.name for uc in table.constraints if uc.name and "uq" in uc.name]
-        assert "uq_attendance_event_per_entry_verification" in constraint_names
+        assert "uq_attendance_event_per_entry_verification" not in constraint_names
 
 
 # ---------------------------------------------------------------------------

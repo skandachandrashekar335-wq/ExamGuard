@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Fragment } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -185,7 +185,7 @@ export default function ExamAttendancePage() {
                   Rate
                 </div>
                 <div className="eg-display text-2xl">
-                  {Math.round(summary.attendance_rate * 100)}%
+                  {Math.round(summary.attendance_rate)}%
                 </div>
               </div>
             </div>
@@ -297,9 +297,8 @@ export default function ExamAttendancePage() {
               </thead>
               <tbody>
                 {records.map((r) => (
-                  <>
+                  <Fragment key={r.id}>
                     <tr
-                      key={r.id}
                       className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
                     >
                       <td className="px-4 py-3 font-mono text-sm">{r.id}</td>
@@ -493,7 +492,7 @@ export default function ExamAttendancePage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
