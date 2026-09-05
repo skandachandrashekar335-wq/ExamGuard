@@ -1,6 +1,6 @@
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.models import Base
 
@@ -23,3 +23,9 @@ def db_session(engine):
     if transaction.is_active:
         transaction.rollback()
     connection.close()
+
+
+@pytest.fixture()
+def SessionLocal(engine):
+    """Provide a SessionLocal-compatible factory backed by the test engine."""
+    return sessionmaker(bind=engine)

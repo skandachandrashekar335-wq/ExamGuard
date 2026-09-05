@@ -10,6 +10,7 @@ from app.services.monitoring.connection_manager import ConnectionManager
 from app.services.monitoring.event_buffer import EventBuffer
 from app.services.monitoring.event_publisher import EventPublisher
 from app.services.monitoring.publisher import init_monitoring_publisher
+from app.services.security_event_bridge import make_security_event_hook
 
 settings = get_settings()
 
@@ -36,7 +37,11 @@ def create_app() -> FastAPI:
     )
     event_buffer = EventBuffer(capacity=settings.MONITORING_EVENT_BUFFER_SIZE)
     alert_buffer = AlertBuffer(capacity=settings.MONITORING_ALERT_BUFFER_SIZE)
-    publisher = EventPublisher(connection_manager, event_buffer, alert_buffer)
+    security_hook = make_security_event_hook()
+    publisher = EventPublisher(
+        connection_manager, event_buffer, alert_buffer,
+        post_publish=security_hook,
+    )
     init_monitoring_publisher(publisher)
 
     @application.get("/health")

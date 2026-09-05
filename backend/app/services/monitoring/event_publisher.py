@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import threading
 import uuid
+from collections.abc import Callable
 from datetime import datetime, timezone
 
 from app.services.monitoring.alert_buffer import Alert, AlertBuffer
@@ -33,10 +34,12 @@ class EventPublisher:
         connection_manager: ConnectionManager,
         event_buffer: EventBuffer,
         alert_buffer: AlertBuffer,
+        post_publish: Callable[[MonitoringEvent], None] | None = None,
     ) -> None:
         self._connection_manager = connection_manager
         self._event_buffer = event_buffer
         self._alert_buffer = alert_buffer
+        self._post_publish = post_publish
         self._published_ids: set[uuid.UUID] = set()
         self._lock = threading.Lock()
         self._total_published: int = 0
@@ -102,6 +105,13 @@ class EventPublisher:
             logger.debug(
                 "No event loop available; broadcast deferred to WebSocket layer"
             )
+
+        # Post-publish hook (e.g., security event bridge)
+        if self._post_publish is not None:
+            try:
+                self._post_publish(event)
+            except Exception:
+                logger.debug("Post-publish hook failed", exc_info=True)
 
     def status(self) -> dict:
         """Return publisher status for REST API use."""

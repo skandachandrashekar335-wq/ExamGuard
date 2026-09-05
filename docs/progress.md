@@ -4,8 +4,9 @@
 
 - **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, 12 COMPLETE, 13 COMPLETE, **14 IN PROGRESS**
 - **Tests:** 2382 passing, 0 failures, 0 errors
-- **Frontend:** 28 pages building successfully
+- **Frontend:** 30 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
+- **Phase 14.6:** Security event bridge — monitoring events → SecurityEvent records (27 tests)
 
 ---
 
@@ -2248,7 +2249,32 @@ Replaces the ephemeral monitoring-only approach with durable audit history.
 | `backend/app/schemas/security_event.py` | **New:** Response + request schemas |
 | `backend/app/services/security_event.py` | **New:** Event service |
 | `backend/app/services/security_alert.py` | **New:** Alert service |
+| `backend/app/services/security_event_bridge.py` | **New:** Monitoring → SecurityEvent bridge |
 | `backend/app/api/v1/security_events.py` | **New:** REST API |
 | `backend/app/api/v1/security_alerts.py` | **New:** REST API |
 | `backend/app/api/v1/router.py` | **Modified:** Registered routers |
+| `backend/app/services/monitoring/event_publisher.py` | **Modified:** Added post_publish hook |
+| `backend/app/main.py` | **Modified:** Wired security event bridge |
+| `backend/tests/conftest.py` | **Modified:** Added SessionLocal fixture |
 | `backend/tests/test_phase_14_security_events.py` | **New:** 36 tests |
+| `backend/tests/test_phase_14_6_bridge.py` | **New:** 27 tests |
+| `frontend/src/lib/security-event-api.ts` | **New:** API client |
+| `frontend/src/lib/security-alert-api.ts` | **New:** API client |
+| `frontend/src/app/security-events/page.tsx` | **New:** Security events page |
+| `frontend/src/app/security-alerts/page.tsx` | **New:** Security alerts page with actions |
+| `frontend/src/app/dashboard/page.tsx` | **Modified:** Added navigation links |
+| `frontend/src/app/page.tsx` | **Modified:** Added footer links |
+
+### Frontend Pages
+
+- `/security-events` — List, filter (type, severity, source), pagination
+- `/security-alerts` — List, filter (status, severity), pagination, acknowledge/resolve/dismiss actions
+
+### Integration Wiring (Phase 14.6)
+
+- `EventPublisher` accepts an optional `post_publish` callback
+- `SecurityEventBridge` maps 8 monitoring event types to `SecurityEvent` records
+- Mapped: SIGNAL_DETECTED, RISK_ELEVATED, RISK_HIGH, RISK_CRITICAL, ENTRY_ESCALATED, ENTRY_DENIED, ATTENDANCE_CORRECTED, CAMERA_OFFLINE
+- Unmapped (skipped): ENTRY_CREATED, ENTRY_BEGAN, CAMERA_ONLINE, HEARTBEAT, RISK_ASSESSED, ENTRY_GRANTED, ENTRY_RESOLVED, ATTENDANCE_RECORDED
+- Bridge opens its own DB session per event (safe for post-commit context)
+- Graceful failure: hook catches exceptions without disrupting the monitoring pipeline
