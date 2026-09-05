@@ -19,6 +19,8 @@ from app.models.verification import VerificationDecision, VerificationOutcome
 from app.models.hall_ticket import HallTicket
 from app.models.entry_verification import EntryVerification
 from app.models.attendance import AttendanceEvent, AttendanceRecord
+from app.models.security_event import SecurityAlert, SecurityEvent
+from app.models.proxy_risk import ProxyRiskAssessment, SecuritySignal
 from app.services import batch_verification
 
 
@@ -26,6 +28,8 @@ from app.services import batch_verification
 def cleanup():
     db = SessionLocal()
     try:
+        db.execute(delete(SecurityAlert))
+        db.execute(delete(SecurityEvent))
         db.execute(delete(VerificationOutcome))
         all_match_results = db.query(HallTicketMatchResult.id).subquery()
         db.execute(
@@ -44,6 +48,8 @@ def cleanup():
         db.execute(delete(IdentityVerificationAttempt))
         db.execute(delete(AttendanceEvent))
         db.execute(delete(AttendanceRecord))
+        db.execute(delete(SecuritySignal))
+        db.execute(delete(ProxyRiskAssessment))
         db.execute(delete(EntryVerification))
         db.execute(delete(ExamRegistration))
         db.execute(delete(Exam))

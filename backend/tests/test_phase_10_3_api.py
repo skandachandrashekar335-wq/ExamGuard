@@ -20,6 +20,8 @@ from app.models.exam_hall import ExamHall
 from app.models.exam_registration import ExamRegistration
 from app.models.hall_ticket import HallTicket
 from app.models.identity_verification import IdentityVerificationAttempt
+from app.models.security_event import SecurityAlert, SecurityEvent
+from app.models.proxy_risk import ProxyRiskAssessment, SecuritySignal
 from app.models.seat_assignment import SeatAssignment
 from app.models.student import Student
 from app.models.subject import Subject
@@ -34,6 +36,41 @@ def clean_test_data():
     """Remove test data before each test."""
     db = SessionLocal()
     try:
+        ev_ids_sub = db.query(EntryVerification.id).filter(
+            EntryVerification.student_id.in_(
+                db.query(Student.id).filter(Student.usn.ilike("EVAPI%"))
+            )
+        ).subquery()
+        db.execute(delete(SecurityAlert).where(
+            SecurityAlert.security_event_id.in_(
+                db.query(SecurityEvent.id).filter(
+                    SecurityEvent.entry_verification_id.in_(db.query(ev_ids_sub))
+                )
+            )
+        ))
+        db.execute(delete(SecurityEvent).where(
+            SecurityEvent.entry_verification_id.in_(db.query(ev_ids_sub))
+        ))
+        db.execute(delete(SecurityAlert).where(
+            SecurityAlert.security_event_id.in_(
+                db.query(SecurityEvent.id).filter(
+                    SecurityEvent.student_id.in_(
+                        db.query(Student.id).filter(Student.usn.ilike("EVAPI%"))
+                    )
+                )
+            )
+        ))
+        db.execute(delete(SecurityEvent).where(
+            SecurityEvent.student_id.in_(
+                db.query(Student.id).filter(Student.usn.ilike("EVAPI%"))
+            )
+        ))
+        db.execute(delete(SecuritySignal).where(
+            SecuritySignal.entry_verification_id.in_(db.query(ev_ids_sub))
+        ))
+        db.execute(delete(ProxyRiskAssessment).where(
+            ProxyRiskAssessment.entry_verification_id.in_(db.query(ev_ids_sub))
+        ))
         db.execute(delete(EntryVerification).where(
             EntryVerification.student_id.in_(
                 db.query(Student.id).filter(Student.usn.ilike("EVAPI%"))

@@ -12,6 +12,15 @@ from app.models.extraction import (
 )
 from app.models.hall_ticket_match import HallTicketMatchResult, HallTicketMatchSignal
 from app.models.verification import VerificationOutcome
+from app.models.student import Student
+from app.models.entry_verification import EntryVerification
+from app.models.exam_registration import ExamRegistration
+from app.models.identity_verification import IdentityVerificationAttempt, IdentityVerificationEvidence
+from app.models.hall_ticket import HallTicket
+from app.models.seat_assignment import SeatAssignment
+from app.models.attendance import AttendanceEvent, AttendanceRecord
+from app.models.security_event import SecurityAlert, SecurityEvent
+from app.models.proxy_risk import ProxyRiskAssessment, SecuritySignal
 from app.services import extraction_review
 
 
@@ -19,6 +28,81 @@ from app.services import extraction_review
 def cleanup():
     db = SessionLocal()
     try:
+        rev_ev_sub = db.query(EntryVerification.id).filter(
+            EntryVerification.student_id.in_(
+                db.query(Student.id).filter(Student.usn.ilike("REV_UNIQUE%"))
+            )
+        ).subquery()
+        db.execute(delete(SecurityAlert).where(
+            SecurityAlert.security_event_id.in_(
+                db.query(SecurityEvent.id).filter(
+                    SecurityEvent.entry_verification_id.in_(db.query(rev_ev_sub))
+                )
+            )
+        ))
+        db.execute(delete(SecuritySignal).where(
+            SecuritySignal.entry_verification_id.in_(db.query(rev_ev_sub))
+        ))
+        db.execute(delete(ProxyRiskAssessment).where(
+            ProxyRiskAssessment.entry_verification_id.in_(db.query(rev_ev_sub))
+        ))
+        db.execute(delete(SecurityEvent).where(
+            SecurityEvent.entry_verification_id.in_(db.query(rev_ev_sub))
+        ))
+        db.execute(delete(SecurityEvent).where(
+            SecurityEvent.student_id.in_(
+                db.query(Student.id).filter(Student.usn.ilike("REV_UNIQUE%"))
+            )
+        ))
+        db.execute(delete(AttendanceEvent).where(
+            AttendanceEvent.student_id.in_(
+                db.query(Student.id).filter(Student.usn.ilike("REV_UNIQUE%"))
+            )
+        ))
+        db.execute(delete(AttendanceRecord).where(
+            AttendanceRecord.student_id.in_(
+                db.query(Student.id).filter(Student.usn.ilike("REV_UNIQUE%"))
+            )
+        ))
+        db.execute(delete(SeatAssignment).where(
+            SeatAssignment.student_id.in_(
+                db.query(Student.id).filter(Student.usn.ilike("REV_UNIQUE%"))
+            )
+        ))
+        db.execute(delete(EntryVerification).where(
+            EntryVerification.student_id.in_(
+                db.query(Student.id).filter(Student.usn.ilike("REV_UNIQUE%"))
+            )
+        ))
+        db.execute(delete(IdentityVerificationEvidence).where(
+            IdentityVerificationEvidence.attempt_id.in_(
+                db.query(IdentityVerificationAttempt.id).filter(
+                    IdentityVerificationAttempt.student_id.in_(
+                        db.query(Student.id).filter(Student.usn.ilike("REV_UNIQUE%"))
+                    )
+                )
+            )
+        ))
+        db.execute(delete(IdentityVerificationAttempt).where(
+            IdentityVerificationAttempt.student_id.in_(
+                db.query(Student.id).filter(Student.usn.ilike("REV_UNIQUE%"))
+            )
+        ))
+        db.execute(delete(HallTicket).where(
+            HallTicket.exam_registration_id.in_(
+                db.query(ExamRegistration.id).filter(
+                    ExamRegistration.student_id.in_(
+                        db.query(Student.id).filter(Student.usn.ilike("REV_UNIQUE%"))
+                    )
+                )
+            )
+        ))
+        db.execute(delete(ExamRegistration).where(
+            ExamRegistration.student_id.in_(
+                db.query(Student.id).filter(Student.usn.ilike("REV_UNIQUE%"))
+            )
+        ))
+        db.execute(delete(Student).where(Student.usn.ilike("REV_UNIQUE%")))
         db.execute(delete(VerificationOutcome))
         all_match_results = db.query(HallTicketMatchResult.id).subquery()
         db.execute(

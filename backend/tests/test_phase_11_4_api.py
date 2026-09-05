@@ -27,6 +27,7 @@ from app.models.identity_verification import (
 )
 from app.models.proxy_risk import ProxyRiskAssessment, SecuritySignal
 from app.models.seat_assignment import SeatAssignment
+from app.models.security_event import SecurityAlert, SecurityEvent
 from app.models.student import Student
 from app.models.subject import Subject
 
@@ -40,6 +41,35 @@ def clean_test_data():
     """Remove test data before each test."""
     db = SessionLocal()
     try:
+        ev_ids_sub = db.query(EntryVerification.id).filter(
+            EntryVerification.student_id.in_(
+                db.query(Student.id).filter(Student.usn.ilike("PRAPI%"))
+            )
+        ).subquery()
+        db.execute(delete(SecurityAlert).where(
+            SecurityAlert.security_event_id.in_(
+                db.query(SecurityEvent.id).filter(
+                    SecurityEvent.entry_verification_id.in_(db.query(ev_ids_sub))
+                )
+            )
+        ))
+        db.execute(delete(SecurityEvent).where(
+            SecurityEvent.entry_verification_id.in_(db.query(ev_ids_sub))
+        ))
+        db.execute(delete(SecurityAlert).where(
+            SecurityAlert.security_event_id.in_(
+                db.query(SecurityEvent.id).filter(
+                    SecurityEvent.student_id.in_(
+                        db.query(Student.id).filter(Student.usn.ilike("PRAPI%"))
+                    )
+                )
+            )
+        ))
+        db.execute(delete(SecurityEvent).where(
+            SecurityEvent.student_id.in_(
+                db.query(Student.id).filter(Student.usn.ilike("PRAPI%"))
+            )
+        ))
         db.execute(delete(ProxyRiskAssessment).where(
             ProxyRiskAssessment.entry_verification_id.in_(
                 db.query(EntryVerification.id).filter(
