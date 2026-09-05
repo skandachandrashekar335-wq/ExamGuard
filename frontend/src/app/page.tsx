@@ -357,6 +357,7 @@ export default function Home() {
                   { label: "Identity Verification", href: "/identity-verifications" },
                   { label: "Exam Security", href: "/exams" },
                   { label: "Admin Dashboard", href: "/dashboard" },
+                  { label: "Monitoring", href: "/monitoring" },
                 ].map((item) => (
                   <li key={item.label}>
                     <a href={item.href} className="eg-body text-xs text-[var(--gray-500)] hover:text-[var(--white)] transition-colors duration-200">

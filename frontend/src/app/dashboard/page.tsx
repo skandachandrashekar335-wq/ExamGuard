@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 
 interface ExamListItem {
   id: number;
@@ -200,6 +201,15 @@ export default function DashboardPage() {
         <p className="text-[#999] mb-8">
           Exam-level verification status overview
         </p>
+
+        <div className="flex gap-4 mb-8 items-center">
+          <Link
+            href="/monitoring"
+            className="text-xs font-mono uppercase tracking-wider text-[#666] hover:text-white transition-colors"
+          >
+            Monitoring &rarr;
+          </Link>
+        </div>
 
         <div className="flex gap-4 mb-8">
           <select

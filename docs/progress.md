@@ -2,9 +2,9 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, 12 COMPLETE, **13.1 COMPLETE, 13.2 COMPLETE, 13.3 COMPLETE, 13.4 COMPLETE, 13.5 COMPLETE, 13.6 IN PROGRESS**
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, 12 COMPLETE, **13.1 COMPLETE, 13.2 COMPLETE, 13.3 COMPLETE, 13.4 COMPLETE, 13.5 COMPLETE, 13.6 COMPLETE, 13.7 IN PROGRESS**
 - **Tests:** 2346 passing, 0 failures, 0 errors
-- **Frontend:** 27 pages building successfully
+- **Frontend:** 28 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
 ---
@@ -2061,3 +2061,85 @@ No fallback. No silent initialization.
 
 **Total tests:** 2346 (2287 previous + 59 new), 0 failures, 0 errors
 **Consecutive full-suite runs:** 2 (both 2346 passed)
+
+---
+
+## Phase 13.7 — Monitoring Admin UI
+
+**Status: COMPLETE**
+
+### Implementation
+
+Built a monitoring admin UI using the real monitoring REST API (Phase 13.6)
+and real WebSocket monitoring API (Phase 13.3). No fake data. No mock events.
+No simulated live events.
+
+- `frontend/src/lib/monitoring-api.ts` — **New:** API client + types + safePayload filter
+- `frontend/src/hooks/useMonitoringSocket.ts` — **New:** WebSocket lifecycle hook
+- `frontend/src/app/monitoring/page.tsx` — **New:** Monitoring page (28th route)
+- `frontend/src/app/page.tsx` — **Modified:** Added Monitoring link to footer
+- `frontend/src/app/dashboard/page.tsx` — **Modified:** Added Monitoring link
+
+### REST Integration
+
+- `getMonitoringStatus()` → status strip with real buffer counts and capacities
+- `getMonitoringEvents(filters)` → initial event stream load
+- `getMonitoringAlerts(filters)` → initial alerts load
+- Status refreshes every 15 seconds
+- All errors shown honestly (no fake zeroes)
+
+### WebSocket Integration
+
+- `useMonitoringSocket()` hook handles full lifecycle
+- Connection states: INITIALIZING → CONNECTING → CONNECTED → DISCONNECTED → RECONNECTING
+- Bounded exponential backoff reconnect (1s base, 30s max, 10 attempts)
+- Server heartbeat ping responded with pong
+- Clean disconnect on component unmount
+- Filter updates trigger safe reconnect
+
+### Live Event Merging
+
+- REST initial events + WebSocket events merged by event_id
+- Deduplication prevents double display
+- Bounded frontend display (max 200 events)
+- Client-side filter applied to live WebSocket events
+
+### Filters Implemented
+
+Events: category, event_type, min_severity, exam_id, hall_id, limit
+Alerts: severity, event_type, limit
+
+### Empty/Loading/Error States
+
+- Events: "NO RETAINED EVENTS" / "Loading event stream..." / "EVENTS UNAVAILABLE"
+- Alerts: "NO RETAINED ALERTS" / "Loading alerts..." / "ALERTS UNAVAILABLE"
+- Status: "Loading status..." / "STATUS UNAVAILABLE"
+- Each section handles failures independently
+
+### Security/Privacy Audit
+
+- `safePayload()` filters sensitive keys from event payloads before display
+- Blocked keys: face_image, face_embeddings, biometric_data, credentials, api_key, secrets, password, token, raw_ocr, database_url, filesystem_path, stack_trace
+- No sensitive data rendered in event rows or detail panels
+- No console.log of monitoring payloads
+- No localStorage/sessionStorage persistence of monitoring data
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `frontend/src/lib/monitoring-api.ts` | **New:** API client, types, safePayload |
+| `frontend/src/hooks/useMonitoringSocket.ts` | **New:** WebSocket lifecycle hook |
+| `frontend/src/app/monitoring/page.tsx` | **New:** Monitoring page |
+| `frontend/src/app/page.tsx` | **Modified:** Added Monitoring to footer |
+| `frontend/src/app/dashboard/page.tsx` | **Modified:** Added Monitoring link |
+
+### Verification
+
+- Frontend TypeScript: passes
+- Frontend build: passes (28 routes)
+- Backend pytest run 1: 2346 passed
+- Backend pytest run 2: 2346 passed
+- No migration created
+- No fake data introduced
+- No existing tests weakened
