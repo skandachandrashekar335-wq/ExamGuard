@@ -2,9 +2,9 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, **12.1 COMPLETE, 12.2 COMPLETE, 12.3 IN PROGRESS**
-- **Tests:** 2044 passing, 1 pre-existing flaky failure, 0 errors
-- **Frontend:** 24 pages building successfully
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, **12.1 COMPLETE, 12.2 COMPLETE, 12.3 COMPLETE, 12.4 COMPLETE**
+- **Tests:** 2048 passing, 0 failures, 0 errors
+- **Frontend:** 27 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
 ---
@@ -1500,3 +1500,39 @@ The `attendance_events.entry_verification_id` UNIQUE constraint means each EV ca
 
 **Total tests:** 1986 (1931 previous + 55 new), 0 failures, 0 errors
 **Consecutive full-suite runs:** 2 (both 1986 passed)
+
+---
+
+## Phase 12.4 — Attendance Admin UI
+
+**Status: COMPLETE**
+
+### Implementation
+
+- `frontend/src/lib/attendance-api.ts` — API client for all 7 attendance endpoints
+- `frontend/src/app/attendance/page.tsx` — Exam list page with per-exam attendance summary (registered, present, rate)
+- `frontend/src/app/attendance/[examId]/page.tsx` — Per-exam attendance view:
+  - Summary stats (registered, present, absent, excused, rate)
+  - Per-hall breakdown
+  - Filterable attendance records table (by hall, status)
+  - Inline manual correction form (status, reason, recorded_by)
+  - Inline event history viewer per entry verification
+- `frontend/src/app/attendance/events/[entryVerificationId]/page.tsx` — Full event history for an entry verification
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `frontend/src/lib/attendance-api.ts` | New: API client with types and functions for all attendance endpoints |
+| `frontend/src/app/attendance/page.tsx` | New: Exam list with attendance summaries |
+| `frontend/src/app/attendance/[examId]/page.tsx` | New: Per-exam attendance view with correction + event history |
+| `frontend/src/app/attendance/events/[entryVerificationId]/page.tsx` | New: Full event history page |
+
+### Tests
+
+- Frontend build: 27 routes clean (24 existing + 3 new attendance routes)
+- Backend: 2048 passing, 0 failures, 0 errors
+- No new backend tests — Phase 12.4 is frontend only
+
+**Total tests:** 2048 (unchanged), 0 failures, 0 errors
+**Consecutive full-suite runs:** 3 (all 2048 passed)
