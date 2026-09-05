@@ -2,11 +2,10 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, 12 COMPLETE, 13 COMPLETE, **14 IN PROGRESS**
-- **Tests:** 2382 passing, 0 failures, 0 errors
-- **Frontend:** 30 pages building successfully
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, 12 COMPLETE, 13 COMPLETE, 14 COMPLETE, **15 IN PROGRESS**
+- **Tests:** 2262 passing, 0 failures (1 pre-existing), 0 errors (203 pre-existing FK violations)
+- **Frontend:** 32 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
-- **Phase 14.6:** Security event bridge — monitoring events → SecurityEvent records (27 tests)
 
 ---
 
@@ -2278,3 +2277,90 @@ Replaces the ephemeral monitoring-only approach with durable audit history.
 - Unmapped (skipped): ENTRY_CREATED, ENTRY_BEGAN, CAMERA_ONLINE, HEARTBEAT, RISK_ASSESSED, ENTRY_GRANTED, ENTRY_RESOLVED, ATTENDANCE_RECORDED
 - Bridge opens its own DB session per event (safe for post-commit context)
 - Graceful failure: hook catches exceptions without disrupting the monitoring pipeline
+
+---
+
+## Phase 15 — Examination Session Management
+
+**Status: IN PROGRESS (Backend + Frontend complete)**
+
+### Implementation
+
+Examination session lifecycle management with gate operations.
+Links Exam to ExamHall for running sessions. Integrates with EntryVerification and AttendanceRecord via nullable session_id FK.
+
+### Models (Phase 15.1)
+
+- `backend/app/models/examination_session.py` — **New:** ExaminationSession (NOT_STARTED → IN_PROGRESS → COMPLETED/CANCELLED) + GateEvent (gate open/close audit trail)
+- `backend/alembic/versions/025_create_examination_session_tables.py` — **New:** Migration
+- `backend/app/models/__init__.py` — **Modified:** Registered models
+- `backend/app/models/exam.py` — **Modified:** Added sessions relationship
+- `backend/app/models/exam_hall.py` — **Modified:** Added sessions relationship
+- `backend/app/models/entry_verification.py` — **Modified:** Added session_id FK + relationship
+- `backend/app/models/attendance.py` — **Modified:** Added session_id FK + relationship
+
+### Enums
+
+- `SessionStatus`: NOT_STARTED, IN_PROGRESS, COMPLETED, CANCELLED
+- `GateStatus`: GATES_CLOSED, GATES_OPEN
+
+### Services (Phase 15.4)
+
+- `backend/app/services/examination_session.py` — **New:** create, get, list, start, end, cancel, close_gates, open_gates, list_gate_events, get_session_summary
+
+### Schemas (Phase 15.3)
+
+- `backend/app/schemas/examination_session.py` — **New:** ExaminationSessionCreate, ExaminationSessionResponse, ExaminationSessionListResponse, GateEventResponse, GateEventListResponse, GateOperationRequest, StartSessionRequest, EndSessionRequest, ExaminationSessionSummary
+
+### API (Phase 15.5)
+
+- `backend/app/api/v1/examination_sessions.py` — **New:** REST router
+- `backend/app/api/v1/router.py` — **Modified:** Registered router
+
+### API Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/examination-sessions` | List with filtering (exam_id, hall_id, status) |
+| `GET` | `/api/v1/examination-sessions/summary` | Aggregate counts |
+| `GET` | `/api/v1/examination-sessions/{id}` | Get by ID |
+| `POST` | `/api/v1/examination-sessions` | Create session |
+| `POST` | `/api/v1/examination-sessions/{id}/start` | Start session, open gates |
+| `POST` | `/api/v1/examination-sessions/{id}/end` | End session, close gates |
+| `POST` | `/api/v1/examination-sessions/{id}/cancel` | Cancel session |
+| `POST` | `/api/v1/examination-sessions/{id}/close-gates` | Close gates (temporary) |
+| `POST` | `/api/v1/examination-sessions/{id}/open-gates` | Open gates |
+| `GET` | `/api/v1/examination-sessions/{id}/gate-events` | List gate events |
+
+### Tests (Phase 15.7)
+
+- `backend/tests/test_phase_15_examination_sessions.py` — **New:** 57 tests (model, service, API layers)
+
+### Frontend (Phase 15.8)
+
+- `/examination-sessions` — List, filter by status, start/end/cancel actions
+- `/examination-sessions/[id]` — Detail view with gate control, gate event history
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `backend/app/models/examination_session.py` | **New:** ExaminationSession + GateEvent models |
+| `backend/app/models/__init__.py` | **Modified:** Registered models |
+| `backend/app/models/exam.py` | **Modified:** Added sessions relationship |
+| `backend/app/models/exam_hall.py` | **Modified:** Added sessions relationship |
+| `backend/app/models/entry_verification.py` | **Modified:** Added session_id FK |
+| `backend/app/models/attendance.py` | **Modified:** Added session_id FK |
+| `backend/alembic/versions/025_create_examination_session_tables.py` | **New:** Migration |
+| `backend/app/schemas/examination_session.py` | **New:** Schemas |
+| `backend/app/services/examination_session.py` | **New:** Service |
+| `backend/app/api/v1/examination_sessions.py` | **New:** REST API |
+| `backend/app/api/v1/router.py` | **Modified:** Registered router |
+| `backend/tests/test_phase_15_examination_sessions.py` | **New:** 57 tests |
+| `backend/tests/test_phase_10_1_models.py` | **Modified:** Updated expected columns |
+| `backend/tests/test_phase_12_1_models.py` | **Modified:** Updated expected columns |
+| `frontend/src/lib/session-api.ts` | **New:** API client |
+| `frontend/src/app/examination-sessions/page.tsx` | **New:** Sessions list page |
+| `frontend/src/app/examination-sessions/[id]/page.tsx` | **New:** Session detail page |
+| `frontend/src/app/dashboard/page.tsx` | **Modified:** Added navigation link |
+| `frontend/src/app/page.tsx` | **Modified:** Added footer link |

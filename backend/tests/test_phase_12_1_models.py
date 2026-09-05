@@ -729,7 +729,7 @@ class TestModelRegistration:
         expected = {
             "id", "student_id", "exam_id", "exam_registration_id",
             "status", "entry_verification_id", "entry_method", "entry_time",
-            "hall_id", "seat_number", "recorded_at", "updated_at",
+            "hall_id", "session_id", "seat_number", "recorded_at", "updated_at",
         }
         actual = {c.name for c in table.columns}
         assert expected == actual

@@ -683,6 +683,7 @@ class TestModelRegistration:
             "hall_ticket_id",
             "identity_verification_attempt_id",
             "camera_id",
+            "session_id",
             "status",
             "hall_ticket_check",
             "identity_check",
@@ -707,6 +708,7 @@ class TestModelRegistration:
             "hall_ticket_id",
             "identity_verification_attempt_id",
             "camera_id",
+            "session_id",
         }
         assert expected_fk_columns == fk_parent_columns
 

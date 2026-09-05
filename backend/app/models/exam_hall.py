@@ -69,6 +69,9 @@ class ExamHall(Base):
     entry_points: Mapped[list["EntryPoint"]] = relationship(  # noqa: F821
         back_populates="hall",
     )
+    sessions: Mapped[list["ExaminationSession"]] = relationship(  # noqa: F821
+        back_populates="hall",
+    )
 
     def __repr__(self) -> str:
         return f"<ExamHall id={self.id} building={self.building!r} room={self.room_number!r}>"

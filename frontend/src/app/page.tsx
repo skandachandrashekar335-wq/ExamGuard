@@ -357,6 +357,7 @@ export default function Home() {
                   { label: "Identity Verification", href: "/identity-verifications" },
                   { label: "Exam Security", href: "/exams" },
                   { label: "Admin Dashboard", href: "/dashboard" },
+                  { label: "Examination Sessions", href: "/examination-sessions" },
                   { label: "Monitoring", href: "/monitoring" },
                   { label: "Security Events", href: "/security-events" },
                   { label: "Security Alerts", href: "/security-alerts" },

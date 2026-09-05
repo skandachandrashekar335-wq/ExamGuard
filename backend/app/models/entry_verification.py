@@ -109,6 +109,13 @@ class EntryVerification(Base):
         index=True,
         comment="Camera that observed the entry (nullable if not yet linked)",
     )
+    session_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("examination_sessions.id"),
+        nullable=True,
+        index=True,
+        comment="Examination session this entry belongs to (nullable for backward compat)",
+    )
     status: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
@@ -165,6 +172,7 @@ class EntryVerification(Base):
     hall_ticket: Mapped["HallTicket | None"] = relationship()  # noqa: F821
     identity_verification_attempt: Mapped["IdentityVerificationAttempt | None"] = relationship()  # noqa: F821
     camera: Mapped["Camera | None"] = relationship()  # noqa: F821
+    session: Mapped["ExaminationSession | None"] = relationship()  # noqa: F821
 
     def __repr__(self) -> str:
         return (

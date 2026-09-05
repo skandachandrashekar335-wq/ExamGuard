@@ -90,6 +90,13 @@ class AttendanceRecord(Base):
         index=True,
         comment="Exam hall where student entered (snapshot at entry time)",
     )
+    session_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("examination_sessions.id"),
+        nullable=True,
+        index=True,
+        comment="Examination session this attendance belongs to (nullable for backward compat)",
+    )
     seat_number: Mapped[str | None] = mapped_column(
         String(50),
         nullable=True,
@@ -113,6 +120,7 @@ class AttendanceRecord(Base):
     registration: Mapped["ExamRegistration"] = relationship()  # noqa: F821
     entry_verification: Mapped["EntryVerification"] = relationship()  # noqa: F821
     hall: Mapped["ExamHall"] = relationship()  # noqa: F821
+    session: Mapped["ExaminationSession | None"] = relationship()  # noqa: F821
 
     def __repr__(self) -> str:
         return (

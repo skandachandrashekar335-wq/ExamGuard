@@ -29,6 +29,7 @@ from app.api.v1.ws_monitoring import router as ws_monitoring_router
 from app.api.v1.monitoring import router as monitoring_router
 from app.api.v1.security_events import router as security_events_router
 from app.api.v1.security_alerts import router as security_alerts_router
+from app.api.v1.examination_sessions import router as examination_sessions_router
 
 router = APIRouter()
 
@@ -61,6 +62,7 @@ router.include_router(ws_monitoring_router)
 router.include_router(monitoring_router)
 router.include_router(security_events_router)
 router.include_router(security_alerts_router)
+router.include_router(examination_sessions_router)
 
 
 @router.get("/ping")

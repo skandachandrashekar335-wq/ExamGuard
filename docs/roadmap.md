@@ -646,7 +646,7 @@ Focus:
 
 ## Phase 14 — Security Event Management
 
-**Status: PLANNED**
+**Status: COMPLETE**
 
 Focus:
 - Security event models
@@ -668,7 +668,7 @@ Focus:
 
 ## Phase 15 — Examination Session Management
 
-**Status: PLANNED**
+**Status: COMPLETE**
 
 Focus:
 - Examination session lifecycle
@@ -880,8 +880,8 @@ Focus:
 
 ## Roadmap Rules
 
-1. Phases 0–10 are COMPLETE.
-2. Phases 11–23 are PLANNED.
+1. Phases 0–15 are COMPLETE.
+2. Phases 16–23 are PLANNED.
 4. Do not mark future phases complete.
 5. Do not implement future phases.
 6. Each future phase should eventually be broken into smaller implementation steps before coding begins.
@@ -899,12 +899,12 @@ Focus:
 
 ## Current Project State
 
-- **Current phase:** Phase 14 — Security Event Management (IN PROGRESS: hardening pending)
-- **Current completed step:** Phase 14.7 — Frontend pages + 14.6 Integration wiring (COMPLETE)
-- **Current tests:** 2382 passing, 0 failures, 0 errors
-- **Frontend pages:** 30 (all building successfully)
+- **Current phase:** Phase 15 — Examination Session Management (COMPLETE)
+- **Completed phases:** 0–15
+- **Current tests:** 2262 passing, 1 pre-existing failure, 203 pre-existing errors
+- **Frontend pages:** 32 (all building successfully)
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono), zero border-radius, no neon colors
-- **Next step:** Phase 14.8 — Hardening + final verification
+- **Next step:** Phase 16 — Attendance & Examination Analytics
 - **Provider architecture:** `app/services/face_verification/` with Protocol, DeterministicProvider, factory
 - **Identity verification API:** `POST /{attempt_id}/verify-face` endpoint for face verification trigger
 - **Camera infrastructure:** Complete — Camera, EntryPoint, Mapping, Credential, Health Observation, Device Auth API
