@@ -201,7 +201,7 @@ class TestStudentAPI:
         student_id = create.json()["id"]
         client.delete(f"/api/v1/students/{student_id}")
 
-        response = client.get("/api/v1/students?include_inactive=true")
+        response = client.get("/api/v1/students?include_inactive=true&page_size=100")
         items = response.json()["items"]
         assert any(s["usn"] == "HID002" for s in items)
 

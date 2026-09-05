@@ -37,6 +37,7 @@ from app.models.student import Student
 from app.models.subject import Subject
 from app.services.attendance.service import (
     get_attendance,
+    get_attendance_by_registration,
     get_entry_events,
     get_exam_summary,
     list_attendance,
@@ -816,3 +817,30 @@ class TestPrivacy:
         forbidden = ["api_key", "secret", "password", "token"]
         for f in forbidden:
             assert f not in columns
+
+
+# ---------------------------------------------------------------------------
+# get_attendance_by_registration
+# ---------------------------------------------------------------------------
+
+
+class TestGetAttendanceByRegistration:
+    def test_returns_record_when_exists(self, db_session, student, subject, exam, hall, ev_granted):
+        record = record_attendance(db_session, ev_granted.id)
+        assert record is not None
+
+        result = get_attendance_by_registration(db_session, ev_granted.exam_registration_id)
+        assert result is not None
+        assert result.id == record.id
+        assert result.exam_registration_id == ev_granted.exam_registration_id
+
+    def test_returns_none_when_no_record(self, db_session, student, subject, exam, hall, ev_granted):
+        result = get_attendance_by_registration(db_session, 99999)
+        assert result is None
+
+    def test_returns_correct_record_for_registration(self, db_session, student, subject, exam, hall, ev_granted):
+        record = record_attendance(db_session, ev_granted.id)
+        result = get_attendance_by_registration(db_session, ev_granted.exam_registration_id)
+        assert result.student_id == student.id
+        assert result.exam_id == exam.id
+        assert result.status == AttendanceStatus.PRESENT.value

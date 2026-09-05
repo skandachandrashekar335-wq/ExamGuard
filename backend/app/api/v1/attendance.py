@@ -148,13 +148,7 @@ def get_registration_attendance(
 
     Returns 404 if no attendance record exists.
     """
-    from app.models.attendance import AttendanceRecord
-
-    record = (
-        db.query(AttendanceRecord)
-        .filter(AttendanceRecord.exam_registration_id == exam_registration_id)
-        .first()
-    )
+    record = att_service.get_attendance_by_registration(db, exam_registration_id)
     if not record:
         raise HTTPException(
             status_code=404,

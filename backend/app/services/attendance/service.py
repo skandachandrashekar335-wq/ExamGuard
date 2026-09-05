@@ -282,6 +282,31 @@ def get_attendance(
 
 
 # ---------------------------------------------------------------------------
+# 2b. get_attendance_by_registration
+# ---------------------------------------------------------------------------
+
+
+def get_attendance_by_registration(
+    db: Session,
+    exam_registration_id: int,
+) -> AttendanceRecord | None:
+    """Get current attendance record for an exam registration.
+
+    Args:
+        db: Database session.
+        exam_registration_id: Registration ID.
+
+    Returns:
+        AttendanceRecord if found, None otherwise.
+    """
+    return (
+        db.query(AttendanceRecord)
+        .filter(AttendanceRecord.exam_registration_id == exam_registration_id)
+        .first()
+    )
+
+
+# ---------------------------------------------------------------------------
 # 3. list_attendance
 # ---------------------------------------------------------------------------
 
