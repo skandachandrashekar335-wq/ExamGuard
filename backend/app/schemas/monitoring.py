@@ -1,8 +1,6 @@
-"""Monitoring schemas (Phase 13.1).
+"""Monitoring schemas (Phase 13.1, 13.6).
 
-Pydantic schemas for monitoring events and filters.
-Suitable for WebSocket serialization and REST monitoring responses.
-
+Pydantic schemas for monitoring events, alerts, status, and REST responses.
 No database dependency. No ORM dependency.
 """
 
@@ -45,12 +43,10 @@ class MonitoringEventSchema(BaseModel):
 
 
 class MonitoringEventListResponse(BaseModel):
-    """Paginated list of monitoring events."""
+    """List of monitoring events from ring buffer (no page/page_size)."""
 
     items: list[MonitoringEventSchema]
-    total: int
-    page: int
-    page_size: int
+    count: int
 
 
 # ---------------------------------------------------------------------------
@@ -81,17 +77,21 @@ class MonitoringFilterParams(BaseModel):
 
 
 class MonitoringStatusResponse(BaseModel):
-    """Monitoring system status."""
+    """Monitoring system status from in-memory components."""
 
     active_connections: int = Field(description="Number of active WebSocket connections")
-    uptime_seconds: float = Field(description="Server uptime in seconds")
-    events_published_total: int = Field(
+    buffered_events: int = Field(description="Events currently in ring buffer")
+    buffered_alerts: int = Field(description="Alerts currently in ring buffer")
+    total_published: int = Field(
         description="Total events published since server start"
     )
+    event_buffer_capacity: int = Field(description="Max events in ring buffer")
+    alert_buffer_capacity: int = Field(description="Max alerts in ring buffer")
+    max_connections: int = Field(description="Max WebSocket connections")
 
 
 # ---------------------------------------------------------------------------
-# Alert schemas (for future Phase 13.5)
+# Alert schemas
 # ---------------------------------------------------------------------------
 
 
@@ -99,6 +99,7 @@ class MonitoringAlertSchema(BaseModel):
     """Monitoring alert for operator attention."""
 
     alert_id: str = Field(description="UUID identifying this alert")
+    event_id: str = Field(description="UUID of the originating event")
     event_type: EventType = Field(description="Event type that triggered the alert")
     severity: EventSeverity = Field(description="Alert severity")
     entity_type: str = Field(description="Domain entity type")
@@ -107,11 +108,23 @@ class MonitoringAlertSchema(BaseModel):
     hall_id: int | None = Field(default=None)
     student_id: int | None = Field(default=None)
     message: str = Field(description="Human-readable alert message")
-    timestamp: datetime = Field(description="When the alert was generated")
+    created_at: datetime = Field(description="When the alert was generated")
 
 
 class MonitoringAlertListResponse(BaseModel):
-    """List of monitoring alerts."""
+    """List of monitoring alerts from ring buffer."""
 
     items: list[MonitoringAlertSchema]
-    total: int
+    count: int
+
+
+# ---------------------------------------------------------------------------
+# Connection status schema
+# ---------------------------------------------------------------------------
+
+
+class MonitoringConnectionStatusResponse(BaseModel):
+    """WebSocket connection status."""
+
+    active_connections: int = Field(description="Number of active connections")
+    max_connections: int = Field(description="Maximum allowed connections")

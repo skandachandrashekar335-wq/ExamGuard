@@ -518,22 +518,28 @@ class TestMonitoringSchemas:
         """MonitoringStatusResponse validates correctly."""
         status = MonitoringStatusResponse(
             active_connections=5,
-            uptime_seconds=3600.0,
-            events_published_total=142,
+            buffered_events=100,
+            buffered_alerts=10,
+            total_published=142,
+            event_buffer_capacity=1000,
+            alert_buffer_capacity=200,
+            max_connections=50,
         )
         assert status.active_connections == 5
-        assert status.events_published_total == 142
+        assert status.total_published == 142
+        assert status.event_buffer_capacity == 1000
 
     def test_alert_schema(self):
         """MonitoringAlertSchema validates correctly."""
         alert = MonitoringAlertSchema(
             alert_id=str(uuid.uuid4()),
+            event_id=str(uuid.uuid4()),
             event_type=EventType.RISK_CRITICAL,
             severity=EventSeverity.CRITICAL,
             entity_type="ProxyRiskAssessment",
             entity_id=10,
             message="Critical risk detected",
-            timestamp=datetime.now(timezone.utc),
+            created_at=datetime.now(timezone.utc),
         )
         assert alert.severity == EventSeverity.CRITICAL
         assert alert.message == "Critical risk detected"

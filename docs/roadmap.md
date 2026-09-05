@@ -899,12 +899,12 @@ Focus:
 
 ## Current Project State
 
-- **Current phase:** Phase 13 — Real-Time Monitoring & Alerting (IN PROGRESS: 13.1-13.4 complete, 13.5 in progress)
-- **Current completed step:** Phase 13.4 — Event Publication Wiring (COMPLETE)
-- **Current tests:** 2287 passing, 0 failures, 0 errors
+- **Current phase:** Phase 13 — Real-Time Monitoring & Alerting (IN PROGRESS: 13.1-13.5 complete, 13.6 in progress)
+- **Current completed step:** Phase 13.5 — Alerting (COMPLETE)
+- **Current tests:** 2346 passing, 0 failures, 0 errors
 - **Frontend pages:** 27 (all building successfully)
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono), zero border-radius, no neon colors
-- **Next step:** Phase 13.6 — Monitoring REST API
+- **Next step:** Phase 13.7 — Monitoring Admin UI
 - **Provider architecture:** `app/services/face_verification/` with Protocol, DeterministicProvider, factory
 - **Identity verification API:** `POST /{attempt_id}/verify-face` endpoint for face verification trigger
 - **Camera infrastructure:** Complete — Camera, EntryPoint, Mapping, Credential, Health Observation, Device Auth API

@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, 12 COMPLETE, **13.1 COMPLETE, 13.2 COMPLETE, 13.3 COMPLETE, 13.4 COMPLETE, 13.5 IN PROGRESS**
-- **Tests:** 2287 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, 12 COMPLETE, **13.1 COMPLETE, 13.2 COMPLETE, 13.3 COMPLETE, 13.4 COMPLETE, 13.5 COMPLETE, 13.6 IN PROGRESS**
+- **Tests:** 2346 passing, 0 failures, 0 errors
 - **Frontend:** 27 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -1980,3 +1980,84 @@ NO: acknowledgement, resolution, dismissal, assignment, persistence.
 
 **Total tests:** 2287 (2235 previous + 52 new), 0 failures, 0 errors
 **Consecutive full-suite runs:** 2 (both 2287 passed)
+
+---
+
+## Phase 13.6 — Monitoring REST API
+
+**Status: COMPLETE**
+
+### Implementation
+
+Exposed the in-memory monitoring system through 4 REST endpoints.
+READ-ONLY access to EventBuffer, AlertBuffer, ConnectionManager.
+No database dependency. No authentication. No persistence.
+
+- `backend/app/api/v1/monitoring.py` — **New:** 4 REST endpoints
+- `backend/app/api/v1/router.py` — **Modified:** Registered monitoring_router
+- `backend/app/schemas/monitoring.py` — **Modified:** Extended with REST response models
+- `backend/tests/test_phase_13_6_api.py` — **New:** 59 tests
+- `backend/tests/test_phase_13_1_events.py` — **Modified:** Updated schema tests for new fields
+
+### Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/monitoring/status` | Publisher status (connections, buffer counts, capacities) |
+| `GET` | `/monitoring/events` | Recent events from ring buffer with filtering |
+| `GET` | `/monitoring/alerts` | Recent alerts from ring buffer with filtering |
+| `GET` | `/monitoring/connections` | WebSocket connection count and max |
+
+### Events Query Parameters
+
+- `limit` (1-200, default 50) — Max events to return
+- `category` (EventCategory) — Filter by category
+- `event_type` (EventType) — Filter by event type
+- `min_severity` (EventSeverity) — Minimum severity level
+- `exam_id` (int) — Filter by exam ID
+- `hall_id` (int) — Filter by hall ID
+
+### Alerts Query Parameters
+
+- `limit` (1-200, default 50) — Max alerts to return
+- `severity` (EventSeverity) — Filter by severity
+- `event_type` (EventType) — Filter by event type
+- `exam_id` (int) — Filter by exam ID
+- `hall_id` (int) — Filter by hall ID
+
+### 503 Behavior
+
+All endpoints return 503 Service Unavailable when `get_monitoring_publisher()` returns None.
+No fallback. No silent initialization.
+
+### In-Memory Nature
+
+- Events and alerts are in ring buffers, not databases
+- Restart clears all monitoring data
+- Old events disappear when buffers reach capacity
+- No page/page_size pagination (ring buffer semantics)
+- limit-only retrieval
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `backend/app/api/v1/monitoring.py` | **New:** 4 REST endpoints |
+| `backend/app/api/v1/router.py` | **Modified:** Registered monitoring_router |
+| `backend/app/schemas/monitoring.py` | **Modified:** Extended with REST response models |
+| `backend/tests/test_phase_13_6_api.py` | **New:** 59 tests |
+| `backend/tests/test_phase_13_1_events.py` | **Modified:** Updated schema tests for new fields |
+
+### Tests
+
+59 tests covering:
+- Route registration (8): All 4 routes exist, wrong methods rejected
+- Status (5): Response fields, empty buffers, real counts, real capacities, 503
+- Events (17): Empty buffer, published events, ordering, category/event_type/min_severity/exam_id/hall_id filters, combined filters, default/custom limit, limit boundaries (200 accepted, 201 rejected, 0 rejected, negative rejected), 503
+- Alerts (17): Empty buffer, alert-producing events, no alert for INFO, severity/event_type/exam_id/hall_id filters, combined filters, default/custom limit, limit boundaries, 503
+- Connections (3): Response fields, real counts, 503
+- Schema contract (5): Event/alert/status/connection field sets, nullable optional IDs
+- Security/privacy (7): No biometrics, credentials, database URLs, filesystem paths, stack traces in events/alerts
+
+**Total tests:** 2346 (2287 previous + 59 new), 0 failures, 0 errors
+**Consecutive full-suite runs:** 2 (both 2346 passed)
