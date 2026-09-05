@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, **12.1 COMPLETE, 12.2 COMPLETE, 12.3 COMPLETE, 12.4 COMPLETE, 12.5 COMPLETE**
-- **Tests:** 2093 passing, 0 failures, 0 errors
+- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, 12 COMPLETE, **13.1 IN PROGRESS**
+- **Tests:** 2133 passing, 0 failures, 0 errors
 - **Frontend:** 27 pages building successfully
 - **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -1607,3 +1607,64 @@ The `attendance_events.entry_verification_id` UNIQUE constraint means each EV ca
 
 **Total tests:** 2093 (2048 previous + 45 new), 0 failures, 0 errors
 **Consecutive full-suite runs:** 2 (both 2093 passed)
+
+---
+
+## Phase 13.1 — Real-Time Event Domain
+
+**Status: COMPLETE**
+
+### Implementation
+
+Pure event-domain foundation for real-time monitoring. No database persistence, no WebSocket, no alerts, no frontend.
+
+- `backend/app/services/monitoring/__init__.py` — Public API exports
+- `backend/app/services/monitoring/events.py` — MonitoringEvent (frozen dataclass), enums, severity mapping, filter matching, payload safety validation
+- `backend/app/schemas/monitoring.py` — Pydantic schemas for WebSocket/REST serialization
+
+### Event Taxonomy
+
+**16 event types** across 5 categories:
+- ENTRY: ENTRY_CREATED, ENTRY_BEGAN, ENTRY_GRANTED, ENTRY_DENIED, ENTRY_ESCALATED, ENTRY_RESOLVED
+- RISK: SIGNAL_DETECTED, RISK_ASSESSED, RISK_ELEVATED, RISK_HIGH, RISK_CRITICAL
+- ATTENDANCE: ATTENDANCE_RECORDED, ATTENDANCE_CORRECTED
+- CAMERA: CAMERA_OFFLINE, CAMERA_ONLINE
+- SYSTEM: HEARTBEAT
+
+### Severity Mapping
+
+- INFO: All normal/informational events (11 types)
+- WARNING: ENTRY_ESCALATED, RISK_ELEVATED, RISK_HIGH, CAMERA_OFFLINE
+- CRITICAL: RISK_CRITICAL
+
+### Design
+
+- **Immutable**: MonitoringEvent is a frozen dataclass
+- **Ephemeral**: No database persistence; delivery vehicles, not audit records
+- **Independent**: No FastAPI, SQLAlchemy, PostgreSQL, or WebSocket dependencies
+- **Safe**: Payload validation rejects sensitive keys (face images, embeddings, credentials, secrets, etc.)
+- **Filterable**: MonitoringFilter supports exam_id, hall_id, category, event_type, min_severity
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `backend/app/services/monitoring/__init__.py` | New: public API exports |
+| `backend/app/services/monitoring/events.py` | New: MonitoringEvent, enums, severity, filters, payload safety |
+| `backend/app/schemas/monitoring.py` | New: Pydantic schemas for events, filters, status, alerts |
+| `backend/tests/test_phase_13_1_events.py` | New: 40 tests |
+
+### Tests
+
+40 tests covering:
+- Event creation, UUID uniqueness, immutability
+- Enum validation (EventType, EventCategory, EventSeverity)
+- Severity ordering and deterministic mapping
+- Auto-derived category and severity from event_type
+- Serialization (to_dict): minimal, full, UUID, datetime
+- Payload safety: rejects 8+ sensitive key types
+- Filter matching: exam_id, hall_id, category, event_type, min_severity, combined, boundary
+- Pydantic schema validation: event, filter, status, alert
+
+**Total tests:** 2133 (2093 previous + 40 new), 0 failures, 0 errors
+**Consecutive full-suite runs:** 2 (both 2133 passed)
