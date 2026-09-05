@@ -18,6 +18,7 @@ from app.models.identity_verification import (
 from app.models.verification import VerificationDecision, VerificationOutcome
 from app.models.hall_ticket import HallTicket
 from app.models.entry_verification import EntryVerification
+from app.models.attendance import AttendanceEvent, AttendanceRecord
 from app.services import batch_verification
 
 
@@ -41,6 +42,8 @@ def cleanup():
         db.execute(delete(HallTicket))
         db.execute(delete(IdentityVerificationEvidence))
         db.execute(delete(IdentityVerificationAttempt))
+        db.execute(delete(AttendanceEvent))
+        db.execute(delete(AttendanceRecord))
         db.execute(delete(EntryVerification))
         db.execute(delete(ExamRegistration))
         db.execute(delete(Exam))

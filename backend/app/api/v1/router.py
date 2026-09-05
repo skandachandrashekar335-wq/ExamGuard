@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.v1.attendance import router as attendance_router
 from app.api.v1.batch_verification import router as batch_verification_router
 from app.api.v1.camera_entry_points import router as camera_entry_points_router
 from app.api.v1.camera_health import router as camera_health_router
@@ -27,6 +28,7 @@ from app.api.v1.subjects import router as subjects_router
 
 router = APIRouter()
 
+router.include_router(attendance_router)
 router.include_router(batch_verification_router)
 router.include_router(camera_entry_points_router)
 router.include_router(camera_health_router)
