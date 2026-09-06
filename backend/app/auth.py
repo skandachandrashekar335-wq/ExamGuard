@@ -79,35 +79,38 @@ class Role:
 
 # Role permissions: which routes/resources each role can access
 PERMISSIONS: Dict[str, List[str]] = {
-    Role.ADMIN: [
-        # Admin operations
-        "api:admin:*",
-        # Full access to all endpoints
-        "GET,POST,PUT,DELETE",
-    ],
-    Role.OPERATOR: [
-        # Operator can manage exams, students, halls, etc.
-        "api:exams:*",
-        "api:students:*",
-        "api:exam_halls:*",
-        "api:seat_assignments:*",
-        "api:entry_verifications:*",
-        "api:verification:*",
-        "api:proxy_risk:*",
-        # Can view but not administer
-        "GET api:users:*",
-        "GET api:roles:*",
-        "GET api:permissions:*",
-    ],
-    Role.REVIEWER: [
-        # Reviewer can view and verify
-        "api:entry_verifications:GET",
-        "api:verification:GET",
-        "api:proxy_risk:GET",
-        "api:attendance:GET",
-        # Cannot administer
-        "POST,PUT,DELETE denied",
-    ],
+    Role.ADMIN:
+        [
+            # Admin operations
+            "api:admin:*",
+            # Full access to all endpoints
+            "GET,POST,PUT,DELETE",
+        ],
+    Role.OPERATOR:
+        [
+            # Operator can manage exams, students, halls, etc.
+            "api:exams:*",
+            "api:students:*",
+            "api:exam_halls:*",
+            "api:seat_assignments:*",
+            "api:entry_verifications:*",
+            "api:verification:*",
+            "api:proxy_risk:*",
+            # Can view but not administer
+            "GET api:users:*",
+            "GET api:roles:*",
+            "GET api:permissions:*",
+        ],
+    Role.REVIEWER:
+        [
+            # Reviewer can view and verify
+            "api:entry_verifications:GET",
+            "api:verification:GET",
+            "api:proxy_risk:GET",
+            "api:attendance:GET",
+            # Cannot administer
+            "POST,PUT,DELETE denied",
+        ],
 }
 
 
@@ -132,6 +135,29 @@ def has_permission(role: str, permission: str) -> bool:
     return False
 
 
+def get_current_user(
+    authorization: str | None = None,
+) -> Optional[Dict[str, Any]]:
+    """Extract the current user from a Bearer JWT token.
+
+    Args:
+        authorization: The Authorization header value (e.g. "Bearer <token>").
+
+    Returns:
+        Dict of JWT claims if valid, None if missing or invalid.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    token = authorization[7:].strip()
+    claims = decode_token(token)
+    if claims is None:
+        return None
+    # Ensure required claims exist
+    if "role" not in claims or "sub" not in claims:
+        return None
+    return claims
+
+
 def require_role(allowed_roles: List[str]):
     """Decorator factory for FastAPI endpoints that checks role membership.
 
@@ -139,11 +165,19 @@ def require_role(allowed_roles: List[str]):
         allowed_roles: List of role strings that are allowed to access the endpoint.
 
     Returns:
-        Depends function that raises HTTP 403 if the user's role is not allowed.
+        Depends function that raises HTTP 401 if unauthenticated,
+        HTTP 403 if authenticated but unauthorized.
     """
-    from fastapi import HTTPException, status
+    from fastapi import HTTPException, status, Request
 
-    def dependency(current_user: dict = ...):  # type: ignore
+    def dependency(request: Request,
+                   current_user: dict = ...):  # type: ignore
+        # If no user, authentication is required via 401
+        if current_user is None or current_user.get("role") is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+            )
         if current_user.get("role") not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -163,9 +197,15 @@ def require_any_role(allowed_roles: List[str]):
     Returns:
         Depends function.
     """
-    from fastapi import HTTPException, status
+    from fastapi import HTTPException, status, Request
 
-    def dependency(current_user: dict = ...):  # type: ignore
+    def dependency(request: Request,
+                 current_user: dict = ...):  # type: ignore
+        if current_user is None or current_user.get("role") is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+            )
         if current_user.get("role") not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

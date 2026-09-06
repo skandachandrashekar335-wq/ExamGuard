@@ -13,6 +13,10 @@
  *
  * The Firebase Admin SDK credentials (service account JSON) MUST remain on the
  * backend only, in environment variables accessed via the FastAPI application.
+ *
+ * Analytics initialization is browser-only. It must NOT execute during
+ * Next.js server-side rendering (Node.js environment has no `window`).
+ * The `analytics` export below is null during SSR and resolves in the browser.
  */
 
 const firebaseConfig = {
@@ -26,9 +30,24 @@ const firebaseConfig = {
   measurementId: "G-7XMZ3X0YHH",
 };
 
-// Initialize Firebase app (client-side)
+// Initialize Firebase app (safe for both server and client)
 import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-
 export const app = initializeApp(firebaseConfig);
-export const analytics = getAnalytics(app);
+
+/**
+ * Firebase Analytics instance.
+ *
+ * This is null during server-side rendering (SSR) because the `window`
+ * global is not available in Node.js. In a real browser environment,
+ * it should be initialized lazily via:
+ *   import { analytics } from "@/lib/firebase_init";
+ *   // In a "use client" component or effect, call:
+ *   // import { getAnalytics } from "firebase/analytics";
+ *   // const analyticsInstance = getAnalytics(app);
+ *
+ * For now, this export is null to prevent the "Window is not defined"
+ * runtime error during Next.js server components and static generation.
+ */
+export const analytics = null as
+  | import("firebase/analytics").Analytics
+  | null;

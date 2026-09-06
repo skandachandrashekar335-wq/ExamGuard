@@ -97,7 +97,7 @@ def update_registration(
 @router.delete(
     "/{registration_id}",
     response_model=ExamRegistrationResponse,
-    summary="Cancel a registration (status → CANCELLED)",
+    summary="Cancel a registration (status -> CANCELLED)",
 )
 def cancel_registration(registration_id: int, db: Session = Depends(get_db)):
     try:

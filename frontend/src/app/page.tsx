@@ -8,19 +8,60 @@ export default function Home() {
   const [stage, setStage] = useState("ready");
   const [progress, setProgress] = useState(0);
 
+  // Pipeline stages
+  const stages = [
+    { key: "CAMERA", title: "CAMERA", desc: "Stage 1 of 7" },
+    { key: "IDENTITY", title: "IDENTITY", desc: "Stage 2 of 7" },
+    { key: "LIVENESS", title: "LIVENESS", desc: "Stage 3 of 7" },
+    { key: "HALL_TICKET", title: "HALL TICKET", desc: "Stage 4 of 7" },
+    { key: "SEAT", title: "SEAT", desc: "Stage 5 of 7" },
+    { key: "EVIDENCE", title: "EVIDENCE", desc: "Stage 6 of 7" },
+    { key: "DECISION", title: "DECISION", desc: "Stage 7 of 7" },
+  ];
+
+  useEffect(() => {
+    let animated = false;
+    if (scrollRef.current && !animated) {
+      animated = true;
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting) {
+            let current = 0;
+            const interval = setInterval(() => {
+              current += 10;
+              setProgress(current);
+              if (current >= 100) {
+                clearInterval(interval);
+                setProgress(100);
+              }
+            }, 20);
+            setTimeout(() => observer.disconnect(), 1000);
+          }
+        },
+        { root: scrollRef.current }
+      );
+      observer.observe(scrollRef.current);
+    }
+    return () => {
+      if (scrollRef.current) {
+        // observer will be cleaned up by React
+      }
+    };
+  }, []);
+
   return (
     <>
-/\* Sticky Navigation \*/
+      {/* Sticky Navigation */}
       <div className="sticky-nav">
         <div className="max-w-7xl mx-auto px-6 sm:px-10 height-full flex items-center justify-between">
           <div className="flex items-center gap-2">
             <a href="/" className="eg-mono-sm font-medium uppercase tracking-wider">EXAMGUARD</a>
             <nav className="hidden sm:block sm:flex items-center gap-8">
               <a href="/examination-sessions" className="eg-mono-sm text-[#555555] hover:text-[#111111] transition-colors duration-200">PRODUCT</a>
-              <a href="/identity-verifications" className="eg-mono-sm text-[555555] hover:text-[#111111] transition-colors duration-200">VERIFICATION</a>
-              <a href="/exams" className="eg-mono-sm text-[555555] hover:text-[#111111] transition-colors duration-200">SECURITY</a>
-              <a href="/monitoring" className="eg-mono-sm text-[555555] hover:text-[#111111] transition-colors duration-200">ANALYTICS</a>
-              <a href="/security-events" className="eg-mono-sm text-[555555] hover:text-[#111111] transition-colors duration-200">AUDIT</a>
+              <a href="/identity-verifications" className="eg-mono-sm text-[#555555] hover:text-[#111111] transition-colors duration-200">VERIFICATION</a>
+              <a href="/exams" className="eg-mono-sm text-[#555555] hover:text-[#111111] transition-colors duration-200">SECURITY</a>
+              <a href="/monitoring" className="eg-mono-sm text-[#555555] hover:text-[#111111] transition-colors duration-200">ANALYTICS</a>
+              <a href="/security-events" className="eg-mono-sm text-[#555555] hover:text-[#111111] transition-colors duration-200">AUDIT</a>
             </nav>
             <a href="/examination-sessions" className="eg-btn eg-btn-sm eg-btn-primary uppercase rounded-md px-3 text-xs">ACCESS SYSTEM</a>
           </div>
@@ -28,7 +69,6 @@ export default function Home() {
       </div>
 
       {/* Hero Section */}
-
       <section className="relative min-h-[80vh] overflow-hidden bg-[var(--bg-light)]">
         <div className="max-w-7xl mx-auto px-6 py-12 sm:py-20">
           <div className="text-center">
@@ -38,7 +78,7 @@ export default function Home() {
             </p>
 
             {/* Main Headline */}
-            <h1 className="eg-display font-bold text-[clamp(72px,10vw,180px)] text-[var(--black)] leading-[0.9] mb-6 capitalize">
+            <h1 className="eg-display font-bold text-[clamp(72px,10vw,200px)] text-[var(--black)] leading-[0.9] mb-6 capitalize">
               ENTRY SHOULD BE
               <span className="block">VERIFIED.</span>
             </h1>
@@ -59,6 +99,11 @@ export default function Home() {
                 <div className="absolute top-1/4 left-1/3 -translate-x-1/3 -translate-y-1/4 w-16 h-1 bg-[var(--gray-30)] opacity-20" />
                 <div className="absolute bottom-1/3 right-1/2 -translate-x-1/2 -translate-y-1/3 w-20 h-1 bg-[var(--gray-40)] opacity-20" />
               </div>
+
+              {/* Scanning line */}
+              <div className="absolute inset-0 overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-0.5 bg-[var(--primary)] animate-scan" />
+              </div>
             </div>
 
             {/* Verification Visual */}
@@ -78,6 +123,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Narrative Pipeline */}
       <section
         className="py-24 sm:py-32 bg-[var(--bg-light)] border-t border-[var(--border)]"
       >
@@ -95,81 +142,20 @@ export default function Home() {
                 validates the evidence before progression. Human review remains available
                 at every step.
               </p>
-<div className="grid grid-cols-2 gap-4 my-8">
-                <div
-                  key="CAMERA"
-                  className="bg-[var(--bg-raised)] p-4 rounded border border-[var(--border)] transition-colors duration-300 hover:border-[var(--border-strong)]"
-                >
-                  <span className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider block mb-2">CAMERA</span>
-                  <p className="eg-body text-sm text-[var(--gray-400)]">Stage 1 of 7</p>
-                </div>
-                <div
-                  key="IDENTITY"
-                  className="bg-[var(--bg-raised)] p-4 rounded border border-[var(--border)] transition-colors duration-300 hover:border-[var(--border-strong)]"
-                >
-                  <span className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider block mb-2">IDENTITY</span>
-                  <p className="eg-body text-sm text-[var(--gray-400)]">Stage 2 of 7</p>
-                </div>
-                <div
-                  key="LIVENESS"
-                  className="bg-[var(--bg-raised)] p-4 rounded border border-[var(--border)] transition-colors duration-300 hover:border-[var(--border-strong)]"
-                >
-                  <span className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider block mb-2">LIVENESS</span>
-                  <p className="eg-body text-sm text-[var(--gray-400)]">Stage 3 of 7</p>
-                </div>
-                <div
-                  key="HALL TICKET"
-                  className="bg-[var(--bg-raised)] p-4 rounded border border-[var(--border)] transition-colors duration-300 hover:border-[var(--border-strong)]"
-                >
-                  <span className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider block mb-2">HALL TICKET</span>
-                  <p className="eg-body text-sm text-[var(--gray-400)]">Stage 4 of 7</p>
-                </div>
-                <div
-                  key="SEAT"
-                  className="bg-[var(--bg-raised)] p-4 rounded border border-[var(--border)] transition-colors duration-300 hover:border-[var(--border-strong)]"
-                >
-                  <span className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider block mb-2">SEAT</span>
-                  <p className="eg-body text-sm text-[var(--gray-400)]">Stage 5 of 7</p>
-                </div>
-                <div
-                  key="EVIDENCE"
-                  className="bg-[var(--bg-raised)] p-4 rounded border border-[var(--border)] transition-colors duration-300 hover:border-[var(--border-strong)]"
-                >
-                  <span className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider block mb-2">EVIDENCE</span>
-                  <p className="eg-body text-sm text-[var(--gray-400)]">Stage 6 of 7</p>
-                </div>
-                <div
-                  key="DECISION"
-                  className="bg-[var(--bg-raised)] p-4 rounded border border-[var(--border)] transition-colors duration-300 hover:border-[var(--border-strong)]"
-                >
-                  <span className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider block mb-2">DECISION</span>
-                  <p className="eg-body text-sm text-[var(--gray-400)]">Stage 7 of 7</p>
-                </div>
-</div>
-              <div>
-                <button className="eg-btn eg-btn-sm uppercase tracking-wider px-4 py-2 text-[var(--gray-55)] border border-[var(--border)] rounded hover:border-[var(--white)] transition-colors duration-200">
-                  READY
-                </button>
-                <button className="eg-btn eg-btn-sm uppercase tracking-wider px-4 py-2 text-[var(--gray-55)] border border-[var(--border)] rounded hover:border-[var(--white)] transition-colors duration-200">
-                  DETECT
-                </button>
-                <button className="eg-btn eg-btn-sm uppercase tracking-wider px-4 py-2 text-[var(--gray-55)] border border-[var(--border)] rounded hover:border-[var(--white)] transition-colors duration-200">
-                  VERIFY
-                </button>
-                <button className="eg-btn eg-btn-sm uppercase tracking-wider px-4 py-2 text-[var(--gray-55)] border border-[var(--border)] rounded hover:border-[var(--white)] transition-colors duration-200">
-                  DECIDE
-                </button>
-                <button className="eg-btn eg-btn-sm uppercase tracking-wider px-4 py-2 text-[var(--gray-55)] border border-[var(--border)] rounded hover:border-[var(--white)] transition-colors duration-200">
-                  AUTHORIZE
-                </button>
-              </div>
-              <FaceGeometry phase="frame" className="opacity-60" />
-              <div className="mt-6 flex justify-center">
-                <div className="eg-progress-line" style={{ '--progress': '0%' }} />
-              </div>
             </div>
-
-            <div></div>
+            <div className="space-y-4">
+              {stages.map((stage) => (
+                <div
+                  key={stage.key}
+                  className="bg-[var(--bg-raised)] p-4 rounded border border-[var(--border)] transition-colors duration-300 hover:border-[var(--border-strong)]"
+                >
+                  <span className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider block mb-2">
+                    {stage.key}
+                  </span>
+                  <p className="eg-body text-sm text-[var(--gray-400)]">{stage.desc}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -240,7 +226,7 @@ export default function Home() {
               <p className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider mb-4">
                 LIVE VERIFICATION
               </p>
-<div className="grid grid-cols-3 gap-4 mb-8">
+              <div className="grid grid-cols-3 gap-4 mb-8">
                 <div className="bg-[var(--bg-raised)] border border-[var(--border)] rounded p-4 text-center transition-colors duration-300">
                   <span className="eg-mono text-[var(--gray-500)] text-[0.7rem] uppercase tracking-wider mb-2">ANALYZING</span>
                   <p className="eg-body text-sm text-[var(--gray-400)]">In progress</p>
@@ -254,14 +240,10 @@ export default function Home() {
                   <p className="eg-body text-sm text-[var(--gray-400)]">In progress</p>
                 </div>
                 <div className="bg-[var(--bg-raised)] border border-[var(--border)] rounded p-4 text-center transition-colors duration-300">
-                  <span className="eg-mono text-[var(--gray-500)] text-[0.7rem] uppercase tracking-wider mb-2">PENDING</span>
-                  <p className="eg-body text-sm text-[var(--gray-400)]">In progress</p>
-                </div>
-                <div className="bg-[var(--bg-raised)] border border-[var(--border)] rounded p-4 text-center transition-colors duration-300">
                   <span className="eg-mono text-[var(--gray-500)] text-[0.7rem] uppercase tracking-wider mb-2">REVIEW REQUIRED</span>
                   <p className="eg-body text-sm text-[var(--gray-400)]">In progress</p>
                 </div>
-</div>
+              </div>
               <div className="bg-[var(--bg-raised)] p-6 rounded border border-[var(--border)] mb-8">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -284,33 +266,12 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <div>
-                  <span className="eg-mono text-[var(--gray-500)] text-xs uppercase tracking-wider block mb-2">IDENTITY</span>
-                  <p className="eg-body text-sm text-[var(--gray-400)]">ANALYZING</p>
-                </div>
-                <div>
-                  <span className="eg-mono text-[var(--gray-500)] text-xs uppercase tracking-wider block mb-2">LIVENESS</span>
-                  <p className="eg-body text-sm text-[var(--gray-400)]">ANALYZING</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="eg-mono text-[var(--gray-500)] text-xs uppercase tracking-wider block mb-2">EVIDENCE</span>
-                  <p className="eg-body text-sm text-[var(--gray-400)]">COLLECTING</p>
-                </div>
-                <div>
-                  <span className="eg-mono text-[var(--gray-500)] text-xs uppercase tracking-wider block mb-2">DECISION</span>
-                  <p className="eg-body text-sm text-[var(--gray-400)]">PENDING</p>
-                </div>
-              </div>
             </div>
-
             <div>
               <p className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider mb-4">
                 RISK ASSESSMENT
               </p>
-<div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="security-signal">
                   <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">IDENTITY MISMATCH</span>
                   <span className="eg-body text-xs text-[var(--gray-400)]">Identity mismatch detected</span>
@@ -331,7 +292,7 @@ export default function Home() {
                   <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">REPEATED FAILED VERIFICATION</span>
                   <span className="eg-body text-xs text-[var(--gray-400)]">Multiple failed verification attempts</span>
                 </div>
-</div>
+              </div>
             </div>
           </div>
         </div>
@@ -350,28 +311,28 @@ export default function Home() {
               Every decision is guarded
             </h2>
           </div>
-<div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="security-signal" style={{ borderLeftColor: "#000" }}>
-                  <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">IDENTITY MISMATCH</span>
-                  <span className="eg-body text-xs text-[var(--gray-400)]">Identity mismatch detected</span>
-                </div>
-                <div className="security-signal" style={{ borderLeftColor: "#000" }}>
-                  <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">WRONG HALL</span>
-                  <span className="eg-body text-xs text-[var(--gray-400)]">Candidate assigned to wrong hall</span>
-                </div>
-                <div className="security-signal" style={{ borderLeftColor: "#555555" }}>
-                  <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">LIVENESS SPOOF</span>
-                  <span className="eg-body text-xs text-[var(--gray-400)]">Liveness spoof detected</span>
-                </div>
-                <div className="security-signal" style={{ borderLeftColor: "#555555" }}>
-                  <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">WRONG ENTRY POINT</span>
-                  <span className="eg-body text-xs text-[var(--gray-400)]">Candidate entered through wrong gate</span>
-                </div>
-                <div className="security-signal" style={{ borderLeftColor: "#555555" }}>
-                  <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">REPEATED FAILED VERIFICATION</span>
-                  <span className="eg-body text-xs text-[var(--gray-400)]">Multiple failed verification attempts</span>
-                </div>
-</div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="security-signal" style={{ borderLeftColor: "#000" }}>
+              <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">IDENTITY MISMATCH</span>
+              <span className="eg-body text-xs text-[var(--gray-400)]">Identity mismatch detected</span>
+            </div>
+            <div className="security-signal" style={{ borderLeftColor: "#000" }}>
+              <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">WRONG HALL</span>
+              <span className="eg-body text-xs text-[var(--gray-400)]">Candidate assigned to wrong hall</span>
+            </div>
+            <div className="security-signal" style={{ borderLeftColor: "#555555" }}>
+              <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">LIVENESS SPOOF</span>
+              <span className="eg-body text-xs text-[var(--gray-400)]">Liveness spoof detected</span>
+            </div>
+            <div className="security-signal" style={{ borderLeftColor: "#555555" }}>
+              <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">WRONG ENTRY POINT</span>
+              <span className="eg-body text-xs text-[var(--gray-400)]">Candidate entered through wrong gate</span>
+            </div>
+            <div className="security-signal" style={{ borderLeftColor: "#555555" }}>
+              <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">REPEATED FAILED VERIFICATION</span>
+              <span className="eg-body text-xs text-[var(--gray-400)]">Multiple failed verification attempts</span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -392,20 +353,20 @@ export default function Home() {
             <a href="/dashboard" className="eg-btn eg-btn-sm eg-btn-primary uppercase tracking-wider">
               Dashboard
             </a>
-            <a href="/exams" className="eg-btn eg-btn-sm uppercase tracking-wider text-[var(--gray-55)] hover:text-[var(--black)] transition-colors duration-200">
+            <a href="/exams" className="eg-btn eg-btn-sm uppercase tracking-wider text-[#555555] hover:#111111 transition-colors duration-200">
               Exams
             </a>
-            <a href="/examination-sessions" className="eg-btn eg-btn-sm uppercase tracking-wider text-[var(--gray-55)] hover:text-[var(--black)] transition-colors duration-200">
+            <a href="/examination-sessions" className="eg-btn eg-btn-sm uppercase tracking-wider text-[#555555] hover:#111111 transition-colors duration-200">
               Sessions
             </a>
-            <a href="/monitoring" className="eg-btn eg-btn-sm uppercase tracking-wider text-[var(--gray-55)] hover:text-[var(--black)] transition-colors duration-200">
+            <a href="/monitoring" className="eg-btn eg-btn-sm uppercase tracking-wider text-[#555555] hover:#111111 transition-colors duration-200">
               Monitoring
             </a>
-            <a href="/security-events" className="eg-btn eg-btn-sm uppercase tracking-wider text-[var(--gray-55)] hover:text-[var(--black)] transition-colors duration-200">
+            <a href="/security-events" className="eg-btn eg-btn-sm uppercase tracking-wider text-[#555555] hover:#111111 transition-colors duration-200">
               Security Events
             </a>
           </div>
-          <p className="mt-8 eg-mono text-[var(--gray-700)] text-xs uppercase tracking-wider">
+          <p className="mt-8 eg-mono text-[#707070] text-xs uppercase tracking-wider">
             EXAMINATION INTEGRITY, BUILT INTO EVERY ENTRY.
           </p>
         </div>
@@ -434,8 +395,8 @@ export default function Home() {
             ].map((item) => (
               <div key={item.num} className="bg-[var(--bg-raised)] p-6 sm:p-8 group hover:bg-[var(--bg-base)] transition-colors duration-300">
                 <span className="eg-mono-sm text-[var(--gray-600)] block mb-3">{item.num}</span>
-                <h3 className="eg-display text-base sm:text-lg text-[var(--white)] mb-2">{item.title}</h3>
-                <p className="eg-body text-xs sm:text-sm text-[var(--gray-400)]">{item.desc}</p>
+                <h3 className="eg-display text-base sm:text-lg text-[#FFFFFF] mb-2">{item.title}</h3>
+                <p className="eg-body text-xs sm:text-sm text-[#CCCCCC]">{item.desc}</p>
               </div>
             ))}
           </div>
@@ -453,50 +414,47 @@ export default function Home() {
                 <br />
                 Not authority.
               </h2>
-              <p className="eg-body text-sm sm:text-base text-[var(--gray-400)] mb-8 max-w-lg">
+              <p className="eg-body text-sm sm:text-base text-[#CCCCCC] mb-8 max-w-lg">
                 ExamGuard separates what the AI sees from what the system decides.
                 Provider output is evidence — never a direct authorization decision.
                 The decision engine evaluates evidence against configurable thresholds.
                 Human override is always available.
               </p>
-<div className="space-y-3">
+              <div className="space-y-3">
                 <div key="0" className="flex items-center gap-3">
-                  <div className="w-1 h-px bg-[var(--gray-500)]" />
-                  <span className="eg-mono-sm text-[var(--gray-400)]">Provider-agnostic integration</span>
+                  <div className="w-1 h-px bg-[#777777]" />
+                  <span className="eg-mono-sm text-[#777777]">Provider-agnostic integration</span>
                 </div>
                 <div key="1" className="flex items-center gap-3">
-                  <div className="w-1 h-px bg-[var(--gray-500)]" />
-                  <span className="eg-mono-sm text-[var(--gray-400)]">Evidence ≠ decision</span>
+                  <div className="w-1 h-px bg-[#777777]" />
+                  <span className="eg-mono-sm text-[#777777]">Evidence ≠ decision</span>
                 </div>
                 <div key="2" className="flex items-center gap-3">
-                  <div className="w-1 h-px bg-[var(--gray-500)]" />
-                  <span className="eg-mono-sm text-[var(--gray-400)]">Configurable thresholds</span>
+                  <div className="w-1 h-px bg-[#777777]" />
+                  <span className="eg-mono-sm text-[#777777]">Configurable thresholds</span>
                 </div>
                 <div key="3" className="flex items-center gap-3">
-                  <div className="w-1 h-px bg-[var(--gray-500)]" />
-                  <span className="eg-mono-sm text-[var(--gray-400)]">Full audit trail</span>
+                  <div className="w-1 h-px bg-[#777777]" />
+                  <span className="eg-mono-sm text-[#777777]">Full audit trail</span>
                 </div>
-</div>''',
               </div>
-
-              <div className="space-y-px bg-[var(--border)]">
-                <div className="bg-[var(--bg-raised)] p-5 flex items-start gap-4">
-                  <span className="eg-mono-sm text-[var(--gray-500)] w-16 flex-shrink-0">ENTRY</span>
-                  <span className="eg-body text-sm text-[var(--gray-400)]">Hall ticket + student context</span>
-                </div>
-                <div className="bg-[var(--bg-raised)] p-5 flex items-start gap-4">
-                  <span className="eg-mono-sm text-[var(--gray-500)] w-16 flex-shrink-0">LIVENESS</span>
-                  <span className="eg-body text-sm text-[var(--gray-400)]">Anti-spoofing detection</span>
-                </div>
-                <div className="bg-[var(--bg-raised)] p-5 flex items-start gap-4">
-                  <span className="eg-mono-sm text-[var(--gray-500)] w-16 flex-shrink-0">DECISION</span>
-                  <span className="eg-body text-sm text-[var(--gray-400)]">Evidence threshold evaluation</span>
-                </div>
-                <div className="bg-[var(--bg-raised)] p-5 flex items-start gap-4">
-                  <span className="eg-mono-sm text-[var(--gray-500)] w-16 flex-shrink-0">AUDIT</span>
-                  <span className="eg-body text-sm text-[var(--gray-400)]">Full decision trail</span>
-                </div>
-</div>''',
+            </div>
+            <div className="bg-[var(--bg-raised)] p-5 flex items-start gap-4">
+              <span className="eg-mono-sm text-[#777777] w-16 flex-shrink-0">ENTRY</span>
+              <span className="eg-body text-sm text-[#888888]">Hall ticket + student context</span>
+            </div>
+            <div className="bg-[var(--bg-raised)] p-5 flex items-start gap-4">
+              <span className="eg-mono-sm text-[#777777] w-16 flex-shrink-0">LIVENESS</span>
+              <span className="eg-body text-sm text-[#888888]">Anti-spoofing detection</span>
+            </div>
+            <div className="bg-[var(--bg-raised)] p-5 flex items-start gap-4">
+              <span className="eg-mono-sm text-[#777777] w-16 flex-shrink-0">DECISION</span>
+              <span className="eg-body text-sm text-[#888888]">Evidence threshold evaluation</span>
+            </div>
+            <div className="bg-[var(--bg-raised)] p-5 flex items-start gap-4">
+              <span className="eg-mono-sm text-[#777777] w-16 flex-shrink-0">AUDIT</span>
+              <span className="eg-body text-sm text-[#888888]">Full decision trail</span>
+            </div>
           </div>
         </div>
       </section>
@@ -505,10 +463,10 @@ export default function Home() {
       <section className="bg-[var(--bg-surface)] border-t border-[var(--border)]">
         <div className="max-w-5xl mx-auto px-6 sm:px-10 py-24 sm:py-32">
           <div className="mb-12">
-            <p className="eg-mono-sm text-[var(--gray-500)] mb-4">PRINCIPLES</p>
+            <p className="eg-mono-sm text-[#777777] mb-4">PRINCIPLES</p>
             <h2 className="eg-display text-[1.8rem] sm:text-[2.2rem]">Built on constraints</h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-[var(--border)]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-[#CCCCCC]">
             {[
               { num: "01", title: "Student Privacy First", desc: "Minimal data collection. No biometric storage beyond enrollment hashes. Right to deletion." },
               { num: "02", title: "No Black-Box AI", desc: "Every AI decision is explainable. Evidence is logged. Thresholds are configurable." },
@@ -516,9 +474,9 @@ export default function Home() {
               { num: "04", title: "Provider Independence", desc: "Swap face recognition providers without code changes. Evidence format is standardized." },
             ].map((item) => (
               <div key={item.num} className="bg-[var(--bg-raised)] p-6 sm:p-8">
-                <span className="eg-mono-sm text-[var(--gray-600)] block mb-3">{item.num}</span>
-                <h3 className="eg-display text-base sm:text-lg text-[var(--white)] mb-2">{item.title}</h3>
-                <p className="eg-body text-xs sm:text-sm text-[var(--gray-400)]">{item.desc}</p>
+                <span className="eg-mono-sm text-[#777777] block mb-3">{item.num}</span>
+                <h3 className="eg-display text-base sm:text-lg text#[FFFFFF] mb-2">{item.title}</h3>
+                <p className="eg-body text-xs sm:text-sm text-[#CCCCCC]">{item.desc}</p>
               </div>
             ))}
           </div>
@@ -529,10 +487,10 @@ export default function Home() {
       <section className="bg-[var(--bg-surface)]">
         <div className="max-w-3xl mx-auto px-6 sm:px-10 py-24 sm:py-32">
           <div className="mb-12">
-            <p className="eg-mono-sm text-[var(--gray-500)] mb-4">DEVELOPMENT</p>
+            <p className="eg-mono-sm text-[#777777] mb-4">DEVELOPMENT</p>
             <h2 className="eg-display text-[1.8rem] sm:text-[2.2rem]">23-phase build</h2>
           </div>
-          <div className="space-y-px bg-[var(--border)]">
+          <div className="space-y-px bg-[#CCCCCC]">
             {[
               { phase: "00–06", title: "Foundation", desc: "Models, schemas, config, admin CRUD, tests", done: true },
               { phase: "07", title: "Identity Verification", desc: "Core verification engine with provider abstraction", done: true },
@@ -542,17 +500,17 @@ export default function Home() {
               { phase: "19–23", title: "Auth & Polish", desc: "Authentication, RBAC, performance, deployment", done: false },
             ].map((item) => (
               <div key={item.phase} className="bg-[var(--bg-raised)] p-5 flex items-start gap-5">
-                <span className="eg-mono-sm text-[var(--gray-600)] w-10 flex-shrink-0">{item.phase}</span>
+                <span className="eg-mono-sm text-[#777777] w-10 flex-shrink-0">{item.phase}</span>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="eg-display text-sm text-[var(--white)]">{item.title}</h3>
+                    <h3 className="eg-display text-sm #[FFFFFF]">{item.title}</h3>
                     {item.done && (
-                      <span className="eg-mono-sm text-[var(--gray-500)] border border-[var(--gray-700)] px-1.5 py-0.5">
+                      <span className="eg-mono-sm text-[#777777] border #[777777] px-1.5 py-0.5">
                         DONE
                       </span>
                     )}
                   </div>
-                  <p className="eg-body text-xs text-[var(--gray-500)] mt-1">{item.desc}</p>
+                  <p className="eg-body text-xs text-[#888888] mt-1">{item.desc}</p>
                 </div>
               </div>
             ))}
@@ -566,27 +524,27 @@ export default function Home() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-8">
             <div className="col-span-2 sm:col-span-1">
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-2 h-2 border border-[var(--gray-500)] rotate-45" />
-                <span className="eg-mono-sm text-[var(--gray-500)]">EXAMGUARD</span>
+                <div className="w-2 h-2 border #[777777] rotate-45" />
+                <span className="eg-mono-sm text-[#777777]">EXAMGUARD</span>
               </div>
-              <p className="eg-body text-xs text-[var(--gray-500)] leading-relaxed">
+              <p className="eg-body text-[#888888] leading-relaxed">
                 AI-powered examination verification for institutions that take integrity seriously.
               </p>
             </div>
             <div>
-              <h4 className="eg-mono-sm text-[var(--gray-500)] mb-3">SYSTEM</h4>
+              <h4 className="eg-mono-sm text-[#777777] mb-3">SYSTEM</h4>
               <ul className="space-y-2">
               </ul>
             </div>
             <div>
-              <h4 className="eg-mono-sm text-[var(--gray-500)] mb-3">COMPLIANCE</h4>
+              <h4 className="eg-mono-sm text-[#777777] mb-3">COMPLIANCE</h4>
               <ul className="space-y-2">
                 {[
                   { label: "Privacy Policy", href: "/privacy" },
                   { label: "Terms of Service", href: "/terms" },
                 ].map((item) => (
                   <li key={item.label}>
-                    <a href={item.href} className="eg-body text-xs text-[var(--gray-500)] hover:text-[var(--white)] transition-colors duration-200">
+                    <a href={item.href} className="eg-body text-[#888888] #[FFFFFF] text-[#888888] hover:#[FFFFFF] transition-colors duration-200">
                       {item.label}
                     </a>
                   </li>
@@ -594,17 +552,17 @@ export default function Home() {
               </ul>
             </div>
             <div>
-              <h4 className="eg-mono-sm text-[var(--gray-500)] mb-3">STATUS</h4>
+              <h4 className="eg-mono-sm text-[#777777] mb-3">STATUS</h4>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-1 h-1 rounded-full bg-[var(--gray-500)]" />
-                  <span className="eg-mono-sm text-[var(--gray-600)]">System operational</span>
+                  <div className="w-1 h-1 rounded-[#777777]" />
+                  <span className="eg-mono-sm text-[#777777]">System operational</span>
                 </div>
-                <span className="eg-mono-sm text-[var(--gray-700)] block">v0.7.0</span>
+                <span className="eg-mono-sm #[FFFFFF] block">v0.7.0</span>
               </div>
             </div>
             <div>
-              <p className="eg-mono-sm text-[var(--gray-700)] text-center">
+              <p className="eg-mono-sm #[FFFFFF] text-center">
                 EXAMGUARD — AI-POWERED EXAMINATION INTEGRITY PLATFORM
               </p>
             </div>
