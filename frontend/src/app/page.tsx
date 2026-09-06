@@ -1,200 +1,417 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
-import { useScrollProgress, useMouseCSS, type ScrollState } from "@/components/useScrollProgress";
+import { useRef, useEffect, useState } from "react";
 import FaceGeometry from "@/components/FaceGeometry";
-import HallTicketViz from "@/components/HallTicketViz";
-import StageNav from "@/components/StageNav";
-import SystemTerminal from "@/components/SystemTerminal";
-
-const STAGE_STARTS = [0, 0.05, 0.3, 0.55, 0.8];
 
 export default function Home() {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { subscribe, getState } = useScrollProgress(scrollRef);
-  useMouseCSS();
-
-  const [scrollState, setScrollState] = useState<ScrollState>(() => getState());
-  const [initialized, setInitialized] = useState(false);
-
-  useEffect(() => {
-    return subscribe(setScrollState);
-  }, [subscribe]);
-
-  useEffect(() => {
-    if (!initialized && scrollState.progress > 0.01) {
-      setInitialized(true);
-    }
-  }, [scrollState.progress, initialized]);
-
-  const handleStageClick = useCallback((stageIndex: number) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const target = STAGE_STARTS[stageIndex] || 0;
-    const rect = el.getBoundingClientRect();
-    const total = rect.height - window.innerHeight;
-    const y = el.getBoundingClientRect().top + window.scrollY + total * target;
-    window.scrollTo({ top: y, behavior: "auto" });
-  }, []);
-
-  const { stage, subProgress, progress, stageIndex } = scrollState;
-  const isScrolling = progress > 0.01;
-
-  const opacity = (start: number, peak: number, end: number) => {
-    if (progress < start || progress > end) return 0;
-    return progress < peak
-      ? Math.max(0, Math.min(1, (progress - start) / (peak - start)))
-      : Math.max(0, Math.min(1, (end - progress) / (end - peak)));
-  };
-
-  const detectOpacity = opacity(0.05, 0.12, 0.28);
-  const verifyOpacity = opacity(0.3, 0.37, 0.53);
-  const decideOpacity = opacity(0.55, 0.62, 0.78);
-  const authorizeOpacity = opacity(0.8, 0.87, 1.0);
-
-  const stageTitle =
-    stage === "ready" ? "ENTRY SHOULD BE\nVERIFIED."
-    : stage === "detect" ? "DETECTION STAGE"
-    : stage === "verify" ? "IDENTITY + CONTEXT"
-    : stage === "decide" ? "EVIDENCE ≠ DECISION"
-    : "ENTRY DECISION\nREQUIRED.";
-
-  const stageSubtext =
-    stage === "ready" ? "Scroll to begin the verification experience"
-    : stage === "detect" ? "Facial liveness and anti-spoofing detection"
-    : stage === "verify" ? "Hall-ticket context meets identity verification"
-    : stage === "decide" ? "AI perception informs — does not decide"
-    : "Awaiting verified decision from evidence engine.";
+  const [stage, setStage] = useState("ready");
+  const [progress, setProgress] = useState(0);
 
   return (
     <>
-      <div ref={scrollRef} style={{ height: "500vh" }} className="relative">
-        <div className="eg-sticky overflow-hidden">
-
-          {/* Power-up overlay */}
-          <div
-            className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[var(--bg-base)] transition-opacity duration-500"
-            style={{ opacity: initialized ? 0 : 1, pointerEvents: initialized ? "none" : "auto" }}
-          >
-            <div className="text-center">
-              <p className="eg-mono text-[var(--gray-500)] mb-3">INITIALIZE</p>
-              <div className="w-8 h-px bg-[var(--gray-700)] mx-auto" />
-            </div>
+/\* Sticky Navigation \*/
+      <div className="sticky-nav">
+        <div className="max-w-7xl mx-auto px-6 sm:px-10 height-full flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <a href="/" className="eg-mono-sm font-medium uppercase tracking-wider">EXAMGUARD</a>
+            <nav className="hidden sm:block sm:flex items-center gap-8">
+              <a href="/examination-sessions" className="eg-mono-sm text-[#555555] hover:text-[#111111] transition-colors duration-200">PRODUCT</a>
+              <a href="/identity-verifications" className="eg-mono-sm text-[555555] hover:text-[#111111] transition-colors duration-200">VERIFICATION</a>
+              <a href="/exams" className="eg-mono-sm text-[555555] hover:text-[#111111] transition-colors duration-200">SECURITY</a>
+              <a href="/monitoring" className="eg-mono-sm text-[555555] hover:text-[#111111] transition-colors duration-200">ANALYTICS</a>
+              <a href="/security-events" className="eg-mono-sm text-[555555] hover:text-[#111111] transition-colors duration-200">AUDIT</a>
+            </nav>
+            <a href="/examination-sessions" className="eg-btn eg-btn-sm eg-btn-primary uppercase rounded-md px-3 text-xs">ACCESS SYSTEM</a>
           </div>
-
-          {/* Header */}
-          <header
-            className="absolute top-0 left-0 right-0 z-30 px-6 sm:px-10 py-5 flex items-center justify-between transition-opacity duration-500"
-            style={{ opacity: isScrolling ? 0 : 1, pointerEvents: isScrolling ? "none" : "auto" }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 border border-[var(--gray-400)] rotate-45" />
-              <span className="eg-mono-sm text-[var(--gray-500)]">EXAMGUARD</span>
-            </div>
-            <a
-              href="/dashboard"
-              className="eg-focusable eg-mono-sm text-[var(--gray-500)] hover:text-[var(--white)] transition-colors duration-200"
-            >
-              DASHBOARD →
-            </a>
-          </header>
-
-          {/* Title — scroll-driven motion */}
-          <div className="absolute inset-x-0 top-[12%] sm:top-[15%] z-20 px-6 sm:px-10 pointer-events-none">
-            <div
-              className="transition-transform duration-100"
-              style={{ transform: `translateY(${-progress * 80}vh)` }}
-            >
-              <p className="eg-mono-sm text-[var(--gray-500)] mb-4">
-                {stage === "ready" ? "SCROLL TO BEGIN" : `0${stageIndex} / ${stage.toUpperCase()}`}
-              </p>
-              <h1
-                className="eg-display-lg text-[2.5rem] sm:text-[4rem] md:text-[5.5rem] lg:text-[7rem] whitespace-pre-line"
-                style={{ color: stage === "authorize" ? "var(--gray-300)" : "var(--white)" }}
-              >
-                {stageTitle}
-              </h1>
-              <p className="eg-body text-sm sm:text-base text-[var(--gray-500)] mt-4 max-w-md">
-                {stageSubtext}
-              </p>
-            </div>
-          </div>
-
-          {/* Stage navigation */}
-          <div
-            className="absolute top-5 left-1/2 -translate-x-1/2 z-30 transition-opacity duration-300"
-            style={{ opacity: isScrolling ? 1 : 0, pointerEvents: isScrolling ? "auto" : "none" }}
-          >
-            <StageNav stage={stage} onStageClick={handleStageClick} />
-          </div>
-
-          {/* Right panel — scene visualizer */}
-          <div className="absolute right-6 sm:right-10 lg:right-16 top-1/2 -translate-y-1/2 z-10 w-[300px] sm:w-[380px] h-[400px] sm:h-[480px] pointer-events-none">
-            <div
-              className="relative w-full h-full border border-[var(--border)] bg-[var(--bg-surface)]"
-              style={{ opacity: subProgress === 0 && stage === "ready" ? 0.8 : 1 }}
-            >
-              {/* Stage label */}
-              <div className="absolute top-0 left-0 px-3 py-2">
-                <span className="eg-mono-sm text-[var(--gray-600)]">
-                  {stage === "ready" ? "SYSTEM" : stage.toUpperCase()}
-                </span>
-              </div>
-
-              {/* Visual area */}
-              <div className="absolute inset-0 flex items-center justify-center p-8">
-                {(stage === "ready" || stage === "detect") && (
-                  <div style={{ opacity: stage === "ready" ? 0.8 : detectOpacity }} className="w-full h-full">
-                    <FaceGeometry phase={stage === "ready" ? "frame" : "scan"} />
-                  </div>
-                )}
-                {stage === "verify" && (
-                  <div style={{ opacity: verifyOpacity }} className="w-full">
-                    <HallTicketViz progress={progress} subProgress={subProgress} />
-                  </div>
-                )}
-                {stage === "decide" && (
-                  <div style={{ opacity: decideOpacity }} className="w-full h-full">
-                    <FaceGeometry phase="evidence" />
-                  </div>
-                )}
-                {stage === "authorize" && (
-                  <div style={{ opacity: authorizeOpacity }} className="w-full h-full">
-                    <FaceGeometry phase="authorize" />
-                  </div>
-                )}
-              </div>
-
-              {/* Status bar */}
-              <div className="absolute bottom-0 left-0 right-0 px-3 py-2 flex items-center justify-between border-t border-[var(--border)]">
-                <span className="eg-mono-sm text-[var(--gray-600)]">
-                  {stage === "ready" ? "STANDBY" : "ACTIVE"}
-                </span>
-                <span className="eg-mono-sm text-[var(--gray-700)]">
-                  {Math.round(progress * 100)}%
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom — terminal */}
-          <div className="absolute right-6 sm:right-10 lg:right-16 bottom-6 z-20 w-[280px] sm:w-[360px] pointer-events-none">
-            <SystemTerminal stage={stage} />
-          </div>
-
-          {/* Scroll hint */}
-          {!initialized && (
-            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2">
-              <div className="w-px h-8 bg-[var(--gray-700)]" />
-              <span className="eg-mono-sm text-[var(--gray-600)]">SCROLL</span>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* ============================
-          SECTION 1 — THE PROBLEM
-          ============================ */}
+      {/* Hero Section */}
+
+      <section className="relative min-h-[80vh] overflow-hidden bg-[var(--bg-light)]">
+        <div className="max-w-7xl mx-auto px-6 py-12 sm:py-20">
+          <div className="text-center">
+            {/* Eyebrow */}
+            <p className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider mb-4">
+              EXAM ENTRY / IDENTITY / SECURITY
+            </p>
+
+            {/* Main Headline */}
+            <h1 className="eg-display font-bold text-[clamp(72px,10vw,180px)] text-[var(--black)] leading-[0.9] mb-6 capitalize">
+              ENTRY SHOULD BE
+              <span className="block">VERIFIED.</span>
+            </h1>
+
+            {/* Supporting Paragraph */}
+            <p className="eg-body text-base text-[var(--gray-55)] max-w-xl mx-auto mb-12">
+              An examination entry verification system connecting identity, hall-ticket, seating, evidence and attendance into one auditable workflow.
+            </p>
+
+            {/* Echo Stack + Verification Visual Container */}
+            <div className="absolute inset-0 pointer-events-none">
+              {/* Foreground text color */}
+              <p className="eg-display text-[var(--black)] absolute inset-0 transform -translate-y-1/2 top-1/2 -translate-x-1/2 opacity-20 capitalize">ENTRY SHOULD BE VERIFIED.</p>
+
+              {/* Background Echo Layers */}
+              <div className="absolute inset-0 overflow-hidden">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-2 bg-[var(--gray-20)] opacity-30" />
+                <div className="absolute top-1/4 left-1/3 -translate-x-1/3 -translate-y-1/4 w-16 h-1 bg-[var(--gray-30)] opacity-20" />
+                <div className="absolute bottom-1/3 right-1/2 -translate-x-1/2 -translate-y-1/3 w-20 h-1 bg-[var(--gray-40)] opacity-20" />
+              </div>
+            </div>
+
+            {/* Verification Visual */}
+            <div className="relative z-10 pt-16">
+              <div className="mx-auto w-24 h-24 rounded-full border-2 border-[var(--border)] flex items-center justify-center">
+                <div className="w-3/4 h-3/4 rounded-full bg-[var(--gray-20)] relative">
+                  <div className="absolute inset-0 animate-blink">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-[var(--gray-30)]" />
+                    <div className="absolute bottom-0 right-0 w-full h-1 bg-[var(--gray-30)]" />
+                  </div>
+                  <span className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider absolute inset-0 flex items-center justify-center">
+                    CAMERA
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section
+        className="py-24 sm:py-32 bg-[var(--bg-light)] border-t border-[var(--border)]"
+      >
+        <div className="max-w-7xl mx-auto px-6 sm:px-10">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <p className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider mb-4">
+                VERIFICATION PIPELINE
+              </p>
+              <h2 className="eg-display text-[2rem] sm:text-[2.5rem] md:text-[3rem] mb-6">
+                CAMERA → IDENTITY → LIVENESS → HALL TICKET → SEAT → EVIDENCE → DECISION
+              </h2>
+              <p className="eg-body text-sm sm:text-base text-[var(--gray-55)] leading-relaxed mb-8">
+                The seven-stage pipeline that governs every examination entry. Each stage
+                validates the evidence before progression. Human review remains available
+                at every step.
+              </p>
+<div className="grid grid-cols-2 gap-4 my-8">
+                <div
+                  key="CAMERA"
+                  className="bg-[var(--bg-raised)] p-4 rounded border border-[var(--border)] transition-colors duration-300 hover:border-[var(--border-strong)]"
+                >
+                  <span className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider block mb-2">CAMERA</span>
+                  <p className="eg-body text-sm text-[var(--gray-400)]">Stage 1 of 7</p>
+                </div>
+                <div
+                  key="IDENTITY"
+                  className="bg-[var(--bg-raised)] p-4 rounded border border-[var(--border)] transition-colors duration-300 hover:border-[var(--border-strong)]"
+                >
+                  <span className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider block mb-2">IDENTITY</span>
+                  <p className="eg-body text-sm text-[var(--gray-400)]">Stage 2 of 7</p>
+                </div>
+                <div
+                  key="LIVENESS"
+                  className="bg-[var(--bg-raised)] p-4 rounded border border-[var(--border)] transition-colors duration-300 hover:border-[var(--border-strong)]"
+                >
+                  <span className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider block mb-2">LIVENESS</span>
+                  <p className="eg-body text-sm text-[var(--gray-400)]">Stage 3 of 7</p>
+                </div>
+                <div
+                  key="HALL TICKET"
+                  className="bg-[var(--bg-raised)] p-4 rounded border border-[var(--border)] transition-colors duration-300 hover:border-[var(--border-strong)]"
+                >
+                  <span className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider block mb-2">HALL TICKET</span>
+                  <p className="eg-body text-sm text-[var(--gray-400)]">Stage 4 of 7</p>
+                </div>
+                <div
+                  key="SEAT"
+                  className="bg-[var(--bg-raised)] p-4 rounded border border-[var(--border)] transition-colors duration-300 hover:border-[var(--border-strong)]"
+                >
+                  <span className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider block mb-2">SEAT</span>
+                  <p className="eg-body text-sm text-[var(--gray-400)]">Stage 5 of 7</p>
+                </div>
+                <div
+                  key="EVIDENCE"
+                  className="bg-[var(--bg-raised)] p-4 rounded border border-[var(--border)] transition-colors duration-300 hover:border-[var(--border-strong)]"
+                >
+                  <span className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider block mb-2">EVIDENCE</span>
+                  <p className="eg-body text-sm text-[var(--gray-400)]">Stage 6 of 7</p>
+                </div>
+                <div
+                  key="DECISION"
+                  className="bg-[var(--bg-raised)] p-4 rounded border border-[var(--border)] transition-colors duration-300 hover:border-[var(--border-strong)]"
+                >
+                  <span className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider block mb-2">DECISION</span>
+                  <p className="eg-body text-sm text-[var(--gray-400)]">Stage 7 of 7</p>
+                </div>
+</div>
+              <div>
+                <button className="eg-btn eg-btn-sm uppercase tracking-wider px-4 py-2 text-[var(--gray-55)] border border-[var(--border)] rounded hover:border-[var(--white)] transition-colors duration-200">
+                  READY
+                </button>
+                <button className="eg-btn eg-btn-sm uppercase tracking-wider px-4 py-2 text-[var(--gray-55)] border border-[var(--border)] rounded hover:border-[var(--white)] transition-colors duration-200">
+                  DETECT
+                </button>
+                <button className="eg-btn eg-btn-sm uppercase tracking-wider px-4 py-2 text-[var(--gray-55)] border border-[var(--border)] rounded hover:border-[var(--white)] transition-colors duration-200">
+                  VERIFY
+                </button>
+                <button className="eg-btn eg-btn-sm uppercase tracking-wider px-4 py-2 text-[var(--gray-55)] border border-[var(--border)] rounded hover:border-[var(--white)] transition-colors duration-200">
+                  DECIDE
+                </button>
+                <button className="eg-btn eg-btn-sm uppercase tracking-wider px-4 py-2 text-[var(--gray-55)] border border-[var(--border)] rounded hover:border-[var(--white)] transition-colors duration-200">
+                  AUTHORIZE
+                </button>
+              </div>
+              <FaceGeometry phase="frame" className="opacity-60" />
+              <div className="mt-6 flex justify-center">
+                <div className="eg-progress-line" style={{ '--progress': '0%' }} />
+              </div>
+            </div>
+
+            <div></div>
+          </div>
+        </div>
+      </section>
+
+      {/* AI Perception */}
+      <section
+        className="py-24 sm:py-32 bg-[var(--bg-light)] border-t border-[var(--border)]"
+      >
+        <div className="max-w-4xl mx-auto px-6 sm:px-10">
+          <div className="text-center mb-12">
+            <p className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider mb-2">
+              AI AS PERCEPTION
+            </p>
+            <h2 className="eg-display text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
+              AI <span className="text-[var(--gray-400)]">NOT</span> AUTHORITY
+            </h2>
+            <p className="eg-body text-base sm:text-lg text-[var(--gray-55)] leading-relaxed max-w-xl mx-auto">
+              AI produces evidence. The system evaluates evidence. Human review remains
+              possible. The decision engine evaluates evidence against configurable
+              thresholds. Human override is always available.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-6 mt-12">
+            <div className="bg-[var(--bg-raised)] p-6 rounded border border-[var(--border)]">
+              <div className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider mb-3">AI</div>
+              <p className="eg-body text-sm text-[var(--gray-400)]">
+                Perceives biometric data. Outputs evidence package.
+              </p>
+            </div>
+            <div className="bg-[var(--bg-raised)] p-6 rounded border border-[var(--border)]">
+              <div className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider mb-3">EVidence</div>
+              <p className="eg-body text-sm text-[var(--gray-400)]">
+                Standardized format. Includes confidence metrics. No authorization claim.
+              </p>
+            </div>
+            <div className="bg-[var(--bg-raised)] p-6 rounded border border-[var(--border)]">
+              <div className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider mb-3">DECISION ENGINE</div>
+              <p className="eg-body text-sm text-[var(--gray-400)]">
+                Evaluates evidence. Applies thresholds. Supports human override.
+              </p>
+            </div>
+            <div className="bg-[var(--bg-raised)] p-6 rounded border border-[var(--border)]">
+              <div className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider mb-3">HUMAN REVIEW</div>
+              <p className="eg-body text-sm text-[var(--gray-400)]">
+                Always available. Can approve, reject, or request modification.
+                Full audit trail maintained.
+              </p>
+            </div>
+          </div>
+          <div className="mt-12 pt-8 border-t border-[var(--border)]">
+            <p className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider mb-3">
+              Every decision leaves a trail
+            </p>
+            <a href="/examination-sessions" className="eg-btn eg-btn-primary uppercase tracking-wider">
+              EXPLORE VERIFICATION FLOW
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Live Verification */}
+      <section
+        className="py-24 sm:py-32 bg-[var(--bg-light)] border-t border-[var(--border)]"
+      >
+        <div className="max-w-7xl mx-auto px-6 sm:px-10">
+          <div className="grid lg:grid-cols-2 gap-12">
+            <div>
+              <p className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider mb-4">
+                LIVE VERIFICATION
+              </p>
+<div className="grid grid-cols-3 gap-4 mb-8">
+                <div className="bg-[var(--bg-raised)] border border-[var(--border)] rounded p-4 text-center transition-colors duration-300">
+                  <span className="eg-mono text-[var(--gray-500)] text-[0.7rem] uppercase tracking-wider mb-2">ANALYZING</span>
+                  <p className="eg-body text-sm text-[var(--gray-400)]">In progress</p>
+                </div>
+                <div className="bg-[var(--bg-raised)] border border-[var(--border)] rounded p-4 text-center transition-colors duration-300">
+                  <span className="eg-mono text-[var(--gray-500)] text-[0.7rem] uppercase tracking-wider mb-2">COLLECTING</span>
+                  <p className="eg-body text-sm text-[var(--gray-400)]">In progress</p>
+                </div>
+                <div className="bg-[var(--bg-raised)] border border-[var(--border)] rounded p-4 text-center transition-colors duration-300">
+                  <span className="eg-mono text-[var(--gray-500)] text-[0.7rem] uppercase tracking-wider mb-2">VALIDATING</span>
+                  <p className="eg-body text-sm text-[var(--gray-400)]">In progress</p>
+                </div>
+                <div className="bg-[var(--bg-raised)] border border-[var(--border)] rounded p-4 text-center transition-colors duration-300">
+                  <span className="eg-mono text-[var(--gray-500)] text-[0.7rem] uppercase tracking-wider mb-2">PENDING</span>
+                  <p className="eg-body text-sm text-[var(--gray-400)]">In progress</p>
+                </div>
+                <div className="bg-[var(--bg-raised)] border border-[var(--border)] rounded p-4 text-center transition-colors duration-300">
+                  <span className="eg-mono text-[var(--gray-500)] text-[0.7rem] uppercase tracking-wider mb-2">REVIEW REQUIRED</span>
+                  <p className="eg-body text-sm text-[var(--gray-400)]">In progress</p>
+                </div>
+</div>
+              <div className="bg-[var(--bg-raised)] p-6 rounded border border-[var(--border)] mb-8">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="eg-mono text-[var(--gray-500)] text-xs uppercase tracking-wider block mb-2">EXAM SESSION</span>
+                    <p className="eg-body text-sm text-[var(--gray-500)]">BCA — End Semester</p>
+                  </div>
+                  <div>
+                    <span className="eg-mono text-[var(--gray-500)] text-xs uppercase tracking-wider block mb-2">ENTRY POINT</span>
+                    <p className="eg-body text-sm text-[var(--gray-500)]">GATE 02</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="eg-mono text-[var(--gray-500)] text-xs uppercase tracking-wider block mb-2">HALL TICKET</span>
+                    <p className="eg-body text-sm text-[var(--gray-500)]">VALIDATING</p>
+                  </div>
+                  <div>
+                    <span className="eg-mono text-[var(--gray-500)] text-xs uppercase tracking-wider block mb-2">SEAT ASSIGNED</span>
+                    <p className="eg-body text-sm text-[var(--gray-500)]">A-17</p>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                <div>
+                  <span className="eg-mono text-[var(--gray-500)] text-xs uppercase tracking-wider block mb-2">IDENTITY</span>
+                  <p className="eg-body text-sm text-[var(--gray-400)]">ANALYZING</p>
+                </div>
+                <div>
+                  <span className="eg-mono text-[var(--gray-500)] text-xs uppercase tracking-wider block mb-2">LIVENESS</span>
+                  <p className="eg-body text-sm text-[var(--gray-400)]">ANALYZING</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="eg-mono text-[var(--gray-500)] text-xs uppercase tracking-wider block mb-2">EVIDENCE</span>
+                  <p className="eg-body text-sm text-[var(--gray-400)]">COLLECTING</p>
+                </div>
+                <div>
+                  <span className="eg-mono text-[var(--gray-500)] text-xs uppercase tracking-wider block mb-2">DECISION</span>
+                  <p className="eg-body text-sm text-[var(--gray-400)]">PENDING</p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <p className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider mb-4">
+                RISK ASSESSMENT
+              </p>
+<div className="grid grid-cols-2 gap-3">
+                <div className="security-signal">
+                  <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">IDENTITY MISMATCH</span>
+                  <span className="eg-body text-xs text-[var(--gray-400)]">Identity mismatch detected</span>
+                </div>
+                <div className="security-signal">
+                  <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">WRONG HALL</span>
+                  <span className="eg-body text-xs text-[var(--gray-400)]">Candidate assigned to wrong hall</span>
+                </div>
+                <div className="security-signal">
+                  <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">LIVENESS SPOOF</span>
+                  <span className="eg-body text-xs text-[var(--gray-400)]">Liveness spoof detected</span>
+                </div>
+                <div className="security-signal">
+                  <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">WRONG ENTRY POINT</span>
+                  <span className="eg-body text-xs text-[var(--gray-400)]">Candidate entered through wrong gate</span>
+                </div>
+                <div className="security-signal">
+                  <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">REPEATED FAILED VERIFICATION</span>
+                  <span className="eg-body text-xs text-[var(--gray-400)]">Multiple failed verification attempts</span>
+                </div>
+</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Security Signals */}
+      <section
+        className="py-24 sm:py-32 bg-[var(--bg-light)] border-t border-[var(--border)]"
+      >
+        <div className="max-w-6xl mx-auto px-6 sm:px-10">
+          <div className="text-center mb-12">
+            <p className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider mb-2">
+              SECURITY SIGNALS
+            </p>
+            <h2 className="eg-display text-2xl sm:text-3xl font-semibold mb-4">
+              Every decision is guarded
+            </h2>
+          </div>
+<div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="security-signal" style={{ borderLeftColor: "#000" }}>
+                  <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">IDENTITY MISMATCH</span>
+                  <span className="eg-body text-xs text-[var(--gray-400)]">Identity mismatch detected</span>
+                </div>
+                <div className="security-signal" style={{ borderLeftColor: "#000" }}>
+                  <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">WRONG HALL</span>
+                  <span className="eg-body text-xs text-[var(--gray-400)]">Candidate assigned to wrong hall</span>
+                </div>
+                <div className="security-signal" style={{ borderLeftColor: "#555555" }}>
+                  <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">LIVENESS SPOOF</span>
+                  <span className="eg-body text-xs text-[var(--gray-400)]">Liveness spoof detected</span>
+                </div>
+                <div className="security-signal" style={{ borderLeftColor: "#555555" }}>
+                  <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">WRONG ENTRY POINT</span>
+                  <span className="eg-body text-xs text-[var(--gray-400)]">Candidate entered through wrong gate</span>
+                </div>
+                <div className="security-signal" style={{ borderLeftColor: "#555555" }}>
+                  <span className="eg-mono text-[var(--gray-500)] text-[0.6rem] uppercase tracking-wider block mb-1">REPEATED FAILED VERIFICATION</span>
+                  <span className="eg-body text-xs text-[var(--gray-400)]">Multiple failed verification attempts</span>
+                </div>
+</div>
+        </div>
+      </section>
+
+      {/* Admin Product */}
+      <section
+        className="py-24 sm:py-32 bg-[var(--bg-light)] border-t border-[var(--border)]"
+      >
+        <div className="max-w-7xl mx-auto px-6 sm:px-10">
+          <div className="text-center mb-12">
+            <p className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider mb-2">
+              EXAMINATION INTEGRITY
+            </p>
+            <h2 className="eg-display text-2xl sm:text-3xl font-semibold mb-4">
+              BUILT INTO EVERY ENTRY
+            </h2>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            <a href="/dashboard" className="eg-btn eg-btn-sm eg-btn-primary uppercase tracking-wider">
+              Dashboard
+            </a>
+            <a href="/exams" className="eg-btn eg-btn-sm uppercase tracking-wider text-[var(--gray-55)] hover:text-[var(--black)] transition-colors duration-200">
+              Exams
+            </a>
+            <a href="/examination-sessions" className="eg-btn eg-btn-sm uppercase tracking-wider text-[var(--gray-55)] hover:text-[var(--black)] transition-colors duration-200">
+              Sessions
+            </a>
+            <a href="/monitoring" className="eg-btn eg-btn-sm uppercase tracking-wider text-[var(--gray-55)] hover:text-[var(--black)] transition-colors duration-200">
+              Monitoring
+            </a>
+            <a href="/security-events" className="eg-btn eg-btn-sm uppercase tracking-wider text-[var(--gray-55)] hover:text-[var(--black)] transition-colors duration-200">
+              Security Events
+            </a>
+          </div>
+          <p className="mt-8 eg-mono text-[var(--gray-700)] text-xs uppercase tracking-wider">
+            EXAMINATION INTEGRITY, BUILT INTO EVERY ENTRY.
+          </p>
+        </div>
+      </section>
+
+      {/* The Problem */}
       <section className="bg-[var(--bg-surface)] border-t border-[var(--border)]">
         <div className="max-w-5xl mx-auto px-6 sm:px-10 py-24 sm:py-32">
           <div className="mb-16">
@@ -208,7 +425,6 @@ export default function Home() {
               AI without accountability creates new risks.
             </p>
           </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-[var(--border)]">
             {[
               { num: "01", title: "Identity Verification", desc: "Enrollment-time biometric binding. 1:N matching. Anti-spoofing liveness detection." },
@@ -226,14 +442,12 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ============================
-          SECTION 2 — ARCHITECTURE
-          ============================ */}
-      <section className="bg-[var(--bg-base)]">
+      {/* Architecture */}
+      <section className="bg-[var(--bg-surface)]">
         <div className="max-w-4xl mx-auto px-6 sm:px-10 py-24 sm:py-32">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
-              <p className="eg-mono-sm text-[var(--gray-500)] mb-4">ARCHITECTURE</p>
+              <p className="eg-mono text-[var(--gray-55)] text-xs uppercase tracking-wider mb-4">ARCHITECTURE</p>
               <h2 className="eg-display text-[1.8rem] sm:text-[2.2rem] md:text-[2.8rem] leading-tight mb-5">
                 AI as perception.
                 <br />
@@ -245,36 +459,49 @@ export default function Home() {
                 The decision engine evaluates evidence against configurable thresholds.
                 Human override is always available.
               </p>
-              <div className="space-y-3">
-                {["Provider-agnostic integration", "Evidence ≠ decision", "Configurable thresholds", "Full audit trail"].map((item, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className="w-1 h-px bg-[var(--gray-500)]" />
-                    <span className="eg-mono-sm text-[var(--gray-400)]">{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-px bg-[var(--border)]">
-              {[
-                { label: "ENTRY", desc: "Hall ticket + student context" },
-                { label: "LIVENESS", desc: "Anti-spoofing detection" },
-                { label: "DECISION", desc: "Evidence threshold evaluation" },
-                { label: "AUDIT", desc: "Full decision trail" },
-              ].map((layer) => (
-                <div key={layer.label} className="bg-[var(--bg-raised)] p-5 flex items-start gap-4">
-                  <span className="eg-mono-sm text-[var(--gray-500)] w-16 flex-shrink-0">{layer.label}</span>
-                  <span className="eg-body text-sm text-[var(--gray-400)]">{layer.desc}</span>
+<div className="space-y-3">
+                <div key="0" className="flex items-center gap-3">
+                  <div className="w-1 h-px bg-[var(--gray-500)]" />
+                  <span className="eg-mono-sm text-[var(--gray-400)]">Provider-agnostic integration</span>
                 </div>
-              ))}
-            </div>
+                <div key="1" className="flex items-center gap-3">
+                  <div className="w-1 h-px bg-[var(--gray-500)]" />
+                  <span className="eg-mono-sm text-[var(--gray-400)]">Evidence ≠ decision</span>
+                </div>
+                <div key="2" className="flex items-center gap-3">
+                  <div className="w-1 h-px bg-[var(--gray-500)]" />
+                  <span className="eg-mono-sm text-[var(--gray-400)]">Configurable thresholds</span>
+                </div>
+                <div key="3" className="flex items-center gap-3">
+                  <div className="w-1 h-px bg-[var(--gray-500)]" />
+                  <span className="eg-mono-sm text-[var(--gray-400)]">Full audit trail</span>
+                </div>
+</div>''',
+              </div>
+
+              <div className="space-y-px bg-[var(--border)]">
+                <div className="bg-[var(--bg-raised)] p-5 flex items-start gap-4">
+                  <span className="eg-mono-sm text-[var(--gray-500)] w-16 flex-shrink-0">ENTRY</span>
+                  <span className="eg-body text-sm text-[var(--gray-400)]">Hall ticket + student context</span>
+                </div>
+                <div className="bg-[var(--bg-raised)] p-5 flex items-start gap-4">
+                  <span className="eg-mono-sm text-[var(--gray-500)] w-16 flex-shrink-0">LIVENESS</span>
+                  <span className="eg-body text-sm text-[var(--gray-400)]">Anti-spoofing detection</span>
+                </div>
+                <div className="bg-[var(--bg-raised)] p-5 flex items-start gap-4">
+                  <span className="eg-mono-sm text-[var(--gray-500)] w-16 flex-shrink-0">DECISION</span>
+                  <span className="eg-body text-sm text-[var(--gray-400)]">Evidence threshold evaluation</span>
+                </div>
+                <div className="bg-[var(--bg-raised)] p-5 flex items-start gap-4">
+                  <span className="eg-mono-sm text-[var(--gray-500)] w-16 flex-shrink-0">AUDIT</span>
+                  <span className="eg-body text-sm text-[var(--gray-400)]">Full decision trail</span>
+                </div>
+</div>''',
           </div>
         </div>
       </section>
 
-      {/* ============================
-          SECTION 3 — PRINCIPLES
-          ============================ */}
+      {/* Principles */}
       <section className="bg-[var(--bg-surface)] border-t border-[var(--border)]">
         <div className="max-w-5xl mx-auto px-6 sm:px-10 py-24 sm:py-32">
           <div className="mb-12">
@@ -298,10 +525,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ============================
-          SECTION 4 — ROADMAP
-          ============================ */}
-      <section className="bg-[var(--bg-base)]">
+      {/* Roadmap */}
+      <section className="bg-[var(--bg-surface)]">
         <div className="max-w-3xl mx-auto px-6 sm:px-10 py-24 sm:py-32">
           <div className="mb-12">
             <p className="eg-mono-sm text-[var(--gray-500)] mb-4">DEVELOPMENT</p>
@@ -317,7 +542,7 @@ export default function Home() {
               { phase: "19–23", title: "Auth & Polish", desc: "Authentication, RBAC, performance, deployment", done: false },
             ].map((item) => (
               <div key={item.phase} className="bg-[var(--bg-raised)] p-5 flex items-start gap-5">
-                <span className="eg-mono-sm text-[var(--gray-600)] w-12 flex-shrink-0">{item.phase}</span>
+                <span className="eg-mono-sm text-[var(--gray-600)] w-10 flex-shrink-0">{item.phase}</span>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <h3 className="eg-display text-sm text-[var(--white)]">{item.title}</h3>
@@ -335,11 +560,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ============================
-          FOOTER
-          ============================ */}
+      {/* Footer */}
       <footer className="bg-[var(--bg-surface)] border-t border-[var(--border)]">
-        <div className="max-w-5xl mx-auto px-6 sm:px-10 py-12 sm:py-16">
+        <div className="max-w-7xl mx-auto px-6 sm:px-10 py-12 sm:py-16">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-8">
             <div className="col-span-2 sm:col-span-1">
               <div className="flex items-center gap-2 mb-3">
@@ -353,21 +576,6 @@ export default function Home() {
             <div>
               <h4 className="eg-mono-sm text-[var(--gray-500)] mb-3">SYSTEM</h4>
               <ul className="space-y-2">
-                {[
-                  { label: "Identity Verification", href: "/identity-verifications" },
-                  { label: "Exam Security", href: "/exams" },
-                  { label: "Admin Dashboard", href: "/dashboard" },
-                  { label: "Examination Sessions", href: "/examination-sessions" },
-                  { label: "Monitoring", href: "/monitoring" },
-                  { label: "Security Events", href: "/security-events" },
-                  { label: "Security Alerts", href: "/security-alerts" },
-                ].map((item) => (
-                  <li key={item.label}>
-                    <a href={item.href} className="eg-body text-xs text-[var(--gray-500)] hover:text-[var(--white)] transition-colors duration-200">
-                      {item.label}
-                    </a>
-                  </li>
-                ))}
               </ul>
             </div>
             <div>
@@ -395,14 +603,14 @@ export default function Home() {
                 <span className="eg-mono-sm text-[var(--gray-700)] block">v0.7.0</span>
               </div>
             </div>
-          </div>
-          <div className="mt-12 pt-6 border-t border-[var(--border)]">
-            <p className="eg-mono-sm text-[var(--gray-700)] text-center">
-              EXAMGUARD — AI-POWERED EXAMINATION INTEGRITY PLATFORM
-            </p>
+            <div>
+              <p className="eg-mono-sm text-[var(--gray-700)] text-center">
+                EXAMGUARD — AI-POWERED EXAMINATION INTEGRITY PLATFORM
+              </p>
+            </div>
           </div>
         </div>
       </footer>
     </>
   );
-}
+};

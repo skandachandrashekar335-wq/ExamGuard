@@ -44,9 +44,9 @@ class Settings(BaseSettings):
     MIN_OCR_CONFIDENCE: float = 60.0
 
     # Identity verification decision policy
-    # Threshold for similarity score: scores >= threshold → MATCH candidate
+    # Threshold for similarity score: scores >= threshold -> MATCH candidate
     IDENTITY_VERIFICATION_MATCH_THRESHOLD: float = 0.85
-    # Near-threshold zone: scores >= threshold * NEAR_THRESHOLD_FACTOR → INCONCLUSIVE
+    # Near-threshold zone: scores >= threshold * NEAR_THRESHOLD_FACTOR -> INCONCLUSIVE
     # Must be in range (0.0, 1.0]. Lower values widen the review zone.
     IDENTITY_VERIFICATION_NEAR_THRESHOLD_FACTOR: float = 0.7
     # Policy version identifier for audit trail
@@ -88,6 +88,22 @@ class Settings(BaseSettings):
     MONITORING_MAX_CONNECTIONS: int = 100
     MONITORING_HEARTBEAT_INTERVAL: int = 30
     MONITORING_STALE_TIMEOUT: int = 60
+
+    # Firebase Authentication configuration
+    # These values are read from environment variables:
+    #   FIREBASE_PROJECT_ID
+    #   FIREBASE_CLIENT_EMAIL (optional, for service account)
+    #   FIREBASE_CLIENT_ID (frontend web app client ID)
+    FIREBASE_PROJECT_ID: str | None = None
+    FIREBASE_CLIENT_EMAIL: str | None = None
+    FIREBASE_CLIENT_ID: str | None = None
+    FIREBASE_AUTH_DOMAIN: str | None = None
+
+    # Initial admin provisioning (for initial setup only)
+    # List of email addresses that should be granted ADMIN role on first provisioning.
+    # This is ONLY used when no ADMIN currently exists in the system.
+    # Once an admin exists, this setting is ignored on subsequent logins.
+    INITIAL_ADMIN_EMAILS: list[str] = []
 
     @model_validator(mode="after")
     def validate_decision_policy(self) -> "Settings":

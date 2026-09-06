@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.api.v1.router import router as v1_router
+from app.api.v1.auth import router as auth_router
 from app.core.config import get_settings
 from app.core.database import engine
 from app.services.monitoring.alert_buffer import AlertBuffer
@@ -29,6 +30,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    application.include_router(auth_router, prefix=f"{settings.API_V1_PREFIX}/auth")
     application.include_router(v1_router, prefix=settings.API_V1_PREFIX)
 
     # Initialize monitoring publisher
