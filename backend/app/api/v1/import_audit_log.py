@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.auth import Role, require_role
 from app.core.database import get_db
 from app.schemas.import_audit_log import (
     ImportAuditLogDetail,
@@ -27,6 +28,7 @@ def list_audit_logs(
         None, description="Filter by status"
     ),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.REVIEWER])),
 ):
     result = audit_service.list_audit_logs(
         db,
@@ -51,6 +53,7 @@ def list_audit_logs(
 def get_audit_log(
     audit_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.REVIEWER])),
 ):
     log = audit_service.get_audit_log(db, audit_id)
     if not log:

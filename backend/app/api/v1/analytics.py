@@ -6,6 +6,7 @@ Provides REST endpoints for all analytics services.
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.auth import Role, require_role
 from app.core.database import SessionLocal
 from app.services.analytics.attendance import (
     get_exam_summary,
@@ -51,6 +52,7 @@ router = APIRouter(prefix="/analytics", tags=["analytics"])
 def analytics_attendance_summary(
     exam_id: int,
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Get attendance summary for an exam."""
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
@@ -68,6 +70,7 @@ def analytics_attendance_list(
     page: int = Query(1),
     page_size: int = Query(20),
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """List attendance records for an exam with filters."""
     return list_attendance(db, exam_id, hall_id=hall_id, status=status,
@@ -80,6 +83,7 @@ def analytics_attendance_excused(
     page: int = Query(1),
     page_size: int = Query(20),
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """List excused attendance records for an exam."""
     return list_excused_attendance(db, exam_id, page=page, page_size=page_size)
@@ -90,6 +94,7 @@ def analytics_attendance_timeline(
     exam_id: int,
     days: int = Query(30),
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Get attendance timeline for an exam."""
     return attendance_timeline(db, exam_id, days=days)
@@ -100,6 +105,7 @@ def analytics_attendance_status_timeline(
     exam_id: int,
     days: int = Query(30),
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Get present/excused/absent breakdown by date."""
     return attendance_status_timeline(db, exam_id, days=days)
@@ -111,6 +117,7 @@ def analytics_attendance_export(
     status: str | None = Query(None),
     hall_id: int | None = Query(None),
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Export attendance data for an exam."""
     return export_exam_attendance(db, exam_id, status=status, hall_id=hall_id)
@@ -120,6 +127,7 @@ def analytics_attendance_export(
 def analytics_verification_summary(
     document_id: int,
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Get verification summary for a document."""
     return get_verification_summary(db, document_id)
@@ -129,6 +137,7 @@ def analytics_verification_summary(
 def analytics_verification_distribution(
     exam_id: int,
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Get verification decision distribution for an exam."""
     return get_exam_verification_distribution(db, exam_id)
@@ -138,6 +147,7 @@ def analytics_verification_distribution(
 def analytics_ocr_confidence_distribution(
     exam_id: int,
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Get OCR confidence distribution for an exam."""
     return get_ocr_confidence_distribution(db, exam_id)
@@ -147,6 +157,7 @@ def analytics_ocr_confidence_distribution(
 def analytics_match_status_distribution(
     exam_id: int,
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Get hall-ticket match status distribution for an exam."""
     return get_match_status_distribution(db, exam_id)
@@ -157,6 +168,7 @@ def analytics_decision_trend(
     exam_id: int | None = Query(None),
     days: int = Query(30),
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Get verification decision trend over time."""
     return get_decision_trend(db, exam_id, days=days)
@@ -166,6 +178,7 @@ def analytics_decision_trend(
 def analytics_verification_export(
     document_id: int,
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Export verification data for a document."""
     return export_document_verification(db, document_id)
@@ -175,6 +188,7 @@ def analytics_verification_export(
 def analytics_proxy_risk_average(
     exam_id: int,
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Get average risk score for an exam."""
     return get_average_risk_score(db, exam_id)
@@ -184,6 +198,7 @@ def analytics_proxy_risk_average(
 def analytics_proxy_risk_signal_types(
     exam_id: int,
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Get signal type counts for an exam."""
     return get_signal_type_counts(db, exam_id)
@@ -193,6 +208,7 @@ def analytics_proxy_risk_signal_types(
 def analytics_proxy_risk_strength_distribution(
     exam_id: int,
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Get signal strength distribution for an exam."""
     return get_signal_strength_distribution(db, exam_id)
@@ -202,6 +218,7 @@ def analytics_proxy_risk_strength_distribution(
 def analytics_proxy_risk_risk_levels(
     exam_id: int,
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Get risk level distribution for an exam."""
     return get_risk_level_distribution(db, exam_id)
@@ -211,6 +228,7 @@ def analytics_proxy_risk_risk_levels(
 def analytics_proxy_risk_breakdown(
     exam_id: int,
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Get per-signal-type breakdown for an exam."""
     return get_signal_breakdown_by_type(db, exam_id)
@@ -220,6 +238,7 @@ def analytics_proxy_risk_breakdown(
 def analytics_proxy_risk_export(
     exam_id: int,
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Export proxy risk data for an exam."""
     return export_exam_proxy_risk(db, exam_id)
@@ -229,6 +248,7 @@ def analytics_proxy_risk_export(
 def analytics_hall_utilization(
     exam_id: int,
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Get hall utilization for an exam."""
     return get_exam_hall_utilization(db, exam_id)
@@ -238,6 +258,7 @@ def analytics_hall_utilization(
 def analytics_hall_utilization_export(
     exam_id: int,
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Export hall utilization data for an exam."""
     return export_exam_hall_utilization(db, exam_id)
@@ -247,6 +268,7 @@ def analytics_hall_utilization_export(
 def analytics_exam_statistics(
     exam_id: int,
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Get comprehensive examination statistics."""
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
@@ -260,6 +282,7 @@ def analytics_exam_statistics_list(
     hall_id: int | None = Query(None),
     status: str | None = Query(None),
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """List examination statistics with filters."""
     return list_exam_statistics(db, hall_id=hall_id, status=status)
@@ -269,6 +292,7 @@ def analytics_exam_statistics_list(
 def analytics_department_statistics(
     department_filter: str | None = Query(None),
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Get department-level statistics across exams."""
     return get_department_statistics(db, department_filter=department_filter)
@@ -278,6 +302,7 @@ def analytics_department_statistics(
 def analytics_exam_report(
     exam_id: int,
     db: Session = Depends(SessionLocal),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Get comprehensive examination report."""
     exam = db.query(Exam).filter(Exam.id == exam_id).first()

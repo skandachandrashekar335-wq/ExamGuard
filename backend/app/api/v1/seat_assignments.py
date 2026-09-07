@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.auth import Role, require_role
 from app.core.database import get_db
 from app.schemas.seat_assignment import (
     SeatAssignmentCreate,
@@ -31,7 +32,11 @@ def _to_response(assignment) -> SeatAssignmentWithDetails:
     status_code=201,
     summary="Assign a seat to a registered student",
 )
-def create_assignment(data: SeatAssignmentCreate, db: Session = Depends(get_db)):
+def create_assignment(
+    data: SeatAssignmentCreate,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
     try:
         return seat_service.create_assignment(db, data)
     except LookupError as e:
@@ -50,6 +55,7 @@ def list_assignments(
     registration_id: int | None = Query(None, description="Filter by registration ID"),
     status: str | None = Query(None, description="Filter by status (ASSIGNED/CANCELLED)"),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     assignments, total = seat_service.list_assignments(
         db,
@@ -74,7 +80,11 @@ def list_assignments(
     response_model=SeatAssignmentWithDetails,
     summary="Get a seat assignment",
 )
-def get_assignment(assignment_id: int, db: Session = Depends(get_db)):
+def get_assignment(
+    assignment_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
+):
     assignment = seat_service.get_assignment(db, assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Seat assignment not found")
@@ -90,6 +100,7 @@ def update_assignment(
     assignment_id: int,
     data: SeatAssignmentUpdate,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     try:
         return seat_service.update_assignment(db, assignment_id, data.status)
@@ -104,7 +115,11 @@ def update_assignment(
     response_model=SeatAssignmentResponse,
     summary="Cancel a seat assignment (status → CANCELLED)",
 )
-def cancel_assignment(assignment_id: int, db: Session = Depends(get_db)):
+def cancel_assignment(
+    assignment_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
     try:
         return seat_service.cancel_assignment(db, assignment_id)
     except LookupError as e:

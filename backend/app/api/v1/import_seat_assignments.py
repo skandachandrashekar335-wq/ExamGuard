@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.auth import Role, require_role
 from app.core.database import get_db
 from app.schemas.import_seat_assignments import (
     BulkCancelSeatRequest,
@@ -22,6 +23,7 @@ router = APIRouter(prefix="/import", tags=["Import"])
 def bulk_assign_seats(
     data: BulkSeatAssignmentRequest,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     return import_service.bulk_assign_seats(db, data.exam_hall_id, data.assignments)
 
@@ -35,5 +37,6 @@ def bulk_assign_seats(
 def bulk_cancel_seat_assignments(
     data: BulkCancelSeatRequest,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     return import_service.bulk_cancel_assignments(db, data.assignment_ids)

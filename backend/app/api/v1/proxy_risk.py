@@ -15,6 +15,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.auth import Role, require_role
 from app.core.database import get_db
 from app.models.entry_verification import EntryVerification
 from app.models.proxy_risk import ProxyRiskAssessment, SecuritySignal
@@ -99,6 +100,7 @@ def _assessment_to_response(
 def detect_security_signals(
     entry_verification_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     """Run deterministic signal detection for an entry verification.
 
@@ -144,6 +146,7 @@ def list_security_signals(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Return security signals for an entry verification with pagination."""
     _get_entry_verification_or_404(db, entry_verification_id)
@@ -189,6 +192,7 @@ def list_security_signals(
 def assess_risk(
     entry_verification_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     """Create a new historical ProxyRiskAssessment for an entry verification.
 
@@ -252,6 +256,7 @@ def list_risk_assessments(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Return historical risk assessments in chronological order."""
     _get_entry_verification_or_404(db, entry_verification_id)
@@ -285,6 +290,7 @@ def list_risk_assessments(
 def get_latest_risk_assessment(
     entry_verification_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """Return the most recent persisted risk assessment.
 

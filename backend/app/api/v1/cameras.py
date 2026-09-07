@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.auth import Role, require_role
 from app.core.database import get_db
 from app.schemas.camera import (
     CameraCreate,
@@ -19,7 +20,11 @@ router = APIRouter(prefix="/cameras", tags=["Cameras"])
     status_code=201,
     summary="Create a new camera",
 )
-def create_camera(data: CameraCreate, db: Session = Depends(get_db)):
+def create_camera(
+    data: CameraCreate,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
     try:
         return camera_service.create_camera(db, data)
     except ValueError as e:
@@ -35,6 +40,7 @@ def list_cameras(
     status: str | None = Query(None, description="Filter by status"),
     include_inactive: bool = Query(False, description="Include deactivated cameras"),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     cameras, total = camera_service.list_cameras(
         db,
@@ -54,7 +60,11 @@ def list_cameras(
 
 
 @router.get("/{camera_id}", response_model=CameraResponse, summary="Get a camera")
-def get_camera(camera_id: int, db: Session = Depends(get_db)):
+def get_camera(
+    camera_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
+):
     camera = camera_service.get_camera(db, camera_id)
     if not camera:
         raise HTTPException(status_code=404, detail="Camera not found")
@@ -62,7 +72,12 @@ def get_camera(camera_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{camera_id}", response_model=CameraResponse, summary="Update a camera")
-def update_camera(camera_id: int, data: CameraUpdate, db: Session = Depends(get_db)):
+def update_camera(
+    camera_id: int,
+    data: CameraUpdate,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
     try:
         return camera_service.update_camera(db, camera_id, data)
     except LookupError as e:
@@ -76,7 +91,11 @@ def update_camera(camera_id: int, data: CameraUpdate, db: Session = Depends(get_
     response_model=CameraResponse,
     summary="Deactivate a camera (soft delete)",
 )
-def deactivate_camera(camera_id: int, db: Session = Depends(get_db)):
+def deactivate_camera(
+    camera_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
     try:
         return camera_service.deactivate_camera(db, camera_id)
     except LookupError as e:

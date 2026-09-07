@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.auth import Role, require_role
 from app.core.database import get_db
 from app.schemas.subject import (
     SubjectCreate,
@@ -19,7 +20,11 @@ router = APIRouter(prefix="/subjects", tags=["Subjects"])
     status_code=201,
     summary="Create a new subject",
 )
-def create_subject(data: SubjectCreate, db: Session = Depends(get_db)):
+def create_subject(
+    data: SubjectCreate,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
     try:
         return subject_service.create_subject(db, data)
     except ValueError as e:
@@ -35,6 +40,7 @@ def list_subjects(
     semester: int | None = Query(None, ge=1, le=8, description="Filter by semester"),
     include_inactive: bool = Query(False, description="Include deactivated subjects"),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     subjects, total = subject_service.list_subjects(
         db,
@@ -54,7 +60,11 @@ def list_subjects(
 
 
 @router.get("/{subject_id}", response_model=SubjectResponse, summary="Get a subject")
-def get_subject(subject_id: int, db: Session = Depends(get_db)):
+def get_subject(
+    subject_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
+):
     subject = subject_service.get_subject(db, subject_id)
     if not subject:
         raise HTTPException(status_code=404, detail="Subject not found")
@@ -62,7 +72,12 @@ def get_subject(subject_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{subject_id}", response_model=SubjectResponse, summary="Update a subject")
-def update_subject(subject_id: int, data: SubjectUpdate, db: Session = Depends(get_db)):
+def update_subject(
+    subject_id: int,
+    data: SubjectUpdate,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
     try:
         return subject_service.update_subject(db, subject_id, data)
     except LookupError as e:
@@ -76,7 +91,11 @@ def update_subject(subject_id: int, data: SubjectUpdate, db: Session = Depends(g
     response_model=SubjectResponse,
     summary="Deactivate a subject (soft delete)",
 )
-def deactivate_subject(subject_id: int, db: Session = Depends(get_db)):
+def deactivate_subject(
+    subject_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
     try:
         return subject_service.deactivate_subject(db, subject_id)
     except LookupError as e:

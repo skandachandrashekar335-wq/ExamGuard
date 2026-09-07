@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.auth import Role, require_role
 from app.core.database import get_db
 from app.schemas.exam_registration import (
     ExamRegistrationCreate,
@@ -30,7 +31,11 @@ def _to_response(reg) -> ExamRegistrationWithDetails:
     status_code=201,
     summary="Register a student for an exam",
 )
-def create_registration(data: ExamRegistrationCreate, db: Session = Depends(get_db)):
+def create_registration(
+    data: ExamRegistrationCreate,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
     try:
         return reg_service.create_registration(db, data)
     except LookupError as e:
@@ -47,6 +52,7 @@ def list_registrations(
     exam_id: int | None = Query(None, description="Filter by exam ID"),
     status: str | None = Query(None, description="Filter by status (REGISTERED/CANCELLED)"),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     registrations, total = reg_service.list_registrations(
         db,
@@ -69,7 +75,11 @@ def list_registrations(
     response_model=ExamRegistrationWithDetails,
     summary="Get a registration",
 )
-def get_registration(registration_id: int, db: Session = Depends(get_db)):
+def get_registration(
+    registration_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
+):
     reg = reg_service.get_registration(db, registration_id)
     if not reg:
         raise HTTPException(status_code=404, detail="Registration not found")
@@ -85,6 +95,7 @@ def update_registration(
     registration_id: int,
     data: ExamRegistrationUpdate,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     try:
         return reg_service.update_registration(db, registration_id, data.status)
@@ -99,7 +110,11 @@ def update_registration(
     response_model=ExamRegistrationResponse,
     summary="Cancel a registration (status -> CANCELLED)",
 )
-def cancel_registration(registration_id: int, db: Session = Depends(get_db)):
+def cancel_registration(
+    registration_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
     try:
         return reg_service.cancel_registration(db, registration_id)
     except LookupError as e:

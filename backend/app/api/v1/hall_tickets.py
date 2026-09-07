@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.auth import Role, require_role
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -39,6 +41,7 @@ class ApproveRejectRequest(BaseModel):
 )
 def create_hall_ticket(
     data: HallTicketCreate,
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
     db: Session = Depends(get_db),
 ):
     try:
@@ -59,6 +62,7 @@ def list_hall_tickets(
     page_size: int = Query(20, ge=1, le=100),
     exam_registration_id: int | None = Query(None, description="Filter by registration ID"),
     status: str | None = Query(None, description="Filter by status"),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
     db: Session = Depends(get_db),
 ):
     result = ht_service.list_hall_tickets(
@@ -88,6 +92,7 @@ def search_hall_tickets(
     exam_id: int | None = Query(None, description="Filter by exam ID"),
     status: str | None = Query(None, description="Filter by hall ticket status"),
     subject_code: str | None = Query(None, description="Filter by subject code"),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
     db: Session = Depends(get_db),
 ):
     result = ht_service.search_hall_tickets(
@@ -114,6 +119,7 @@ def search_hall_tickets(
 )
 def get_hall_ticket(
     hall_ticket_id: int,
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
     db: Session = Depends(get_db),
 ):
     ht = ht_service.get_hall_ticket(db, hall_ticket_id)
@@ -129,6 +135,7 @@ def get_hall_ticket(
 )
 def get_hall_ticket_detailed(
     hall_ticket_id: int,
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
     db: Session = Depends(get_db),
 ):
     ctx = ht_service.get_with_context(db, hall_ticket_id)
@@ -153,6 +160,7 @@ def get_hall_ticket_detailed(
 )
 def get_hall_ticket_by_registration(
     exam_registration_id: int,
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
     db: Session = Depends(get_db),
 ):
     ht = ht_service.get_hall_ticket_by_registration(db, exam_registration_id)
@@ -172,6 +180,7 @@ def get_hall_ticket_by_registration(
 def update_hall_ticket(
     hall_ticket_id: int,
     data: HallTicketUpdate,
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
     db: Session = Depends(get_db),
 ):
     try:
@@ -190,6 +199,7 @@ def update_hall_ticket(
 def link_document(
     hall_ticket_id: int,
     body: LinkDocumentRequest,
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
     db: Session = Depends(get_db),
 ):
     try:
@@ -208,6 +218,7 @@ def link_document(
 def approve_hall_ticket(
     hall_ticket_id: int,
     body: ApproveRejectRequest = ApproveRejectRequest(),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
     db: Session = Depends(get_db),
 ):
     try:
@@ -228,6 +239,7 @@ def approve_hall_ticket(
 def reject_hall_ticket(
     hall_ticket_id: int,
     body: ApproveRejectRequest,
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
     db: Session = Depends(get_db),
 ):
     if not body.reason:

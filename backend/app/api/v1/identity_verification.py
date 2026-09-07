@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
+from app.auth import Role, require_role
 from app.core.database import get_db
 from app.schemas.identity_verification import (
     IdentityVerificationContextResponse,
@@ -119,6 +120,7 @@ class VerifyFaceRequest(BaseModel):
 def create_attempt(
     data: IdentityVerificationCreate,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     try:
         return iv_service.create_attempt(db, data)
@@ -143,6 +145,7 @@ def list_attempts(
     status: str | None = Query(None, description="Filter by status"),
     decision: str | None = Query(None, description="Filter by decision"),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     result = iv_service.list_attempts(
         db,
@@ -171,6 +174,7 @@ def list_attempts(
 def get_attempt(
     attempt_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     attempt = iv_service.get_attempt(db, attempt_id)
     if not attempt:
@@ -199,6 +203,7 @@ def get_attempt(
 def get_attempt_context(
     attempt_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     ctx = iv_service.get_attempt_with_context(db, attempt_id)
     if not ctx:
@@ -227,6 +232,7 @@ def get_attempt_context(
 def start_attempt(
     attempt_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     try:
         return iv_service.start_attempt(db, attempt_id)
@@ -246,6 +252,7 @@ def record_evidence(
     attempt_id: int,
     data: IdentityVerificationEvidenceCreate,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     try:
         return iv_service.record_evidence(db, attempt_id, data)
@@ -265,6 +272,7 @@ def verify_face(
     attempt_id: int,
     body: VerifyFaceRequest,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     """Run face verification and persist evidence signals.
 
@@ -356,6 +364,7 @@ def complete_attempt(
     attempt_id: int,
     body: CompleteRequest,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     try:
         return iv_service.complete_attempt(
@@ -376,6 +385,7 @@ def complete_attempt(
 def evaluate_and_complete(
     attempt_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     attempt = iv_service.get_attempt(db, attempt_id)
     if not attempt:
@@ -413,6 +423,7 @@ def fail_attempt(
     attempt_id: int,
     body: FailRequest,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     try:
         return iv_service.fail_attempt(db, attempt_id, reason=body.reason)
@@ -431,6 +442,7 @@ def cancel_attempt(
     attempt_id: int,
     body: CancelRequest = CancelRequest(),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     try:
         return iv_service.cancel_attempt(db, attempt_id, reason=body.reason)
@@ -449,6 +461,7 @@ def review_attempt(
     attempt_id: int,
     body: ReviewRequest = ReviewRequest(),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     """Mark a verification attempt as under human review.
 
@@ -474,6 +487,7 @@ def override_decision(
     attempt_id: int,
     body: OverrideRequest,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     """Override the decision of a completed/failed verification attempt.
 

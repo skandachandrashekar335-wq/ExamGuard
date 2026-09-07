@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
+from app.auth import Role, require_role
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.schemas.document import DocumentListResponse, DocumentResponse
@@ -35,6 +36,7 @@ async def upload_document(
     file: UploadFile = File(...),
     document_type: str = Query(..., description="Document type (e.g. HALL_TICKET)"),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     if not file.filename:
         raise HTTPException(status_code=422, detail="No filename provided")
@@ -59,6 +61,7 @@ def list_documents(
     page_size: int = Query(20, ge=1, le=100),
     document_type: str | None = Query(None, description="Filter by document type"),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     documents, total = doc_service.list_documents(
         db, page=page, page_size=page_size, doc_type=document_type
@@ -72,7 +75,11 @@ def list_documents(
 
 
 @router.get("/{document_id}", response_model=DocumentResponse, summary="Get document metadata")
-def get_document(document_id: int, db: Session = Depends(get_db)):
+def get_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
+):
     document = doc_service.get_document(db, document_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -84,7 +91,11 @@ def get_document(document_id: int, db: Session = Depends(get_db)):
     response_model=ProcessDocumentResponse,
     summary="Process a document through OCR and extraction",
 )
-def process_document(document_id: int, db: Session = Depends(get_db)):
+def process_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
     try:
         result = processing.process_document(db, document_id)
     except LookupError as e:
@@ -113,7 +124,11 @@ def process_document(document_id: int, db: Session = Depends(get_db)):
     response_model=ExtractionResultResponse,
     summary="Get extraction results for a document",
 )
-def get_extraction(document_id: int, db: Session = Depends(get_db)):
+def get_extraction(
+    document_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
+):
     result = processing.get_extraction_result(db, document_id)
     if not result:
         raise HTTPException(status_code=404, detail="No extraction results found for this document")
@@ -152,7 +167,11 @@ def get_extraction(document_id: int, db: Session = Depends(get_db)):
     response_model=ReviewDataResponse,
     summary="Get review data for a document's extraction",
 )
-def get_review(document_id: int, db: Session = Depends(get_db)):
+def get_review(
+    document_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
+):
     try:
         data = extraction_review.get_review_data(db, document_id)
     except LookupError as e:
@@ -199,6 +218,7 @@ def correct_field(
     field_id: int,
     body: ReviewFieldRequest,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     try:
         field = extraction_review.correct_field(
@@ -227,7 +247,11 @@ def correct_field(
     response_model=CompleteReviewResponse,
     summary="Mark extraction as fully reviewed",
 )
-def complete_review(document_id: int, db: Session = Depends(get_db)):
+def complete_review(
+    document_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
     try:
         result = extraction_review.complete_review(db, document_id)
     except LookupError as e:
@@ -253,7 +277,11 @@ def complete_review(document_id: int, db: Session = Depends(get_db)):
     status_code=201,
     summary="Match a hall ticket against domain records",
 )
-def match_hall_ticket(document_id: int, db: Session = Depends(get_db)):
+def match_hall_ticket(
+    document_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
     try:
         result = hall_ticket_matching.match_hall_ticket(db, document_id)
     except LookupError as e:
@@ -303,7 +331,11 @@ def match_hall_ticket(document_id: int, db: Session = Depends(get_db)):
     response_model=HallTicketMatchResultResponse,
     summary="Get the latest matching result for a document",
 )
-def get_match_result(document_id: int, db: Session = Depends(get_db)):
+def get_match_result(
+    document_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
+):
     result = hall_ticket_matching.get_latest_match_result(db, document_id)
     if not result:
         raise HTTPException(
@@ -353,7 +385,11 @@ def get_match_result(document_id: int, db: Session = Depends(get_db)):
     response_model=VerificationSummaryResponse,
     summary="Get verification readiness summary for a document",
 )
-def get_verification_summary(document_id: int, db: Session = Depends(get_db)):
+def get_verification_summary(
+    document_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
+):
     try:
         data = verification.get_verification_summary(db, document_id)
     except LookupError as e:
@@ -368,7 +404,11 @@ def get_verification_summary(document_id: int, db: Session = Depends(get_db)):
     status_code=201,
     summary="Run verification and produce an auditable outcome",
 )
-def run_verification(document_id: int, db: Session = Depends(get_db)):
+def run_verification(
+    document_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
     try:
         outcome = verification.run_verification(db, document_id)
     except LookupError as e:
@@ -398,7 +438,11 @@ def run_verification(document_id: int, db: Session = Depends(get_db)):
     response_model=VerificationOutcomeResponse,
     summary="Get the latest verification outcome for a document",
 )
-def get_verification_outcome(document_id: int, db: Session = Depends(get_db)):
+def get_verification_outcome(
+    document_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
+):
     outcome = verification.get_latest_outcome(db, document_id)
     if not outcome:
         raise HTTPException(

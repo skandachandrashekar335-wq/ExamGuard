@@ -9,6 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.auth import Role, require_role
 from app.core.database import get_db
 from app.schemas.security_event import (
     SecurityEventListResponse,
@@ -41,6 +42,7 @@ def list_security_events(
     ),
     source: str | None = Query(None, description="Filter by source"),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ) -> SecurityEventListResponse:
     result = svc.list_security_events(
         db,
@@ -66,6 +68,7 @@ def list_security_events(
 def get_security_event(
     event_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ) -> SecurityEventResponse:
     try:
         event = svc.get_security_event(db, event_id)

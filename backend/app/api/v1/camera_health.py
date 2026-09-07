@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.auth import Role, require_role
 from app.core.database import get_db
 from app.schemas.camera_health import HealthObservationCreate, HealthResponse
 from app.services import camera_health
@@ -14,7 +15,11 @@ router = APIRouter(prefix="/cameras", tags=["Camera Health"])
     response_model=HealthResponse,
     summary="Get camera health status",
 )
-def get_camera_health(camera_id: int, db: Session = Depends(get_db)):
+def get_camera_health(
+    camera_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
+):
     camera = camera_health.get_camera_health(db, camera_id)
     if not camera:
         raise HTTPException(status_code=404, detail="Camera not found")
@@ -38,6 +43,7 @@ def record_health_observation(
     camera_id: int,
     data: HealthObservationCreate,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     try:
         # Capture previous status before the observation

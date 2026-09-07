@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.auth import Role, require_role
 from app.core.database import get_db
 from app.schemas.camera_entry_point import (
     CameraEntryPointMappingCreate,
@@ -19,7 +20,11 @@ router = APIRouter(prefix="/camera-entry-points", tags=["Camera Entry Points"])
     status_code=201,
     summary="Create a camera-to-entry-point mapping",
 )
-def create_mapping(data: CameraEntryPointMappingCreate, db: Session = Depends(get_db)):
+def create_mapping(
+    data: CameraEntryPointMappingCreate,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
     try:
         return mapping_service.create_mapping(db, data)
     except ValueError as e:
@@ -34,6 +39,7 @@ def list_mappings(
     entry_point_id: int | None = Query(None, description="Filter by entry point"),
     include_disabled: bool = Query(False, description="Include disabled mappings"),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     mappings, total = mapping_service.list_mappings(
         db,
@@ -52,7 +58,11 @@ def list_mappings(
 
 
 @router.get("/{mapping_id}", response_model=CameraEntryPointMappingResponse, summary="Get a mapping")
-def get_mapping(mapping_id: int, db: Session = Depends(get_db)):
+def get_mapping(
+    mapping_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
+):
     mapping = mapping_service.get_mapping(db, mapping_id)
     if not mapping:
         raise HTTPException(status_code=404, detail="Mapping not found")
@@ -60,7 +70,12 @@ def get_mapping(mapping_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{mapping_id}", response_model=CameraEntryPointMappingResponse, summary="Update a mapping")
-def update_mapping(mapping_id: int, data: CameraEntryPointMappingUpdate, db: Session = Depends(get_db)):
+def update_mapping(
+    mapping_id: int,
+    data: CameraEntryPointMappingUpdate,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
     try:
         return mapping_service.update_mapping(db, mapping_id, data)
     except LookupError as e:
@@ -72,7 +87,11 @@ def update_mapping(mapping_id: int, data: CameraEntryPointMappingUpdate, db: Ses
     response_model=CameraEntryPointMappingResponse,
     summary="Disable a mapping (soft delete)",
 )
-def deactivate_mapping(mapping_id: int, db: Session = Depends(get_db)):
+def deactivate_mapping(
+    mapping_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
     try:
         return mapping_service.deactivate_mapping(db, mapping_id)
     except LookupError as e:

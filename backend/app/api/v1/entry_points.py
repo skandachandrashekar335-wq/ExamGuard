@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.auth import Role, require_role
 from app.core.database import get_db
 from app.schemas.entry_point import (
     EntryPointCreate,
@@ -19,7 +20,11 @@ router = APIRouter(prefix="/entry-points", tags=["Entry Points"])
     status_code=201,
     summary="Create a new entry point",
 )
-def create_entry_point(data: EntryPointCreate, db: Session = Depends(get_db)):
+def create_entry_point(
+    data: EntryPointCreate,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
     try:
         return entry_point_service.create_entry_point(db, data)
     except ValueError as e:
@@ -34,6 +39,7 @@ def list_entry_points(
     exam_hall_id: int | None = Query(None, description="Filter by exam hall"),
     include_inactive: bool = Query(False, description="Include deactivated entry points"),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     entry_points, total = entry_point_service.list_entry_points(
         db,
@@ -52,7 +58,11 @@ def list_entry_points(
 
 
 @router.get("/{entry_point_id}", response_model=EntryPointResponse, summary="Get an entry point")
-def get_entry_point(entry_point_id: int, db: Session = Depends(get_db)):
+def get_entry_point(
+    entry_point_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
+):
     entry_point = entry_point_service.get_entry_point(db, entry_point_id)
     if not entry_point:
         raise HTTPException(status_code=404, detail="Entry point not found")
@@ -60,7 +70,12 @@ def get_entry_point(entry_point_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{entry_point_id}", response_model=EntryPointResponse, summary="Update an entry point")
-def update_entry_point(entry_point_id: int, data: EntryPointUpdate, db: Session = Depends(get_db)):
+def update_entry_point(
+    entry_point_id: int,
+    data: EntryPointUpdate,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
     try:
         return entry_point_service.update_entry_point(db, entry_point_id, data)
     except LookupError as e:
@@ -74,7 +89,11 @@ def update_entry_point(entry_point_id: int, data: EntryPointUpdate, db: Session 
     response_model=EntryPointResponse,
     summary="Deactivate an entry point (soft delete)",
 )
-def deactivate_entry_point(entry_point_id: int, db: Session = Depends(get_db)):
+def deactivate_entry_point(
+    entry_point_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
     try:
         return entry_point_service.deactivate_entry_point(db, entry_point_id)
     except LookupError as e:
