@@ -28,3 +28,4 @@ from app.models.proxy_risk import SecuritySignal, ProxyRiskAssessment  # noqa: E
 from app.models.attendance import AttendanceRecord, AttendanceEvent  # noqa: E402, F401
 from app.models.security_event import SecurityEvent, SecurityAlert  # noqa: E402, F401
 from app.models.examination_session import ExaminationSession, GateEvent  # noqa: E402, F401
+from app.models.invigilator_assignment import InvigilatorAssignment  # noqa: E402, F401

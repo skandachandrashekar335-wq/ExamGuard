@@ -173,7 +173,12 @@ async def firebase_token_exchange(
     # Token expires in 30 minutes (existing architecture)
     expires_delta = timedelta(minutes=30)
     examguard_token = create_access_token(
-        data={"sub": str(user.id), "role": user.role}
+        data={
+            "sub": str(user.id),
+            "role": user.role,
+            "email": user.email,
+            "full_name": user.full_name,
+        }
     )
 
     return {

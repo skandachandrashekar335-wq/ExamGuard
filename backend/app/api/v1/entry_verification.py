@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.auth import Role, require_role
 from app.core.database import get_db
 from app.schemas.entry_verification import (
     EntryVerificationCreate,
@@ -39,6 +40,7 @@ class IdentityCheckRequest(BaseModel):
 def create_entry_verification(
     data: EntryVerificationCreate,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ):
     try:
         ev = ev_service.create_entry_verification(
@@ -74,6 +76,7 @@ def list_entry_verifications(
     entry_point_id: int | None = Query(None, description="Filter by entry point ID"),
     student_id: int | None = Query(None, description="Filter by student ID"),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     result = ev_service.list_entry_verifications(
         db,
@@ -101,6 +104,7 @@ def list_entry_verifications(
 def get_entry_verification(
     entry_verification_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     ev = ev_service.get_entry_verification(db, entry_verification_id)
     if not ev:
@@ -118,6 +122,7 @@ def get_entry_verification(
 def begin_processing(
     entry_verification_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ):
     try:
         ev = ev_service.begin_processing(db, entry_verification_id)
@@ -137,6 +142,7 @@ def begin_processing(
 def process_hall_ticket_check(
     entry_verification_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ):
     try:
         return ev_service.process_hall_ticket_check(db, entry_verification_id)
@@ -154,6 +160,7 @@ def process_hall_ticket_check(
 def process_seat_check(
     entry_verification_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ):
     try:
         return ev_service.process_seat_check(db, entry_verification_id)
@@ -172,6 +179,7 @@ def process_identity_check(
     entry_verification_id: int,
     body: IdentityCheckRequest = IdentityCheckRequest(),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ):
     try:
         return ev_service.process_identity_check(
@@ -193,10 +201,10 @@ def process_identity_check(
 def evaluate_entry(
     entry_verification_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ):
     try:
         ev = ev_service.evaluate_entry(db, entry_verification_id)
-        # Publish the appropriate event based on the decision
         if ev.status == "GRANTED":
             publish_entry_granted(
                 entry_verification_id=ev.id,
@@ -238,6 +246,7 @@ def escalate_for_review(
     entry_verification_id: int,
     body: EscalateRequest,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ):
     try:
         ev = ev_service.escalate_for_review(
@@ -267,6 +276,7 @@ def resolve_escalation(
     entry_verification_id: int,
     body: ResolveRequest,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     try:
         ev = ev_service.resolve_escalation(

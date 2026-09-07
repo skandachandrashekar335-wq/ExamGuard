@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.auth import Role, require_role
 from app.core.database import get_db
 from app.schemas.student import (
     StudentCreate,
@@ -19,7 +20,8 @@ router = APIRouter(prefix="/students", tags=["Students"])
     status_code=201,
     summary="Create a new student",
 )
-def create_student(data: StudentCreate, db: Session = Depends(get_db)):
+def create_student(data: StudentCreate, db: Session = Depends(get_db),
+                   _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR]))):
     try:
         return student_service.create_student(db, data)
     except ValueError as e:
@@ -33,6 +35,7 @@ def list_students(
     search: str | None = Query(None, description="Search by USN or name"),
     include_inactive: bool = Query(False, description="Include deactivated students"),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.REVIEWER])),
 ):
     students, total = student_service.list_students(
         db, page=page, page_size=page_size, search=search, include_inactive=include_inactive
@@ -46,7 +49,8 @@ def list_students(
 
 
 @router.get("/{student_id}", response_model=StudentResponse, summary="Get a student")
-def get_student(student_id: int, db: Session = Depends(get_db)):
+def get_student(student_id: int, db: Session = Depends(get_db),
+               _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.REVIEWER]))):
     student = student_service.get_student(db, student_id)
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
@@ -54,7 +58,8 @@ def get_student(student_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{student_id}", response_model=StudentResponse, summary="Update a student")
-def update_student(student_id: int, data: StudentUpdate, db: Session = Depends(get_db)):
+def update_student(student_id: int, data: StudentUpdate, db: Session = Depends(get_db),
+                  _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR]))):
     try:
         return student_service.update_student(db, student_id, data)
     except LookupError as e:
@@ -68,7 +73,8 @@ def update_student(student_id: int, data: StudentUpdate, db: Session = Depends(g
     response_model=StudentResponse,
     summary="Deactivate a student (soft delete)",
 )
-def deactivate_student(student_id: int, db: Session = Depends(get_db)):
+def deactivate_student(student_id: int, db: Session = Depends(get_db),
+                      _user: dict = Depends(require_role([Role.ADMIN]))):
     try:
         return student_service.deactivate_student(db, student_id)
     except LookupError as e:

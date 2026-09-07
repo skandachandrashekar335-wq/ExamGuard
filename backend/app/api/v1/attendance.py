@@ -13,6 +13,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.auth import Role, require_role
 from app.core.database import get_db
 from app.schemas.attendance import (
     AttendanceCorrectionRequest,
@@ -47,6 +48,7 @@ router = APIRouter(prefix="/attendance", tags=["Attendance"])
 def record_attendance(
     entry_verification_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ):
     """Record attendance from a resolved EntryVerification.
 
@@ -92,6 +94,7 @@ def list_exam_attendance(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """List attendance records for an exam with optional filters."""
     result = att_service.list_attendance(
@@ -126,6 +129,7 @@ def list_exam_attendance(
 def get_exam_summary(
     exam_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ):
     """Get attendance summary with by-hall breakdown."""
     try:
@@ -156,6 +160,7 @@ def get_exam_summary(
 def get_registration_attendance(
     exam_registration_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.REVIEWER])),
 ):
     """Return the current AttendanceRecord for a registration.
 
@@ -185,6 +190,7 @@ def correct_attendance(
     exam_registration_id: int,
     body: AttendanceCorrectionRequest,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     """Manually set attendance for a registration.
 
@@ -230,6 +236,7 @@ def list_student_attendance(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.REVIEWER])),
 ):
     """List attendance records for a student across exams."""
     try:
@@ -267,6 +274,7 @@ def list_entry_events(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """List attendance events for an entry verification with pagination."""
     result = att_service.get_entry_events(

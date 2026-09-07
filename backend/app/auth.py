@@ -6,6 +6,7 @@ utilities. All auth logic is server-side; no credentials in frontend code.
 Role hierarchy:
 - ADMIN: Full access to all admin operations and routes
 - OPERATOR: Can operate within designated domains (exams, students, halls)
+- INVIGILATOR: Assigned to specific exam/hall/entry-point, operational access
 - REVIEWER: Can review and verify, but not administer
 
 Token-based authentication using HS256 with secret from environment.
@@ -16,6 +17,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 import jwt
 
+from fastapi import Depends, HTTPException, status, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -23,21 +27,14 @@ SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
+_bearer_scheme = HTTPBearer(auto_error=False)
+
 
 def create_access_token(
     data: dict,
     expires_delta: Optional[timedelta] = None,
 ) -> str:
-    """Create a JWT access token.
-
-    Args:
-        data: Claims to encode in the token.
-        expires_delta: Optional timedelta for token expiration.
-            Defaults to ACCESS_TOKEN_EXPIRE_MINUTES.
-
-    Returns:
-        Encoded JWT string.
-    """
+    """Create a JWT access token."""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
@@ -53,14 +50,7 @@ def create_access_token(
 def decode_token(
     token: str,
 ) -> Optional[Dict[str, Any]]:
-    """Decode and validate a JWT token.
-
-    Args:
-        token: The JWT string to decode.
-
-    Returns:
-        Dict of claims if valid, None if invalid/expired.
-    """
+    """Decode and validate a JWT token."""
     try:
         claims = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return claims
@@ -74,143 +64,81 @@ def decode_token(
 class Role:
     ADMIN = "ADMIN"
     OPERATOR = "OPERATOR"
+    INVIGILATOR = "INVIGILATOR"
     REVIEWER = "REVIEWER"
 
 
-# Role permissions: which routes/resources each role can access
-PERMISSIONS: Dict[str, List[str]] = {
-    Role.ADMIN:
-        [
-            # Admin operations
-            "api:admin:*",
-            # Full access to all endpoints
-            "GET,POST,PUT,DELETE",
-        ],
-    Role.OPERATOR:
-        [
-            # Operator can manage exams, students, halls, etc.
-            "api:exams:*",
-            "api:students:*",
-            "api:exam_halls:*",
-            "api:seat_assignments:*",
-            "api:entry_verifications:*",
-            "api:verification:*",
-            "api:proxy_risk:*",
-            # Can view but not administer
-            "GET api:users:*",
-            "GET api:roles:*",
-            "GET api:permissions:*",
-        ],
-    Role.REVIEWER:
-        [
-            # Reviewer can view and verify
-            "api:entry_verifications:GET",
-            "api:verification:GET",
-            "api:proxy_risk:GET",
-            "api:attendance:GET",
-            # Cannot administer
-            "POST,PUT,DELETE denied",
-        ],
-}
-
-
-def has_permission(role: str, permission: str) -> bool:
-    """Check if a role has the given permission.
-
-    Args:
-        role: The role string (Role.ADMIN, Role.OPERATOR, Role.REVIEWER).
-        permission: The permission string to check.
-
-    Returns:
-        True if the role has the permission, False otherwise.
-    """
-    role_perms = PERMISSIONS.get(role, [])
-    # Check if the permission matches
-    if permission in role_perms:
-        return True
-    # Wildcard match: api:resource:action
-    if permission.endswith("*"):
-        prefix = permission.rstrip("*")
-        return any(p.startswith(prefix) for p in role_perms)
-    return False
+ALL_ROLES = [Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER]
 
 
 def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+) -> Dict[str, Any]:
+    """FastAPI dependency: extract and validate the current user from JWT.
+
+    Returns the decoded JWT claims dict with at least 'sub' and 'role'.
+    Raises 401 if token is missing, expired, or invalid.
+    """
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authentication token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    claims = decode_token(credentials.credentials)
+    if claims is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if "role" not in claims or "sub" not in claims:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token missing required claims",
+        )
+
+    return claims
+
+
+def require_role(allowed_roles: List[str]):
+    """Dependency factory: require the current user to have one of the given roles.
+
+    Usage:
+        @router.get("/admin-only")
+        def admin_endpoint(user = Depends(require_role([Role.ADMIN]))):
+            ...
+    """
+    def _check(current_user: Dict[str, Any] = Depends(get_current_user)):
+        user_role = current_user.get("role")
+        if user_role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Insufficient role: {user_role}. Required: {allowed_roles}",
+            )
+        return current_user
+    return _check
+
+
+def require_any_role(allowed_roles: List[str]):
+    """Same as require_role — allows access if user has ANY of the given roles."""
+    return require_role(allowed_roles)
+
+
+# ---- Legacy compatibility (unused by routes, kept for non-route callers) ----
+
+def get_current_user_raw(
     authorization: str | None = None,
 ) -> Optional[Dict[str, Any]]:
-    """Extract the current user from a Bearer JWT token.
-
-    Args:
-        authorization: The Authorization header value (e.g. "Bearer <token>").
-
-    Returns:
-        Dict of JWT claims if valid, None if missing or invalid.
-    """
+    """Legacy standalone function. Prefer get_current_user dependency."""
     if not authorization or not authorization.startswith("Bearer "):
         return None
     token = authorization[7:].strip()
     claims = decode_token(token)
     if claims is None:
         return None
-    # Ensure required claims exist
     if "role" not in claims or "sub" not in claims:
         return None
     return claims
-
-
-def require_role(allowed_roles: List[str]):
-    """Decorator factory for FastAPI endpoints that checks role membership.
-
-    Args:
-        allowed_roles: List of role strings that are allowed to access the endpoint.
-
-    Returns:
-        Depends function that raises HTTP 401 if unauthenticated,
-        HTTP 403 if authenticated but unauthorized.
-    """
-    from fastapi import HTTPException, status, Request
-
-    def dependency(request: Request,
-                   current_user: dict = ...):  # type: ignore
-        # If no user, authentication is required via 401
-        if current_user is None or current_user.get("role") is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required",
-            )
-        if current_user.get("role") not in allowed_roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient role: {current_user.get('role')}",
-            )
-        return current_user
-
-    return dependency
-
-
-def require_any_role(allowed_roles: List[str]):
-    """Decorator factory that allows access if the user has ANY of the given roles.
-
-    Args:
-        allowed_roles: List of role strings that are allowed.
-
-    Returns:
-        Depends function.
-    """
-    from fastapi import HTTPException, status, Request
-
-    def dependency(request: Request,
-                 current_user: dict = ...):  # type: ignore
-        if current_user is None or current_user.get("role") is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required",
-            )
-        if current_user.get("role") not in allowed_roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient role: {current_user.get('role')}",
-            )
-        return current_user
-
-    return dependency

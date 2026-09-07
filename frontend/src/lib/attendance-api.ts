@@ -63,95 +63,44 @@ export interface AttendanceCorrectionRequest {
   recorded_by: string;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API}${path}`, init);
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new ApiError(res.status, body.detail || "Request failed");
-  }
-  return res.json();
-}
-
-export class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = "ApiError";
-  }
-}
+import { apiRequest, qs } from "./api";
+export { ApiError } from "./api";
 
 export async function listExamAttendance(
   examId: number,
-  params: {
-    hall_id?: number;
-    status?: string;
-    page?: number;
-    page_size?: number;
-  } = {},
+  params: { hall_id?: number; status?: string; page?: number; page_size?: number } = {},
 ): Promise<AttendanceListResponse> {
-  const sp = new URLSearchParams();
-  if (params.hall_id) sp.set("hall_id", String(params.hall_id));
-  if (params.status) sp.set("status", params.status);
-  if (params.page) sp.set("page", String(params.page));
-  if (params.page_size) sp.set("page_size", String(params.page_size));
-  const qs = sp.toString();
-  return request(`/api/v1/attendance/exams/${examId}${qs ? `?${qs}` : ""}`);
+  return apiRequest(`/api/v1/attendance/exams/${examId}${qs(params)}`);
 }
 
-export async function getAttendanceSummary(
-  examId: number,
-): Promise<AttendanceSummaryResponse> {
-  return request(`/api/v1/attendance/exams/${examId}/summary`);
+export async function getAttendanceSummary(examId: number): Promise<AttendanceSummaryResponse> {
+  return apiRequest(`/api/v1/attendance/exams/${examId}/summary`);
 }
 
-export async function getRegistrationAttendance(
-  examRegistrationId: number,
-): Promise<AttendanceRecord> {
-  return request(
-    `/api/v1/attendance/registrations/${examRegistrationId}`,
-  );
+export async function getRegistrationAttendance(examRegistrationId: number): Promise<AttendanceRecord> {
+  return apiRequest(`/api/v1/attendance/registrations/${examRegistrationId}`);
 }
 
 export async function correctAttendance(
   examRegistrationId: number,
   data: AttendanceCorrectionRequest,
 ): Promise<AttendanceRecord> {
-  return request(
-    `/api/v1/attendance/registrations/${examRegistrationId}/correct`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    },
-  );
+  return apiRequest(`/api/v1/attendance/registrations/${examRegistrationId}/correct`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 }
 
 export async function listStudentAttendance(
   studentId: number,
   params: { page?: number; page_size?: number } = {},
 ): Promise<AttendanceListResponse> {
-  const sp = new URLSearchParams();
-  if (params.page) sp.set("page", String(params.page));
-  if (params.page_size) sp.set("page_size", String(params.page_size));
-  const qs = sp.toString();
-  return request(
-    `/api/v1/attendance/students/${studentId}${qs ? `?${qs}` : ""}`,
-  );
+  return apiRequest(`/api/v1/attendance/students/${studentId}${qs(params)}`);
 }
 
 export async function listEntryEvents(
   entryVerificationId: number,
   params: { page?: number; page_size?: number } = {},
 ): Promise<AttendanceEventListResponse> {
-  const sp = new URLSearchParams();
-  if (params.page) sp.set("page", String(params.page));
-  if (params.page_size) sp.set("page_size", String(params.page_size));
-  const qs = sp.toString();
-  return request(
-    `/api/v1/attendance/events/${entryVerificationId}${qs ? `?${qs}` : ""}`,
-  );
+  return apiRequest(`/api/v1/attendance/events/${entryVerificationId}${qs(params)}`);
 }

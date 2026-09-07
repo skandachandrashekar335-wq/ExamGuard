@@ -1,27 +1,5 @@
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API}${path}`, init);
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new ApiError(res.status, body.detail || "Request failed");
-  }
-  return res.json();
-}
-
-export class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = "ApiError";
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+import { apiRequest, qs } from "./api";
+export { ApiError } from "./api";
 
 export type EventType =
   | "ENTRY_CREATED"
@@ -41,13 +19,7 @@ export type EventType =
   | "CAMERA_OFFLINE"
   | "HEARTBEAT";
 
-export type EventCategory =
-  | "ENTRY"
-  | "RISK"
-  | "ATTENDANCE"
-  | "CAMERA"
-  | "SYSTEM";
-
+export type EventCategory = "ENTRY" | "RISK" | "ATTENDANCE" | "CAMERA" | "SYSTEM";
 export type EventSeverity = "INFO" | "WARNING" | "CRITICAL";
 
 export interface MonitoringEvent {
@@ -104,50 +76,24 @@ export interface MonitoringAlertListResponse {
   count: number;
 }
 
-// ---------------------------------------------------------------------------
-// Sensitive field filtering
-// ---------------------------------------------------------------------------
-
 const SENSITIVE_KEYS = new Set([
-  "face_image",
-  "face_images",
-  "face_embeddings",
-  "biometric_data",
-  "biometric_payload",
-  "provider_credentials",
-  "device_credentials",
-  "api_key",
-  "api_keys",
-  "secret",
-  "secrets",
-  "password",
-  "token",
-  "raw_ocr",
-  "ocr_payload",
-  "database_url",
-  "filesystem_path",
-  "stack_trace",
-  "traceback",
+  "face_image", "face_images", "face_embeddings", "biometric_data",
+  "biometric_payload", "provider_credentials", "device_credentials",
+  "api_key", "api_keys", "secret", "secrets", "password", "token",
+  "raw_ocr", "ocr_payload", "database_url", "filesystem_path",
+  "stack_trace", "traceback",
 ]);
 
-export function safePayload(
-  payload: Record<string, unknown>,
-): Record<string, unknown> {
+export function safePayload(payload: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(payload)) {
-    if (!SENSITIVE_KEYS.has(k.toLowerCase())) {
-      out[k] = v;
-    }
+    if (!SENSITIVE_KEYS.has(k.toLowerCase())) out[k] = v;
   }
   return out;
 }
 
-// ---------------------------------------------------------------------------
-// API functions
-// ---------------------------------------------------------------------------
-
 export async function getMonitoringStatus(): Promise<MonitoringStatus> {
-  return request("/api/v1/monitoring/status");
+  return apiRequest("/api/v1/monitoring/status");
 }
 
 export async function getMonitoringEvents(params: {
@@ -158,15 +104,7 @@ export async function getMonitoringEvents(params: {
   exam_id?: number;
   hall_id?: number;
 }): Promise<MonitoringEventListResponse> {
-  const sp = new URLSearchParams();
-  if (params.limit) sp.set("limit", String(params.limit));
-  if (params.category) sp.set("category", params.category);
-  if (params.event_type) sp.set("event_type", params.event_type);
-  if (params.min_severity) sp.set("min_severity", params.min_severity);
-  if (params.exam_id) sp.set("exam_id", String(params.exam_id));
-  if (params.hall_id) sp.set("hall_id", String(params.hall_id));
-  const qs = sp.toString();
-  return request(`/api/v1/monitoring/events${qs ? `?${qs}` : ""}`);
+  return apiRequest(`/api/v1/monitoring/events${qs(params)}`);
 }
 
 export async function getMonitoringAlerts(params: {
@@ -176,16 +114,9 @@ export async function getMonitoringAlerts(params: {
   exam_id?: number;
   hall_id?: number;
 }): Promise<MonitoringAlertListResponse> {
-  const sp = new URLSearchParams();
-  if (params.limit) sp.set("limit", String(params.limit));
-  if (params.severity) sp.set("severity", params.severity);
-  if (params.event_type) sp.set("event_type", params.event_type);
-  if (params.exam_id) sp.set("exam_id", String(params.exam_id));
-  if (params.hall_id) sp.set("hall_id", String(params.hall_id));
-  const qs = sp.toString();
-  return request(`/api/v1/monitoring/alerts${qs ? `?${qs}` : ""}`);
+  return apiRequest(`/api/v1/monitoring/alerts${qs(params)}`);
 }
 
 export async function getMonitoringConnections(): Promise<MonitoringConnectionStatus> {
-  return request("/api/v1/monitoring/connections");
+  return apiRequest("/api/v1/monitoring/connections");
 }

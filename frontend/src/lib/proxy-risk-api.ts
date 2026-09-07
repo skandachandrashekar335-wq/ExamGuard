@@ -34,31 +34,11 @@ export interface ProxyRiskAssessmentListResponse {
   page_size: number;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { apiRequest, qs } from "./api";
+export { ApiError } from "./api";
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API}${path}`, init);
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new ApiError(res.status, body.detail || "Request failed");
-  }
-  return res.json();
-}
-
-export class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = "ApiError";
-  }
-}
-
-export async function detectSignals(
-  entryVerificationId: number,
-): Promise<SecuritySignal[]> {
-  return request(`/api/v1/entry-verifications/${entryVerificationId}/risk/signals/detect`, {
+export async function detectSignals(entryVerificationId: number): Promise<SecuritySignal[]> {
+  return apiRequest(`/api/v1/entry-verifications/${entryVerificationId}/risk/signals/detect`, {
     method: "POST",
   });
 }
@@ -67,17 +47,11 @@ export async function listSignals(
   entryVerificationId: number,
   params?: { page?: number; page_size?: number },
 ): Promise<SecuritySignalListResponse> {
-  const sp = new URLSearchParams();
-  if (params?.page) sp.set("page", String(params.page));
-  if (params?.page_size) sp.set("page_size", String(params.page_size));
-  const qs = sp.toString();
-  return request(`/api/v1/entry-verifications/${entryVerificationId}/risk/signals${qs ? `?${qs}` : ""}`);
+  return apiRequest(`/api/v1/entry-verifications/${entryVerificationId}/risk/signals${qs(params || {})}`);
 }
 
-export async function assessRisk(
-  entryVerificationId: number,
-): Promise<ProxyRiskAssessment> {
-  return request(`/api/v1/entry-verifications/${entryVerificationId}/risk/assess`, {
+export async function assessRisk(entryVerificationId: number): Promise<ProxyRiskAssessment> {
+  return apiRequest(`/api/v1/entry-verifications/${entryVerificationId}/risk/assess`, {
     method: "POST",
   });
 }
@@ -86,15 +60,9 @@ export async function listAssessments(
   entryVerificationId: number,
   params?: { page?: number; page_size?: number },
 ): Promise<ProxyRiskAssessmentListResponse> {
-  const sp = new URLSearchParams();
-  if (params?.page) sp.set("page", String(params.page));
-  if (params?.page_size) sp.set("page_size", String(params.page_size));
-  const qs = sp.toString();
-  return request(`/api/v1/entry-verifications/${entryVerificationId}/risk/assessments${qs ? `?${qs}` : ""}`);
+  return apiRequest(`/api/v1/entry-verifications/${entryVerificationId}/risk/assessments${qs(params || {})}`);
 }
 
-export async function getLatestAssessment(
-  entryVerificationId: number,
-): Promise<ProxyRiskAssessment> {
-  return request(`/api/v1/entry-verifications/${entryVerificationId}/risk`);
+export async function getLatestAssessment(entryVerificationId: number): Promise<ProxyRiskAssessment> {
+  return apiRequest(`/api/v1/entry-verifications/${entryVerificationId}/risk`);
 }

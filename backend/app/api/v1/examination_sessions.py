@@ -1,7 +1,7 @@
 """Examination Session REST API (Phase 15).
 
 Endpoints for managing examination session lifecycle, gate operations,
-and session summaries.
+and session summaries. Auth enforced: OPERATOR+ for mutations, any authenticated for reads.
 """
 
 from __future__ import annotations
@@ -9,6 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.auth import Role, require_role
 from app.core.database import get_db
 from app.schemas.examination_session import (
     EndSessionRequest,
@@ -41,6 +42,7 @@ def list_sessions(
     exam_hall_id: int | None = Query(None),
     status: str | None = Query(None),
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ) -> ExaminationSessionListResponse:
     result = svc.list_examination_sessions(
         db,
@@ -58,7 +60,10 @@ def list_sessions(
     response_model=ExaminationSessionSummary,
     summary="Get session summary",
 )
-def get_summary(db: Session = Depends(get_db)) -> ExaminationSessionSummary:
+def get_summary(
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+) -> ExaminationSessionSummary:
     return ExaminationSessionSummary(**svc.get_session_summary(db))
 
 
@@ -70,6 +75,7 @@ def get_summary(db: Session = Depends(get_db)) -> ExaminationSessionSummary:
 def get_session(
     session_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ) -> ExaminationSessionResponse:
     try:
         return svc.get_examination_session(db, session_id)
@@ -86,6 +92,7 @@ def get_session(
 def create_session(
     body: ExaminationSessionCreate,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ) -> ExaminationSessionResponse:
     return svc.create_examination_session(
         db,
@@ -106,6 +113,7 @@ def start_session(
     session_id: int,
     body: StartSessionRequest,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ) -> ExaminationSessionResponse:
     try:
         return svc.start_session(db, session_id, performed_by=body.performed_by)
@@ -124,6 +132,7 @@ def end_session(
     session_id: int,
     body: EndSessionRequest,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ) -> ExaminationSessionResponse:
     try:
         return svc.end_session(db, session_id, performed_by=body.performed_by)
@@ -142,6 +151,7 @@ def cancel_session(
     session_id: int,
     body: GateOperationRequest,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ) -> ExaminationSessionResponse:
     try:
         return svc.cancel_session(
@@ -164,6 +174,7 @@ def close_gates(
     session_id: int,
     body: GateOperationRequest,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ) -> ExaminationSessionResponse:
     try:
         return svc.close_gates(
@@ -186,6 +197,7 @@ def open_gates(
     session_id: int,
     body: GateOperationRequest,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ) -> ExaminationSessionResponse:
     try:
         return svc.open_gates(
@@ -207,6 +219,7 @@ def open_gates(
 def list_gate_events(
     session_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ) -> GateEventListResponse:
     try:
         return GateEventListResponse(**svc.list_gate_events(db, session_id))

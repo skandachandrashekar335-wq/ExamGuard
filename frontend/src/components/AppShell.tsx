@@ -36,6 +36,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "EXAM DAY",
     links: [
+      { href: "/invigilator", label: "Invigilator" },
       { href: "/examination-sessions", label: "Sessions" },
       { href: "/verify", label: "Verify Entry" },
       { href: "/monitoring", label: "Monitoring" },

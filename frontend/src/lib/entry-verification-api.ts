@@ -32,26 +32,8 @@ export interface EntryVerificationCreate {
   hall_ticket_id?: number | null;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API}${path}`, init);
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new ApiError(res.status, body.detail || "Request failed");
-  }
-  return res.json();
-}
-
-export class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = "ApiError";
-  }
-}
+import { apiRequest, qs } from "./api";
+export { ApiError } from "./api";
 
 export async function listEntryVerifications(params: {
   page?: number;
@@ -60,81 +42,54 @@ export async function listEntryVerifications(params: {
   entry_point_id?: string;
   student_id?: string;
 }): Promise<EntryVerificationListResponse> {
-  const sp = new URLSearchParams();
-  if (params.page) sp.set("page", String(params.page));
-  if (params.page_size) sp.set("page_size", String(params.page_size));
-  if (params.status) sp.set("status", params.status);
-  if (params.entry_point_id) sp.set("entry_point_id", params.entry_point_id);
-  if (params.student_id) sp.set("student_id", params.student_id);
-  return request(`/api/v1/entry-verifications?${sp}`);
+  return apiRequest(`/api/v1/entry-verifications${qs(params)}`);
 }
 
-export async function getEntryVerification(
-  id: number,
-): Promise<EntryVerification> {
-  return request(`/api/v1/entry-verifications/${id}`);
+export async function getEntryVerification(id: number): Promise<EntryVerification> {
+  return apiRequest(`/api/v1/entry-verifications/${id}`);
 }
 
 export async function createEntryVerification(
   data: EntryVerificationCreate,
 ): Promise<EntryVerification> {
-  return request("/api/v1/entry-verifications", {
+  return apiRequest("/api/v1/entry-verifications", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
 }
 
-export async function beginEntryVerification(
-  id: number,
-): Promise<EntryVerification> {
-  return request(`/api/v1/entry-verifications/${id}/begin`, {
-    method: "POST",
-  });
+export async function beginEntryVerification(id: number): Promise<EntryVerification> {
+  return apiRequest(`/api/v1/entry-verifications/${id}/begin`, { method: "POST" });
 }
 
-export async function processHallTicketCheck(
-  id: number,
-): Promise<EntryVerification> {
-  return request(`/api/v1/entry-verifications/${id}/hall-ticket-check`, {
-    method: "POST",
-  });
+export async function processHallTicketCheck(id: number): Promise<EntryVerification> {
+  return apiRequest(`/api/v1/entry-verifications/${id}/hall-ticket-check`, { method: "POST" });
 }
 
-export async function processSeatCheck(
-  id: number,
-): Promise<EntryVerification> {
-  return request(`/api/v1/entry-verifications/${id}/seat-check`, {
-    method: "POST",
-  });
+export async function processSeatCheck(id: number): Promise<EntryVerification> {
+  return apiRequest(`/api/v1/entry-verifications/${id}/seat-check`, { method: "POST" });
 }
 
 export async function processIdentityCheck(
   id: number,
   identityAttemptId?: number | null,
 ): Promise<EntryVerification> {
-  return request(`/api/v1/entry-verifications/${id}/identity-check`, {
+  return apiRequest(`/api/v1/entry-verifications/${id}/identity-check`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ identity_attempt_id: identityAttemptId ?? null }),
   });
 }
 
-export async function evaluateEntryVerification(
-  id: number,
-): Promise<EntryVerification> {
-  return request(`/api/v1/entry-verifications/${id}/evaluate`, {
-    method: "POST",
-  });
+export async function evaluateEntryVerification(id: number): Promise<EntryVerification> {
+  return apiRequest(`/api/v1/entry-verifications/${id}/evaluate`, { method: "POST" });
 }
 
 export async function escalateEntryVerification(
   id: number,
   reason: string,
 ): Promise<EntryVerification> {
-  return request(`/api/v1/entry-verifications/${id}/escalate`, {
+  return apiRequest(`/api/v1/entry-verifications/${id}/escalate`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ reason }),
   });
 }
@@ -144,9 +99,8 @@ export async function resolveEntryVerification(
   granted: boolean,
   reason?: string,
 ): Promise<EntryVerification> {
-  return request(`/api/v1/entry-verifications/${id}/resolve`, {
+  return apiRequest(`/api/v1/entry-verifications/${id}/resolve`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ granted, reason: reason ?? null }),
   });
 }
