@@ -7,6 +7,7 @@ import {
   type AttendanceSummaryResponse,
 } from "@/lib/attendance-api";
 import AppShell from "@/components/AppShell";
+import { apiRequest, qs } from "@/lib/api";
 
 interface Exam {
   id: number;
@@ -44,12 +45,9 @@ export default function AttendancePage() {
     setLoading(true);
     setError("");
     try {
-      const params = new URLSearchParams({
-        page: String(page),
-        page_size: String(pageSize),
-      });
-      const res = await fetch(`${API}/api/v1/exams?${params}`);
-      const data: ExamListResponse = await res.json();
+      const data = await apiRequest<ExamListResponse>(
+        `/api/v1/exams${qs({ page, page_size: pageSize })}`
+      );
       setExams(data.items);
       setTotal(data.total);
 

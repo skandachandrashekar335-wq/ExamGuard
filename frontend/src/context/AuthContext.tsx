@@ -29,14 +29,12 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import {
   signInWithPopup,
   signOut as firebaseSignOut,
-  getCurrentIdToken,
-  isAuthenticated,
-  getUserDisplayName,
   exchangeFirebaseForExamGuard,
   onAuthStateChangedCallback,
   auth,
   googleProvider,
 } from "../lib/firebase";
+import { setTokenGetter } from "../lib/api";
 
 // Types for the auth context state
 export type UserRole = "ADMIN" | "OPERATOR" | "REVIEWER";
@@ -55,6 +53,7 @@ export interface AuthState {
   user: AuthUser | null;
   loading: boolean;
   firebaseIdToken: string | null;
+  examGuardToken: string | null;
   requiresOnboarding: boolean;
   displayName: string;
   isAuthenticated: boolean;
@@ -67,6 +66,7 @@ const AuthStateDefault: AuthState = {
   user: null,
   loading: true,
   firebaseIdToken: null,
+  examGuardToken: null,
   requiresOnboarding: true,
   displayName: "Guest",
   isAuthenticated: false,
@@ -112,6 +112,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
                 user,
                 loading: false,
                 firebaseIdToken: idToken,
+                examGuardToken: result.token,
                 requiresOnboarding: result.requires_onboarding,
                 displayName: result.user.email
                   ? `${result.user.full_name || ""} (${result.user.email})`
@@ -128,6 +129,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
                 user: null,
                 loading: false,
                 firebaseIdToken: idToken ?? null,
+                examGuardToken: null,
                 requiresOnboarding: true,
                 displayName: "User",
                 isAuthenticated: false,
@@ -143,6 +145,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
                 user: null,
                 loading: false,
                 firebaseIdToken: null,
+                examGuardToken: null,
                 requiresOnboarding: true,
                 displayName: "Guest",
                 isAuthenticated: false,
@@ -156,6 +159,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
                 user: null,
                 loading: false,
                 firebaseIdToken: null,
+                examGuardToken: null,
                 requiresOnboarding: true,
                 displayName: "Guest",
                 isAuthenticated: false,
@@ -198,6 +202,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         user: authUser,
         loading: false,
         firebaseIdToken: idToken,
+        examGuardToken: exchangeResult.token,
         requiresOnboarding: exchangeResult.requires_onboarding,
         displayName: authUser.email
           ? `${authUser.full_name || ""} (${authUser.email})`
@@ -226,6 +231,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         user: null,
         loading: false,
         firebaseIdToken: null,
+        examGuardToken: null,
         requiresOnboarding: true,
         displayName: "Guest",
         isAuthenticated: false,
@@ -239,6 +245,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         user: null,
         loading: false,
         firebaseIdToken: null,
+        examGuardToken: null,
         requiresOnboarding: true,
         displayName: "Guest",
         isAuthenticated: false,
@@ -248,12 +255,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
+  // Initialize API client with token getter
+  useEffect(() => {
+    setTokenGetter(() => authState.examGuardToken);
+  }, [authState.examGuardToken]);
+
   return (
     <AuthContext
       value={{
         user: authState.user,
         loading: authState.loading,
         firebaseIdToken: authState.firebaseIdToken,
+        examGuardToken: authState.examGuardToken,
         requiresOnboarding: authState.requiresOnboarding,
         displayName: authState.displayName,
         isAuthenticated: authState.isAuthenticated,

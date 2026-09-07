@@ -74,6 +74,8 @@ interface BatchResult {
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+import { apiRequest, qs } from "@/lib/api";
+
 const STATUS_BADGE: Record<string, string> = {
   VERIFIED: "eg-badge-success",
   FAILED: "eg-badge-danger",
@@ -105,15 +107,13 @@ export default function DashboardPage() {
     if (!selectedExamId) { setDashboard(null); return; }
     setLoading(true);
     setError("");
-    fetch(`${API}/api/v1/exams/${selectedExamId}/dashboard`)
-      .then((r) => { if (!r.ok) throw new Error("Failed to load dashboard"); return r.json(); })
-      .then((data: DashboardData) => { setDashboard(data); setLoading(false); })
+    apiRequest<DashboardData>(`/api/v1/exams/${selectedExamId}/dashboard`)
+      .then((data) => { setDashboard(data); setLoading(false); })
       .catch((e) => { setError(e.message); setLoading(false); });
   }, [selectedExamId]);
 
   useEffect(() => {
-    fetch(`${API}/api/v1/exams?page=1&page_size=100`)
-      .then((r) => r.json())
+    apiRequest<{ items: ExamListItem[] }>("/api/v1/exams?page=1&page_size=100")
       .then((data) => setExams(data.items || []))
       .catch(() => setError("Failed to load exams"));
   }, []);
@@ -144,13 +144,10 @@ export default function DashboardPage() {
     setError("");
     setBatchResult(null);
     try {
-      const res = await fetch(`${API}/api/v1/documents/batch-verify`, {
+      const data = await apiRequest<BatchResult>("/api/v1/documents/batch-verify", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ document_ids: Array.from(selectedDocs) }),
       });
-      if (!res.ok) throw new Error("Batch verification failed");
-      const data: BatchResult = await res.json();
       setBatchResult(data);
       setSelectedDocs(new Set());
       fetchDashboard();
