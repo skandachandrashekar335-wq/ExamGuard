@@ -14,13 +14,7 @@ import {
   type ExaminationSession,
   type GateEvent,
 } from "@/lib/session-api";
-
-function statusClass(s: string): string {
-  if (s === "IN_PROGRESS") return "text-white font-bold";
-  if (s === "NOT_STARTED") return "text-[var(--gray-300)]";
-  if (s === "COMPLETED") return "text-[var(--text-muted)]";
-  return "text-[var(--text-muted)]";
-}
+import AppShell from "@/components/AppShell";
 
 export default function SessionDetailPage() {
   const params = useParams();
@@ -67,49 +61,59 @@ export default function SessionDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] p-8">
-        <div className="max-w-4xl mx-auto">
-          <span className="eg-mono text-[var(--text-muted)]">Loading...</span>
+      <AppShell>
+        <div className="eg-page">
+          <div className="eg-page-header">
+            <span className="eg-mono text-[var(--text-muted)]">Loading...</span>
+          </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] p-8">
-        <div className="max-w-4xl mx-auto">
-          <span className="eg-mono text-[var(--text-muted)]">Session not found</span>
+      <AppShell>
+        <div className="eg-page">
+          <div className="eg-page-header">
+            <span className="eg-mono text-[var(--text-muted)]">Session not found</span>
+          </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] p-8">
-      <div className="max-w-4xl mx-auto">
-        <Link
-          href="/examination-sessions"
-          className="eg-mono-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] mb-8 inline-block"
-        >
-          &larr; SESSIONS
-        </Link>
-
-        <div className="flex items-baseline gap-4 mb-2">
-          <h1 className="eg-display text-3xl">SESSION #{session.id}</h1>
-          <span className={`eg-mono-sm ${statusClass(session.status)}`}>
-            {session.status}
-          </span>
+    <AppShell>
+      <div className="eg-page">
+        <div className="eg-page-header">
+          <Link href="/examination-sessions" className="eg-breadcrumb">
+            ← SESSIONS
+          </Link>
+          <div className="flex items-baseline gap-4">
+            <h1 className="eg-page-title">SESSION #{session.id}</h1>
+            <span
+              className={`eg-badge ${
+                session.status === "IN_PROGRESS"
+                  ? "eg-badge-success"
+                  : session.status === "COMPLETED"
+                    ? "eg-badge-neutral"
+                    : "eg-badge-info"
+              }`}
+            >
+              {session.status}
+            </span>
+          </div>
         </div>
 
         {error && (
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-4 mb-6">
+          <div className="glass-surface p-4 mb-6">
             <span className="eg-mono text-[var(--text-muted)]">{error}</span>
           </div>
         )}
 
         {/* Session Info */}
-        <div className="border border-white/[0.06] bg-[var(--bg-surface)] p-4 mb-6">
+        <div className="glass-surface p-4 mb-6">
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="eg-mono-sm text-[var(--text-muted)]">EXAM ID</span>
@@ -149,7 +153,7 @@ export default function SessionDetailPage() {
         </div>
 
         {/* Actions */}
-        <div className="border border-white/[0.06] bg-[var(--bg-surface)] p-4 mb-6">
+        <div className="glass-surface p-4 mb-6">
           <div className="eg-mono-sm text-[var(--text-muted)] mb-3">ACTIONS</div>
           <div className="flex flex-wrap gap-3">
             {session.status === "NOT_STARTED" && (
@@ -157,14 +161,14 @@ export default function SessionDetailPage() {
                 <button
                   onClick={() => handleAction(() => startSession(id))}
                   disabled={actionLoading}
-                  className="eg-btn"
+                  className="eg-btn eg-btn-primary"
                 >
                   START SESSION
                 </button>
                 <button
                   onClick={() => handleAction(() => cancelSession(id))}
                   disabled={actionLoading}
-                  className="eg-btn"
+                  className="eg-btn eg-btn-danger"
                 >
                   CANCEL
                 </button>
@@ -184,7 +188,7 @@ export default function SessionDetailPage() {
                   <button
                     onClick={() => handleAction(() => openGates(id, "Resume entry"))}
                     disabled={actionLoading}
-                    className="eg-btn"
+                    className="eg-btn eg-btn-primary"
                   >
                     OPEN GATES
                   </button>
@@ -192,14 +196,14 @@ export default function SessionDetailPage() {
                 <button
                   onClick={() => handleAction(() => endSession(id))}
                   disabled={actionLoading}
-                  className="eg-btn"
+                  className="eg-btn eg-btn-primary"
                 >
                   END SESSION
                 </button>
                 <button
                   onClick={() => handleAction(() => cancelSession(id))}
                   disabled={actionLoading}
-                  className="eg-btn"
+                  className="eg-btn eg-btn-danger"
                 >
                   CANCEL
                 </button>
@@ -209,20 +213,24 @@ export default function SessionDetailPage() {
         </div>
 
         {/* Gate Events */}
-        <div className="border border-white/[0.06] bg-[var(--bg-surface)]">
-          <div className="px-4 py-3 border-b border-white/[0.06]">
+        <div className="glass-surface">
+          <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
             <span className="eg-mono-sm text-[var(--text-muted)]">
               GATE EVENTS ({gateEvents.length})
             </span>
           </div>
           {gateEvents.length === 0 ? (
-            <div className="p-4 text-center">
-              <span className="eg-mono-sm text-[var(--text-muted)]">No gate events recorded</span>
+            <div className="eg-empty p-4">
+              <span className="eg-empty-desc">No gate events recorded</span>
             </div>
           ) : (
-            <div className="divide-y divide-white/[0.04]">
+            <div>
               {gateEvents.map((evt) => (
-                <div key={evt.id} className="px-4 py-3 flex items-start gap-4">
+                <div
+                  key={evt.id}
+                  className="px-4 py-3 flex items-start gap-4"
+                  style={{ borderBottom: "1px solid var(--border)" }}
+                >
                   <span className="eg-mono-sm shrink-0 text-[var(--text-muted)]">
                     {new Date(evt.created_at).toLocaleString()}
                   </span>
@@ -245,6 +253,6 @@ export default function SessionDetailPage() {
           )}
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 }

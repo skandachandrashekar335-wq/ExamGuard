@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import AppShell from "@/components/AppShell";
 
 interface ExamListItem {
   id: number;
@@ -73,12 +74,12 @@ interface BatchResult {
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-const STATUS_STYLES: Record<string, string> = {
-  VERIFIED: "bg-emerald-500/20 text-emerald-400",
-  FAILED: "bg-pink-500/20 text-pink-400",
-  REVIEW_REQUIRED: "bg-amber-500/20 text-amber-400",
-  INCOMPLETE: "bg-cyan-500/20 text-cyan-400",
-  NOT_UPLOADED: "bg-[#222] text-[#666]",
+const STATUS_BADGE: Record<string, string> = {
+  VERIFIED: "eg-badge-success",
+  FAILED: "eg-badge-danger",
+  REVIEW_REQUIRED: "eg-badge-warning",
+  INCOMPLETE: "eg-badge-info",
+  NOT_UPLOADED: "eg-badge-neutral",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -101,25 +102,13 @@ export default function DashboardPage() {
   const [selectedDocs, setSelectedDocs] = useState<Set<number>>(new Set());
 
   const fetchDashboard = useCallback(() => {
-    if (!selectedExamId) {
-      setDashboard(null);
-      return;
-    }
+    if (!selectedExamId) { setDashboard(null); return; }
     setLoading(true);
     setError("");
     fetch(`${API}/api/v1/exams/${selectedExamId}/dashboard`)
-      .then((r) => {
-        if (!r.ok) throw new Error("Failed to load dashboard");
-        return r.json();
-      })
-      .then((data: DashboardData) => {
-        setDashboard(data);
-        setLoading(false);
-      })
-      .catch((e) => {
-        setError(e.message);
-        setLoading(false);
-      });
+      .then((r) => { if (!r.ok) throw new Error("Failed to load dashboard"); return r.json(); })
+      .then((data: DashboardData) => { setDashboard(data); setLoading(false); })
+      .catch((e) => { setError(e.message); setLoading(false); });
   }, [selectedExamId]);
 
   useEffect(() => {
@@ -129,40 +118,24 @@ export default function DashboardPage() {
       .catch(() => setError("Failed to load exams"));
   }, []);
 
-  useEffect(() => {
-    fetchDashboard();
-  }, [fetchDashboard]);
+  useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
 
   const filteredStudents =
     dashboard?.students.filter(
-      (s) =>
-        !search ||
-        s.student_usn.toLowerCase().includes(search.toLowerCase()) ||
-        s.student_name.toLowerCase().includes(search.toLowerCase())
+      (s) => !search || s.student_usn.toLowerCase().includes(search.toLowerCase()) || s.student_name.toLowerCase().includes(search.toLowerCase())
     ) || [];
 
   const handleSelectDoc = (docId: number) => {
     setSelectedDocs((prev) => {
       const next = new Set(prev);
-      if (next.has(docId)) {
-        next.delete(docId);
-      } else {
-        next.add(docId);
-      }
+      if (next.has(docId)) next.delete(docId); else next.add(docId);
       return next;
     });
   };
 
   const handleSelectAll = () => {
-    const docIds = filteredStudents
-      .filter((s) => s.document_id !== null)
-      .map((s) => s.document_id!);
-    setSelectedDocs((prev) => {
-      if (prev.size === docIds.length) {
-        return new Set();
-      }
-      return new Set(docIds);
-    });
+    const docIds = filteredStudents.filter((s) => s.document_id !== null).map((s) => s.document_id!);
+    setSelectedDocs((prev) => prev.size === docIds.length ? new Set() : new Set(docIds));
   };
 
   const handleBatchVerify = async () => {
@@ -170,14 +143,12 @@ export default function DashboardPage() {
     setBatchVerifying(true);
     setError("");
     setBatchResult(null);
-
     try {
       const res = await fetch(`${API}/api/v1/documents/batch-verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ document_ids: Array.from(selectedDocs) }),
       });
-
       if (!res.ok) throw new Error("Batch verification failed");
       const data: BatchResult = await res.json();
       setBatchResult(data);
@@ -193,43 +164,22 @@ export default function DashboardPage() {
   const summary = dashboard?.summary;
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-8">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold uppercase tracking-wider mb-2">
-          Verification Dashboard
-        </h1>
-        <p className="text-[#999] mb-8">
-          Exam-level verification status overview
-        </p>
-
-        <div className="flex gap-4 mb-8 items-center">
-          <Link
-            href="/monitoring"
-            className="text-xs font-mono uppercase tracking-wider text-[#666] hover:text-white transition-colors"
-          >
-            Monitoring &rarr;
-          </Link>
-          <Link
-            href="/examination-sessions"
-            className="text-xs font-mono uppercase tracking-wider text-[#666] hover:text-white transition-colors"
-          >
-            Sessions &rarr;
-          </Link>
-          <Link
-            href="/security-events"
-            className="text-xs font-mono uppercase tracking-wider text-[#666] hover:text-white transition-colors"
-          >
-            Security Events &rarr;
-          </Link>
-          <Link
-            href="/security-alerts"
-            className="text-xs font-mono uppercase tracking-wider text-[#666] hover:text-white transition-colors"
-          >
-            Security Alerts &rarr;
-          </Link>
+    <AppShell>
+      <div className="eg-page">
+        <div className="eg-page-header">
+          <Link href="/" className="eg-breadcrumb">← HOME</Link>
+          <h1 className="eg-page-title">Verification Dashboard</h1>
+          <p className="eg-page-desc">Exam-level verification status overview</p>
         </div>
 
-        <div className="flex gap-4 mb-8">
+        <div className="eg-filter-bar">
+          <Link href="/monitoring" className="eg-btn text-xs">Monitoring →</Link>
+          <Link href="/examination-sessions" className="eg-btn text-xs">Sessions →</Link>
+          <Link href="/security-events" className="eg-btn text-xs">Security Events →</Link>
+          <Link href="/security-alerts" className="eg-btn text-xs">Security Alerts →</Link>
+        </div>
+
+        <div className="mb-6">
           <select
             value={selectedExamId ?? ""}
             onChange={(e) => {
@@ -238,7 +188,7 @@ export default function DashboardPage() {
               setSelectedDocs(new Set());
               setBatchResult(null);
             }}
-            className="flex-1 bg-[#111] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+            className="eg-select w-full max-w-lg"
           >
             <option value="">Select an exam...</option>
             {exams.map((ex) => (
@@ -250,204 +200,139 @@ export default function DashboardPage() {
         </div>
 
         {error && (
-          <p className="text-pink-400 text-sm mb-6">{error}</p>
+          <div className="eg-card-flat mb-6" style={{ borderColor: "var(--danger)" }}>
+            <p className="text-sm" style={{ color: "var(--danger)" }}>{error}</p>
+          </div>
         )}
 
         {loading && (
-          <p className="text-[#666] text-sm mb-6">Loading dashboard...</p>
+          <div className="eg-card-flat p-8 text-center mb-6">
+            <p className="text-sm text-[var(--text-muted)]">Loading dashboard...</p>
+          </div>
         )}
 
         {batchResult && (
-          <div className="bg-[#111] border border-emerald-500/30 rounded-lg p-4 mb-6">
-            <h3 className="text-sm font-semibold text-emerald-400 mb-2">
-              Batch Verification Complete
-            </h3>
+          <div className="eg-card mb-6" style={{ borderColor: "rgba(45,159,111,0.3)" }}>
+            <p className="text-sm font-medium mb-3" style={{ color: "var(--success)" }}>Batch Verification Complete</p>
             <div className="grid grid-cols-5 gap-4 text-sm">
-              <div>
-                <span className="text-[#666]">Total:</span>{" "}
-                {batchResult.total}
-              </div>
-              <div>
-                <span className="text-[#666]">Processed:</span>{" "}
-                {batchResult.processed}
-              </div>
-              <div>
-                <span className="text-[#666]">Matched:</span>{" "}
-                {batchResult.matched}
-              </div>
-              <div>
-                <span className="text-emerald-400">Verified:</span>{" "}
-                {batchResult.verified}
-              </div>
-              <div>
-                <span className="text-pink-400">Failed:</span>{" "}
-                {batchResult.failed}
-              </div>
+              <div><span className="text-[var(--text-muted)]">Total: </span>{batchResult.total}</div>
+              <div><span className="text-[var(--text-muted)]">Processed: </span>{batchResult.processed}</div>
+              <div><span className="text-[var(--text-muted)]">Matched: </span>{batchResult.matched}</div>
+              <div style={{ color: "var(--success)" }}>Verified: {batchResult.verified}</div>
+              <div style={{ color: "var(--danger)" }}>Failed: {batchResult.failed}</div>
             </div>
           </div>
         )}
 
         {summary && (
           <>
-            <div className="mb-4">
-              <h2 className="text-xl font-semibold">
-                {summary.exam_name}
-              </h2>
-              <p className="text-[#999] text-sm">
-                {summary.exam_date} &middot; {summary.total_registered} registered
-              </p>
+            <div className="mb-6">
+              <h2 className="text-xl" style={{ fontFamily: "var(--font-display)", color: "var(--text-primary)" }}>{summary.exam_name}</h2>
+              <p className="text-sm text-[var(--text-muted)]">{summary.exam_date} · {summary.total_registered} registered</p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              <StatCard
-                label="Registered"
-                value={summary.total_registered}
-                color="cyan"
-              />
-              <StatCard
-                label="Verified"
-                value={summary.total_verified}
-                color="emerald"
-                rate={summary.verification_rate}
-              />
-              <StatCard
-                label="Failed"
-                value={summary.total_failed}
-                color="pink"
-              />
-              <StatCard
-                label="Review Required"
-                value={summary.total_review_required}
-                color="amber"
-              />
-              <StatCard
-                label="Incomplete"
-                value={summary.total_incomplete}
-                color="cyan"
-              />
-              <StatCard
-                label="Not Uploaded"
-                value={summary.total_not_uploaded}
-                color="neutral"
-              />
-              <StatCard
-                label="Seated"
-                value={summary.total_seated}
-                color="violet"
-              />
-              <StatCard
-                label="Verification Rate"
-                value={`${summary.verification_rate}%`}
-                color="emerald"
-              />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+              <div className="eg-metric">
+                <div className="eg-metric-label">Registered</div>
+                <div className="eg-metric-value">{summary.total_registered}</div>
+              </div>
+              <div className="eg-metric">
+                <div className="eg-metric-label">Verified</div>
+                <div className="eg-metric-value">{summary.total_verified}</div>
+                <div className="eg-metric-detail" style={{ color: "var(--success)" }}>{summary.verification_rate}% rate</div>
+              </div>
+              <div className="eg-metric">
+                <div className="eg-metric-label">Failed</div>
+                <div className="eg-metric-value">{summary.total_failed}</div>
+              </div>
+              <div className="eg-metric">
+                <div className="eg-metric-label">Review Required</div>
+                <div className="eg-metric-value">{summary.total_review_required}</div>
+              </div>
+              <div className="eg-metric">
+                <div className="eg-metric-label">Incomplete</div>
+                <div className="eg-metric-value">{summary.total_incomplete}</div>
+              </div>
+              <div className="eg-metric">
+                <div className="eg-metric-label">Not Uploaded</div>
+                <div className="eg-metric-value">{summary.total_not_uploaded}</div>
+              </div>
+              <div className="eg-metric">
+                <div className="eg-metric-label">Seated</div>
+                <div className="eg-metric-value">{summary.total_seated}</div>
+              </div>
+              <div className="eg-metric">
+                <div className="eg-metric-label">Verification Rate</div>
+                <div className="eg-metric-value">{summary.verification_rate}%</div>
+              </div>
             </div>
 
-            <div className="flex gap-4 mb-4">
+            <div className="eg-filter-bar">
               <input
                 type="text"
                 placeholder="Filter by USN or name..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="flex-1 bg-[#111] border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-[#666] focus:outline-none focus:border-cyan-500"
+                className="eg-input flex-1 max-w-sm"
               />
-              <button
-                onClick={handleSelectAll}
-                className="border border-white/20 px-4 py-2 rounded-lg text-sm hover:bg-white/5"
-              >
-                {selectedDocs.size ===
-                filteredStudents.filter((s) => s.document_id).length
-                  ? "Deselect All"
-                  : "Select All"}
+              <button onClick={handleSelectAll} className="eg-btn text-xs">
+                {selectedDocs.size === filteredStudents.filter((s) => s.document_id).length ? "Deselect All" : "Select All"}
               </button>
               <button
                 onClick={handleBatchVerify}
                 disabled={selectedDocs.size === 0 || batchVerifying}
-                className="bg-gradient-to-r from-cyan-500 to-emerald-500 px-4 py-2 rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-30"
+                className="eg-btn eg-btn-primary text-xs"
               >
-                {batchVerifying
-                  ? "Verifying..."
-                  : `Batch Verify (${selectedDocs.size})`}
+                {batchVerifying ? "Verifying..." : `Batch Verify (${selectedDocs.size})`}
               </button>
             </div>
 
-            <div className="bg-[#111] border border-white/10 rounded-lg overflow-hidden">
-              <table className="w-full">
+            <div className="eg-table-wrap">
+              <table className="eg-table">
                 <thead>
-                  <tr className="border-b border-white/10 text-left text-sm text-[#999]">
-                    <th className="px-6 py-3 w-10"></th>
-                    <th className="px-6 py-3">USN</th>
-                    <th className="px-6 py-3">Name</th>
-                    <th className="px-6 py-3">Seat</th>
-                    <th className="px-6 py-3">Hall</th>
-                    <th className="px-6 py-3">Status</th>
-                    <th className="px-6 py-3">Decision</th>
-                    <th className="px-6 py-3">OCR Conf</th>
-                    <th className="px-6 py-3">Match</th>
+                  <tr>
+                    <th className="w-10"></th>
+                    <th>USN</th>
+                    <th>Name</th>
+                    <th>Seat</th>
+                    <th>Hall</th>
+                    <th>Status</th>
+                    <th>Decision</th>
+                    <th>OCR Conf</th>
+                    <th>Match</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredStudents.map((s) => (
-                    <tr
-                      key={s.student_id}
-                      className="border-b border-white/5 hover:bg-white/[0.02]"
-                    >
-                      <td className="px-6 py-3">
+                    <tr key={s.student_id}>
+                      <td>
                         {s.document_id && (
                           <input
                             type="checkbox"
                             checked={selectedDocs.has(s.document_id)}
                             onChange={() => handleSelectDoc(s.document_id!)}
-                            className="accent-cyan-500"
+                            className="eg-checkbox"
                           />
                         )}
                       </td>
-                      <td className="px-6 py-3 font-mono text-sm">
-                        {s.student_usn}
-                      </td>
-                      <td className="px-6 py-3 text-sm">{s.student_name}</td>
-                      <td className="px-6 py-3 text-sm text-[#999]">
-                        {s.seat_number || "—"}
-                      </td>
-                      <td className="px-6 py-3 text-sm text-[#999]">
-                        {s.hall_name || "—"}
-                      </td>
-                      <td className="px-6 py-3">
-                        <span
-                          className={`text-xs px-2 py-1 rounded-full ${
-                            STATUS_STYLES[s.verification_status] ||
-                            "bg-[#222] text-[#666]"
-                          }`}
-                        >
-                          {STATUS_LABELS[s.verification_status] ||
-                            s.verification_status}
+                      <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.8125rem" }}>{s.student_usn}</td>
+                      <td>{s.student_name}</td>
+                      <td style={{ color: "var(--text-muted)" }}>{s.seat_number || "—"}</td>
+                      <td style={{ color: "var(--text-muted)" }}>{s.hall_name || "—"}</td>
+                      <td>
+                        <span className={`eg-badge ${STATUS_BADGE[s.verification_status] || "eg-badge-neutral"}`}>
+                          {STATUS_LABELS[s.verification_status] || s.verification_status}
                         </span>
                       </td>
-                      <td className="px-6 py-3 text-sm text-[#999]">
-                        {s.decision
-                          ? s.decision.replace(/_/g, " ")
-                          : "—"}
-                      </td>
-                      <td className="px-6 py-3 text-sm text-[#999]">
-                        {s.ocr_avg_confidence != null
-                          ? `${s.ocr_avg_confidence.toFixed(1)}%`
-                          : "—"}
-                      </td>
-                      <td className="px-6 py-3 text-sm text-[#999]">
-                        {s.match_status
-                          ? s.match_status.replace(/_/g, " ")
-                          : "—"}
-                      </td>
+                      <td style={{ color: "var(--text-muted)" }}>{s.decision ? s.decision.replace(/_/g, " ") : "—"}</td>
+                      <td style={{ color: "var(--text-muted)" }}>{s.ocr_avg_confidence != null ? `${s.ocr_avg_confidence.toFixed(1)}%` : "—"}</td>
+                      <td style={{ color: "var(--text-muted)" }}>{s.match_status ? s.match_status.replace(/_/g, " ") : "—"}</td>
                     </tr>
                   ))}
                   {filteredStudents.length === 0 && (
                     <tr>
-                      <td
-                        colSpan={9}
-                        className="px-6 py-8 text-center text-[#666]"
-                      >
-                        {search
-                          ? "No students match the filter"
-                          : "No students registered for this exam"}
+                      <td colSpan={9} className="text-center" style={{ padding: "2rem", color: "var(--text-muted)" }}>
+                        {search ? "No students match the filter" : "No students registered for this exam"}
                       </td>
                     </tr>
                   )}
@@ -458,46 +343,15 @@ export default function DashboardPage() {
         )}
 
         {!dashboard && !loading && !error && (
-          <div className="text-center py-20 text-[#666]">
-            Select an exam to view its verification dashboard
+          <div className="eg-empty">
+            <div className="eg-empty-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="var(--text-muted)" strokeWidth="1.5"/><path d="M3 9h18M9 3v18" stroke="var(--text-muted)" strokeWidth="1.5"/></svg>
+            </div>
+            <p className="eg-empty-title">Select an Exam</p>
+            <p className="eg-empty-desc">Choose an examination from the dropdown above to view its verification dashboard.</p>
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  color,
-  rate,
-}: {
-  label: string;
-  value: number | string;
-  color: string;
-  rate?: number;
-}) {
-  const colorMap: Record<string, string> = {
-    cyan: "border-cyan-500/30",
-    emerald: "border-emerald-500/30",
-    pink: "border-pink-500/30",
-    amber: "border-amber-500/30",
-    violet: "border-violet-500/30",
-    neutral: "border-white/10",
-  };
-
-  return (
-    <div
-      className={`bg-[#111] border ${
-        colorMap[color] || "border-white/10"
-      } rounded-lg p-4`}
-    >
-      <div className="text-xs text-[#666] mb-1">{label}</div>
-      <div className="text-2xl font-bold">{value}</div>
-      {rate !== undefined && (
-        <div className="text-xs text-emerald-400 mt-1">{rate}% pass rate</div>
-      )}
-    </div>
+    </AppShell>
   );
 }

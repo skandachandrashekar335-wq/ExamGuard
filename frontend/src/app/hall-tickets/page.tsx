@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import AppShell from "@/components/AppShell";
 
 interface HallTicket {
   id: number;
@@ -26,12 +27,12 @@ interface ListResponse {
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 const STATUS_COLORS: Record<string, string> = {
-  CREATED: "bg-blue-500/20 text-blue-400",
-  EXTRACTED: "bg-cyan-500/20 text-cyan-400",
-  MATCHED: "bg-indigo-500/20 text-indigo-400",
-  VERIFIED: "bg-emerald-500/20 text-emerald-400",
-  REJECTED: "bg-red-500/20 text-red-400",
-  CANCELLED: "bg-gray-500/20 text-gray-400",
+  CREATED: "eg-badge eg-badge-info",
+  EXTRACTED: "eg-badge eg-badge-info",
+  MATCHED: "eg-badge eg-badge-warning",
+  VERIFIED: "eg-badge eg-badge-success",
+  REJECTED: "eg-badge eg-badge-danger",
+  CANCELLED: "eg-badge eg-badge-neutral",
 };
 
 export default function HallTicketsPage() {
@@ -75,17 +76,17 @@ export default function HallTicketsPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-8">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold uppercase tracking-wider mb-2">
-          Hall Tickets
-        </h1>
-        <p className="text-[#999] mb-8">
-          Manage hall ticket lifecycle — upload, extract, match, verify, approve
-          or reject
-        </p>
+    <AppShell>
+      <div className="eg-page">
+        <div className="eg-page-header">
+          <h1 className="eg-page-title">Hall Tickets</h1>
+          <p className="eg-page-desc">
+            Manage hall ticket lifecycle — upload, extract, match, verify, approve
+            or reject
+          </p>
+        </div>
 
-        <div className="flex gap-4 mb-6">
+        <div className="eg-filter-bar">
           <input
             type="text"
             placeholder="Search by USN..."
@@ -95,7 +96,7 @@ export default function HallTicketsPage() {
               setUseSearch(e.target.value.length > 0);
               setPage(1);
             }}
-            className="flex-1 bg-[#111] border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-[#666] focus:outline-none focus:border-cyan-500"
+            className="eg-input flex-1"
           />
           <select
             value={statusFilter}
@@ -103,7 +104,7 @@ export default function HallTicketsPage() {
               setStatusFilter(e.target.value);
               setPage(1);
             }}
-            className="bg-[#111] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+            className="eg-select"
           >
             <option value="">All statuses</option>
             <option value="CREATED">Created</option>
@@ -115,61 +116,47 @@ export default function HallTicketsPage() {
           </select>
         </div>
 
-        <div className="bg-[#111] border border-white/10 rounded-lg overflow-hidden">
-          <table className="w-full">
+        <div className="eg-table-wrap">
+          <table className="eg-table">
             <thead>
-              <tr className="border-b border-white/10 text-left text-sm text-[#999]">
-                <th className="px-6 py-3">ID</th>
-                <th className="px-6 py-3">Registration</th>
-                <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3">Document</th>
-                <th className="px-6 py-3">Extraction</th>
-                <th className="px-6 py-3">Match</th>
-                <th className="px-6 py-3">Verification</th>
-                <th className="px-6 py-3">Created</th>
-                <th className="px-6 py-3 text-right">Actions</th>
+              <tr>
+                <th>ID</th>
+                <th>Registration</th>
+                <th>Status</th>
+                <th>Document</th>
+                <th>Extraction</th>
+                <th>Match</th>
+                <th>Verification</th>
+                <th>Created</th>
+                <th style={{ textAlign: "right" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {tickets.map((t) => (
-                <tr
-                  key={t.id}
-                  className="border-b border-white/5 hover:bg-white/[0.02]"
-                >
-                  <td className="px-6 py-3 text-sm">{t.id}</td>
-                  <td className="px-6 py-3 text-sm text-[#999]">
-                    #{t.exam_registration_id}
-                  </td>
-                  <td className="px-6 py-3">
+                <tr key={t.id}>
+                  <td>{t.id}</td>
+                  <td>#{t.exam_registration_id}</td>
+                  <td>
                     <span
-                      className={`text-xs px-2 py-1 rounded-full ${
-                        STATUS_COLORS[t.status] || "bg-gray-500/20 text-gray-400"
-                      }`}
+                      className={STATUS_COLORS[t.status] || "eg-badge eg-badge-neutral"}
                     >
                       {t.status}
                     </span>
                   </td>
-                  <td className="px-6 py-3 text-sm text-[#999]">
-                    {t.document_id ? `#${t.document_id}` : "—"}
-                  </td>
-                  <td className="px-6 py-3 text-sm text-[#999]">
-                    {t.extraction_result_id ? `#${t.extraction_result_id}` : "—"}
-                  </td>
-                  <td className="px-6 py-3 text-sm text-[#999]">
-                    {t.match_result_id ? `#${t.match_result_id}` : "—"}
-                  </td>
-                  <td className="px-6 py-3 text-sm text-[#999]">
+                  <td>{t.document_id ? `#${t.document_id}` : "—"}</td>
+                  <td>{t.extraction_result_id ? `#${t.extraction_result_id}` : "—"}</td>
+                  <td>{t.match_result_id ? `#${t.match_result_id}` : "—"}</td>
+                  <td>
                     {t.verification_outcome_id
                       ? `#${t.verification_outcome_id}`
                       : "—"}
                   </td>
-                  <td className="px-6 py-3 text-sm text-[#666]">
-                    {new Date(t.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-3 text-right">
+                  <td>{new Date(t.created_at).toLocaleDateString()}</td>
+                  <td style={{ textAlign: "right" }}>
                     <Link
                       href={`/hall-tickets/${t.id}`}
-                      className="text-cyan-400 hover:text-cyan-300 text-sm"
+                      className="eg-btn eg-btn-primary"
+                      style={{ fontSize: "0.75rem", padding: "0.25rem 0.75rem" }}
                     >
                       View
                     </Link>
@@ -178,11 +165,13 @@ export default function HallTicketsPage() {
               ))}
               {tickets.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={9}
-                    className="px-6 py-8 text-center text-[#666]"
-                  >
-                    No hall tickets found
+                  <td colSpan={9}>
+                    <div className="eg-empty">
+                      <h3 className="eg-empty-title">No hall tickets found</h3>
+                      <p className="eg-empty-desc">
+                        There are no hall tickets matching your current filters.
+                      </p>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -191,27 +180,27 @@ export default function HallTicketsPage() {
         </div>
 
         {totalPages > 1 && (
-          <div className="flex justify-center gap-4 mt-6">
+          <div className="eg-pagination">
             <button
               onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page === 1}
-              className="border border-white/20 px-4 py-2 rounded-lg disabled:opacity-30 hover:bg-white/5"
+              className="eg-btn disabled:opacity-30"
             >
               Previous
             </button>
-            <span className="py-2 text-sm text-[#999]">
+            <span className="eg-pagination-info">
               Page {page} of {totalPages} ({total} total)
             </span>
             <button
               onClick={() => setPage(Math.min(totalPages, page + 1))}
               disabled={page >= totalPages}
-              className="border border-white/20 px-4 py-2 rounded-lg disabled:opacity-30 hover:bg-white/5"
+              className="eg-btn disabled:opacity-30"
             >
               Next
             </button>
           </div>
         )}
       </div>
-    </div>
+    </AppShell>
   );
 }

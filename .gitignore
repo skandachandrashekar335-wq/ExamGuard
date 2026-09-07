@@ -58,3 +58,6 @@ models/weights/
 *.pem
 *.key
 credentials/
+
+.vercel
+.env*

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import AppShell from "@/components/AppShell";
 import {
   listEntryPoints,
   createEntryPoint,
@@ -144,43 +144,24 @@ export default function EntryPointsPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-8">
-      <div className="max-w-5xl mx-auto">
-        <Link
-          href="/dashboard"
-          className="text-[#999] hover:text-white text-sm mb-6 inline-block"
-        >
-          &larr; BACK TO DASHBOARD
-        </Link>
-
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold uppercase tracking-wider">
-              Entry Points
-            </h1>
-            <p className="text-[#999] mt-1">
-              Manage examination entry gates and access points
-            </p>
-          </div>
-          <button
-            onClick={openCreate}
-            className="bg-white text-black px-4 py-2 font-mono text-sm uppercase tracking-wider hover:bg-[#E5E5E5] transition-colors"
-          >
-            + Add Entry Point
-          </button>
+    <AppShell>
+      <div className="eg-page">
+        <div className="eg-page-header">
+          <p className="eg-breadcrumb">HOME / ENTRY POINTS</p>
+          <h1 className="eg-page-title">Entry Points</h1>
+          <p className="eg-page-desc">Manage examination entry gates and access points</p>
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-3 mb-6">
+        <div className="eg-filter-bar">
           <input
             type="text"
-            placeholder="SEARCH ENTRY POINTS..."
+            placeholder="Search entry points..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && load()}
-            className="flex-1 bg-[#111] border border-white/10 px-4 py-2 text-white placeholder:text-[#666] focus:outline-none focus:border-white/30 font-mono text-sm uppercase"
+            className="eg-input flex-1"
           />
-          <label className="flex items-center gap-2 text-sm text-[#999] cursor-pointer select-none">
+          <label className="eg-label flex items-center gap-2">
             <input
               type="checkbox"
               checked={showInactive}
@@ -188,84 +169,75 @@ export default function EntryPointsPage() {
                 setShowInactive(e.target.checked);
                 setPage(1);
               }}
-              className="accent-white"
+              className="eg-checkbox"
             />
-            INCLUDE INACTIVE
+            Include inactive
           </label>
+          <button onClick={openCreate} className="eg-btn eg-btn-primary">
+            + Add Entry Point
+          </button>
         </div>
 
         {error && (
-          <div className="bg-red-900/20 border border-red-500/30 text-red-400 px-4 py-3 mb-6 font-mono text-sm">
+          <div className="eg-alert eg-alert-danger mb-6">
             {error}
           </div>
         )}
 
         {loading ? (
-          <div className="text-center py-20 text-[#666] font-mono text-sm uppercase">
-            Loading entry points...
+          <div className="eg-empty">
+            <p className="eg-empty-title">Loading entry points...</p>
           </div>
         ) : entryPoints.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-[#666] font-mono text-sm uppercase mb-4">
-              No entry points configured
-            </p>
-            <button
-              onClick={openCreate}
-              className="bg-white text-black px-4 py-2 font-mono text-sm uppercase tracking-wider hover:bg-[#E5E5E5] transition-colors"
-            >
+          <div className="eg-empty">
+            <p className="eg-empty-title">No entry points configured</p>
+            <p className="eg-empty-desc">Get started by adding your first entry point.</p>
+            <button onClick={openCreate} className="eg-btn eg-btn-primary mt-4">
               + Add Entry Point
             </button>
           </div>
         ) : (
           <>
-            <div className="bg-[#111] border border-white/10 overflow-hidden">
-              <table className="w-full text-left">
+            <div className="eg-table-wrap">
+              <table className="eg-table">
                 <thead>
-                  <tr className="border-b border-white/10 text-xs text-[#999] uppercase tracking-wider">
-                    <th className="px-4 py-3 font-mono">Name</th>
-                    <th className="px-4 py-3 font-mono">Code</th>
-                    <th className="px-4 py-3 font-mono">Location</th>
-                    <th className="px-4 py-3 font-mono">Hall</th>
-                    <th className="px-4 py-3 font-mono">Active</th>
-                    <th className="px-4 py-3 font-mono">Actions</th>
+                  <tr>
+                    <th>Name</th>
+                    <th>Code</th>
+                    <th>Location</th>
+                    <th>Hall</th>
+                    <th>Active</th>
+                    <th className="text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {entryPoints.map((ep) => (
-                    <tr
-                      key={ep.id}
-                      className="border-b border-white/5 hover:bg-white/[0.02]"
-                    >
-                      <td className="px-4 py-3 text-sm">{ep.name}</td>
-                      <td className="px-4 py-3 text-sm font-mono text-[#999]">
+                    <tr key={ep.id}>
+                      <td>{ep.name}</td>
+                      <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.8125rem" }}>
                         {ep.code}
                       </td>
-                      <td className="px-4 py-3 text-sm text-[#999]">
+                      <td style={{ color: "var(--text-muted)" }}>
                         {ep.location_detail || ep.description || "—"}
                       </td>
-                      <td className="px-4 py-3 text-sm text-[#999]">
+                      <td style={{ color: "var(--text-muted)" }}>
                         {hallLabel(ep.exam_hall_id)}
                       </td>
-                      <td className="px-4 py-3">
+                      <td>
                         <span
-                          className={`text-xs font-mono ${
-                            ep.is_active ? "text-emerald-400" : "text-red-400"
-                          }`}
+                          className={`eg-badge ${ep.is_active ? "eg-badge-success" : "eg-badge-danger"}`}
                         >
-                          {ep.is_active ? "YES" : "NO"}
+                          {ep.is_active ? "Yes" : "No"}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm space-x-3">
-                        <button
-                          onClick={() => openEdit(ep)}
-                          className="text-[#999] hover:text-white text-xs font-mono uppercase"
-                        >
+                      <td className="text-right">
+                        <button onClick={() => openEdit(ep)} className="eg-btn text-xs mr-4">
                           Edit
                         </button>
                         {ep.is_active && (
                           <button
                             onClick={() => setConfirmDelete(ep.id)}
-                            className="text-[#999] hover:text-red-400 text-xs font-mono uppercase"
+                            className="eg-btn eg-btn-danger text-xs"
                           >
                             Deactivate
                           </button>
@@ -277,135 +249,98 @@ export default function EntryPointsPage() {
               </table>
             </div>
 
-            {/* Pagination */}
-            <div className="flex items-center justify-between mt-4">
-              <p className="text-xs text-[#666] font-mono">
-                {total} TOTAL &middot; PAGE {page} OF {totalPages || 1}
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                  className="border border-white/20 px-3 py-1 text-xs font-mono uppercase disabled:opacity-30 hover:bg-white/5"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                  className="border border-white/20 px-3 py-1 text-xs font-mono uppercase disabled:opacity-30 hover:bg-white/5"
-                >
-                  Next
-                </button>
-              </div>
+            <div className="eg-pagination">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="eg-btn eg-btn-sm"
+              >
+                Previous
+              </button>
+              <span className="eg-pagination-info">
+                {total} total · Page {page} of {totalPages || 1}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="eg-btn eg-btn-sm"
+              >
+                Next
+              </button>
             </div>
           </>
         )}
 
-        {/* Create/Edit Form Modal */}
         {showForm && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <div className="bg-[#111] border border-white/10 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-                <h2 className="text-lg font-mono uppercase tracking-wider">
+          <div className="eg-modal-backdrop" onClick={() => setShowForm(false)}>
+            <div className="eg-modal glass-surface glass" onClick={(e) => e.stopPropagation()}>
+              <div className="eg-modal-header">
+                <h2 className="eg-page-title text-lg">
                   {editEP ? "Edit Entry Point" : "Add Entry Point"}
                 </h2>
-                <button
-                  onClick={() => setShowForm(false)}
-                  className="text-[#666] hover:text-white text-xl"
-                >
-                  &times;
-                </button>
+                <button onClick={() => setShowForm(false)} className="eg-modal-close">&times;</button>
               </div>
-              <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <form onSubmit={handleSubmit} className="eg-modal-body">
                 {formError && (
-                  <div className="bg-red-900/20 border border-red-500/30 text-red-400 px-3 py-2 text-sm font-mono">
+                  <div className="eg-alert eg-alert-danger mb-4">
                     {formError}
                   </div>
                 )}
-                <div>
-                  <label className="block text-xs font-mono text-[#999] uppercase mb-1">
-                    Name *
-                  </label>
+                <div className="eg-field">
+                  <label className="eg-label">Name *</label>
                   <input
                     type="text"
                     required
                     value={form.name}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, name: e.target.value }))
-                    }
-                    className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 text-white text-sm focus:outline-none focus:border-white/30"
+                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    className="eg-input w-full"
                     placeholder="e.g. Main Gate"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-mono text-[#999] uppercase mb-1">
-                    Code *
-                  </label>
+                <div className="eg-field">
+                  <label className="eg-label">Code *</label>
                   <input
                     type="text"
                     required
                     value={form.code}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        code: e.target.value.toUpperCase(),
-                      }))
-                    }
-                    className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 text-white text-sm font-mono focus:outline-none focus:border-white/30"
+                    onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
+                    className="eg-input w-full"
+                    style={{ fontFamily: "var(--font-mono)" }}
                     placeholder="e.g. MAIN_GATE"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-mono text-[#999] uppercase mb-1">
-                    Description
-                  </label>
+                <div className="eg-field">
+                  <label className="eg-label">Description</label>
                   <input
                     type="text"
                     value={form.description || ""}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        description: e.target.value || null,
-                      }))
-                    }
-                    className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 text-white text-sm focus:outline-none focus:border-white/30"
+                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value || null }))}
+                    className="eg-input w-full"
                     placeholder="Optional description"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-mono text-[#999] uppercase mb-1">
-                      Location Detail
-                    </label>
+                <div className="eg-grid-2">
+                  <div className="eg-field">
+                    <label className="eg-label">Location Detail</label>
                     <input
                       type="text"
                       value={form.location_detail || ""}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          location_detail: e.target.value || null,
-                        }))
-                      }
-                      className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 text-white text-sm focus:outline-none focus:border-white/30"
+                      onChange={(e) => setForm((f) => ({ ...f, location_detail: e.target.value || null }))}
+                      className="eg-input w-full"
                       placeholder="e.g. Ground floor, east wing"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-mono text-[#999] uppercase mb-1">
-                      Exam Hall
-                    </label>
+                  <div className="eg-field">
+                    <label className="eg-label">Exam Hall</label>
                     <select
                       value={form.exam_hall_id || ""}
                       onChange={(e) =>
                         setForm((f) => ({
                           ...f,
-                          exam_hall_id: e.target.value
-                            ? Number(e.target.value)
-                            : null,
+                          exam_hall_id: e.target.value ? Number(e.target.value) : null,
                         }))
                       }
-                      className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 text-white text-sm focus:outline-none focus:border-white/30"
+                      className="eg-select w-full"
                     >
                       <option value="">None</option>
                       {halls.map((h) => (
@@ -417,22 +352,10 @@ export default function EntryPointsPage() {
                   </div>
                 </div>
                 <div className="flex gap-3 pt-2">
-                  <button
-                    type="submit"
-                    disabled={formLoading}
-                    className="bg-white text-black px-6 py-2 font-mono text-sm uppercase tracking-wider hover:bg-[#E5E5E5] disabled:opacity-50 transition-colors"
-                  >
-                    {formLoading
-                      ? "SAVING..."
-                      : editEP
-                        ? "UPDATE ENTRY POINT"
-                        : "CREATE ENTRY POINT"}
+                  <button type="submit" disabled={formLoading} className="eg-btn eg-btn-primary">
+                    {formLoading ? "Saving..." : editEP ? "Update Entry Point" : "Create Entry Point"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowForm(false)}
-                    className="border border-white/20 px-6 py-2 font-mono text-sm uppercase text-[#999] hover:bg-white/5"
-                  >
+                  <button type="button" onClick={() => setShowForm(false)} className="eg-btn">
                     Cancel
                   </button>
                 </div>
@@ -441,28 +364,21 @@ export default function EntryPointsPage() {
           </div>
         )}
 
-        {/* Deactivate Confirmation */}
         {confirmDelete !== null && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <div className="bg-[#111] border border-white/10 w-full max-w-sm p-6">
-              <h2 className="text-lg font-mono uppercase tracking-wider mb-4">
-                Deactivate Entry Point
-              </h2>
-              <p className="text-sm text-[#999] mb-6">
-                This will deactivate the entry point. It will no longer appear
-                in active operations.
+          <div className="eg-modal-backdrop" onClick={() => setConfirmDelete(null)}>
+            <div className="eg-modal glass-surface glass" onClick={(e) => e.stopPropagation()}>
+              <h2 className="eg-page-title text-lg mb-4">Deactivate Entry Point</h2>
+              <p className="eg-body mb-6">
+                This will deactivate the entry point. It will no longer appear in active operations.
               </p>
               <div className="flex gap-3">
                 <button
                   onClick={() => handleDeactivate(confirmDelete)}
-                  className="bg-red-900/50 border border-red-500/30 text-red-400 px-4 py-2 font-mono text-sm uppercase hover:bg-red-900/80 transition-colors"
+                  className="eg-btn eg-btn-danger"
                 >
                   Deactivate
                 </button>
-                <button
-                  onClick={() => setConfirmDelete(null)}
-                  className="border border-white/20 px-4 py-2 font-mono text-sm uppercase text-[#999] hover:bg-white/5"
-                >
+                <button onClick={() => setConfirmDelete(null)} className="eg-btn">
                   Cancel
                 </button>
               </div>
@@ -470,6 +386,6 @@ export default function EntryPointsPage() {
           </div>
         )}
       </div>
-    </div>
+    </AppShell>
   );
 }

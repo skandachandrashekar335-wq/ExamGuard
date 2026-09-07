@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AppShell from "@/components/AppShell";
 
 interface Document {
   id: number;
@@ -366,39 +367,41 @@ export default function DocumentsPage() {
   if (showReview && reviewData) {
     const allReviewed = reviewData.progress.review_required_count === 0;
     return (
-      <div className="min-h-screen bg-[#050505] text-white p-8">
-        <div className="max-w-5xl mx-auto">
-          <button
-            onClick={() => {
-              setShowReview(false);
-              setReviewData(null);
-              setEditingFieldId(null);
-              setEditValue("");
-            }}
-            className="text-cyan-400 hover:text-cyan-300 mb-6 text-sm"
-          >
-            &larr; Back to Documents
-          </button>
+      <AppShell>
+        <div className="eg-page">
+          <div className="eg-page-header">
+            <button
+              onClick={() => {
+                setShowReview(false);
+                setReviewData(null);
+                setEditingFieldId(null);
+                setEditValue("");
+              }}
+              className="eg-btn mb-4"
+            >
+              ← Back to Documents
+            </button>
+            <h1 className="eg-page-title">Extraction Review</h1>
+            <p className="eg-page-desc">
+              Document #{reviewData.document_id} · {reviewData.ocr_engine} ·{" "}
+              {reviewData.ocr_avg_confidence.toFixed(1)}% confidence
+            </p>
+          </div>
 
-          <h1 className="text-3xl font-bold uppercase tracking-wider mb-2">
-            Extraction Review
-          </h1>
-          <p className="text-[#999] mb-8">
-            Document #{reviewData.document_id} &middot; {reviewData.ocr_engine} &middot;{" "}
-            {reviewData.ocr_avg_confidence.toFixed(1)}% confidence
-          </p>
-
-          <div className="bg-[#111] border border-white/10 rounded-lg p-4 mb-6">
+          <div className="glass-surface glass p-4 mb-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-[#999]">Review Progress</span>
-              <span className="text-sm">
+              <span style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>Review Progress</span>
+              <span style={{ fontSize: "0.875rem" }}>
                 {reviewData.progress.reviewed_count}/{reviewData.progress.total_fields} reviewed
               </span>
             </div>
-            <div className="w-full bg-[#222] rounded-full h-2">
+            <div style={{ width: "100%", height: "8px", borderRadius: "4px", background: "var(--border)", overflow: "hidden" }}>
               <div
-                className="bg-gradient-to-r from-cyan-500 to-emerald-500 h-2 rounded-full transition-all"
                 style={{
+                  height: "100%",
+                  borderRadius: "4px",
+                  background: "var(--accent)",
+                  transition: "width 0.3s ease",
                   width: `${
                     reviewData.progress.total_fields > 0
                       ? (reviewData.progress.reviewed_count / reviewData.progress.total_fields) * 100
@@ -409,38 +412,35 @@ export default function DocumentsPage() {
             </div>
           </div>
 
-          <div className="bg-[#111] border border-white/10 rounded-lg overflow-hidden mb-6">
-            <table className="w-full">
+          <div className="eg-table-wrap">
+            <table className="eg-table">
               <thead>
-                <tr className="border-b border-white/10 text-left text-sm text-[#999]">
-                  <th className="px-6 py-3">Field</th>
-                  <th className="px-6 py-3">OCR Value</th>
-                  <th className="px-6 py-3">Corrected</th>
-                  <th className="px-6 py-3">Confidence</th>
-                  <th className="px-6 py-3">Status</th>
-                  <th className="px-6 py-3">Action</th>
+                <tr>
+                  <th>Field</th>
+                  <th>OCR Value</th>
+                  <th>Corrected</th>
+                  <th>Confidence</th>
+                  <th>Status</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {reviewData.fields.map((f) => (
-                  <tr
-                    key={f.id}
-                    className="border-b border-white/5 hover:bg-white/[0.02]"
-                  >
-                    <td className="px-6 py-3 text-sm font-medium">
+                  <tr key={f.id}>
+                    <td style={{ fontWeight: 500 }}>
                       {f.field_name.replace("_", " ")}
                     </td>
-                    <td className="px-6 py-3 text-sm text-[#999]">
+                    <td style={{ color: "var(--text-muted)" }}>
                       {f.extracted_value || "—"}
                     </td>
-                    <td className="px-6 py-3 text-sm">
+                    <td>
                       {editingFieldId === f.id ? (
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-center">
                           <input
                             type="text"
                             value={editValue}
                             onChange={(e) => setEditValue(e.target.value)}
-                            className="bg-[#050505] border border-white/20 rounded px-3 py-1 text-sm text-white flex-1"
+                            className="eg-input"
                             autoFocus
                             onKeyDown={(e) => {
                               if (e.key === "Enter") handleCorrectField(f.id);
@@ -450,10 +450,7 @@ export default function DocumentsPage() {
                               }
                             }}
                           />
-                          <button
-                            onClick={() => handleCorrectField(f.id)}
-                            className="text-emerald-400 hover:text-emerald-300 text-xs"
-                          >
+                          <button onClick={() => handleCorrectField(f.id)} className="eg-btn eg-btn-primary text-xs">
                             Save
                           </button>
                           <button
@@ -461,47 +458,43 @@ export default function DocumentsPage() {
                               setEditingFieldId(null);
                               setEditValue("");
                             }}
-                            className="text-[#666] hover:text-[#999] text-xs"
+                            className="eg-btn text-xs"
                           >
                             Cancel
                           </button>
                         </div>
                       ) : (
                         <span
-                          className={
-                            f.corrected_value ? "text-emerald-400" : "text-[#666]"
-                          }
+                          style={{ color: f.corrected_value ? "var(--success, #22c55e)" : "var(--text-muted)" }}
                         >
                           {f.corrected_value || "—"}
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-3 text-sm text-[#999]">
-                      {f.ocr_confidence != null
-                        ? `${f.ocr_confidence.toFixed(1)}%`
-                        : "—"}
+                    <td style={{ color: "var(--text-muted)" }}>
+                      {f.ocr_confidence != null ? `${f.ocr_confidence.toFixed(1)}%` : "—"}
                     </td>
-                    <td className="px-6 py-3">
+                    <td>
                       <span
-                        className={`text-xs px-2 py-1 rounded-full ${
+                        className={`eg-badge ${
                           f.review_status === "REVIEWED"
-                            ? "bg-emerald-500/20 text-emerald-400"
+                            ? "eg-badge-success"
                             : f.review_status === "AUTO_APPROVED"
-                            ? "bg-cyan-500/20 text-cyan-400"
-                            : "bg-amber-500/20 text-amber-400"
+                            ? "eg-badge-info"
+                            : "eg-badge-warning"
                         }`}
                       >
                         {f.review_status.replace("_", " ")}
                       </span>
                     </td>
-                    <td className="px-6 py-3">
+                    <td>
                       {editingFieldId !== f.id && (
                         <button
                           onClick={() => {
                             setEditingFieldId(f.id);
                             setEditValue(f.corrected_value || f.extracted_value || "");
                           }}
-                          className="text-cyan-400 hover:text-cyan-300 text-xs"
+                          className="eg-btn text-xs"
                         >
                           Correct
                         </button>
@@ -513,121 +506,113 @@ export default function DocumentsPage() {
             </table>
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex justify-end mt-4">
             <button
               onClick={handleCompleteReview}
               disabled={!allReviewed || completingReview}
-              className="bg-gradient-to-r from-cyan-500 to-emerald-500 px-6 py-2 rounded-lg font-medium hover:opacity-90 disabled:opacity-30"
+              className="eg-btn eg-btn-primary"
             >
               {completingReview ? "Completing..." : "Complete Review"}
             </button>
           </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   if (showVerification && verificationOutcome) {
-    const decisionColor =
-      verificationOutcome.decision === "VERIFIED"
-        ? "emerald"
-        : verificationOutcome.decision === "FAILED"
-        ? "pink"
-        : verificationOutcome.decision === "REVIEW_REQUIRED"
-        ? "amber"
-        : "cyan";
-
     return (
-      <div className="min-h-screen bg-[#050505] text-white p-8">
-        <div className="max-w-5xl mx-auto">
-          <button
-            onClick={() => {
-              setShowVerification(false);
-              setVerificationOutcome(null);
-            }}
-            className="text-cyan-400 hover:text-cyan-300 mb-6 text-sm"
-          >
-            &larr; Back to Documents
-          </button>
-
-          <h1 className="text-3xl font-bold uppercase tracking-wider mb-2">
-            Verification Outcome
-          </h1>
-          <p className="text-[#999] mb-8">
-            Document #{verificationOutcome.document_id} &middot;{" "}
-            <span
-              className={`px-2 py-1 rounded-full text-xs bg-${decisionColor}-500/20 text-${decisionColor}-400`}
+      <AppShell>
+        <div className="eg-page">
+          <div className="eg-page-header">
+            <button
+              onClick={() => {
+                setShowVerification(false);
+                setVerificationOutcome(null);
+              }}
+              className="eg-btn mb-4"
             >
-              {verificationOutcome.decision.replace("_", " ")}
-            </span>
-          </p>
+              ← Back to Documents
+            </button>
+            <h1 className="eg-page-title">Verification Outcome</h1>
+            <p className="eg-page-desc">
+              Document #{verificationOutcome.document_id} ·{" "}
+              <span
+                className={`eg-badge ${
+                  verificationOutcome.decision === "VERIFIED"
+                    ? "eg-badge-success"
+                    : verificationOutcome.decision === "FAILED"
+                    ? "eg-badge-danger"
+                    : verificationOutcome.decision === "REVIEW_REQUIRED"
+                    ? "eg-badge-warning"
+                    : "eg-badge-info"
+                }`}
+              >
+                {verificationOutcome.decision.replace("_", " ")}
+              </span>
+            </p>
+          </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-            <div className="bg-[#111] border border-white/10 rounded-lg p-4">
-              <div className="text-xs text-[#666] mb-1">Extraction Check</div>
-              <div className="text-sm">
-                <span
-                  className={`px-2 py-1 rounded-full text-xs ${
-                    verificationOutcome.extraction_check === "PASSED"
-                      ? "bg-emerald-500/20 text-emerald-400"
-                      : verificationOutcome.extraction_check === "FAILED"
-                      ? "bg-pink-500/20 text-pink-400"
-                      : "bg-amber-500/20 text-amber-400"
-                  }`}
-                >
-                  {verificationOutcome.extraction_check.replace("_", " ")}
-                </span>
-              </div>
+          <div className="eg-grid-3 mb-8">
+            <div className="glass-surface glass p-4">
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>Extraction Check</div>
+              <span
+                className={`eg-badge ${
+                  verificationOutcome.extraction_check === "PASSED"
+                    ? "eg-badge-success"
+                    : verificationOutcome.extraction_check === "FAILED"
+                    ? "eg-badge-danger"
+                    : "eg-badge-warning"
+                }`}
+              >
+                {verificationOutcome.extraction_check.replace("_", " ")}
+              </span>
             </div>
-            <div className="bg-[#111] border border-white/10 rounded-lg p-4">
-              <div className="text-xs text-[#666] mb-1">Match Check</div>
-              <div className="text-sm">
-                <span
-                  className={`px-2 py-1 rounded-full text-xs ${
-                    verificationOutcome.match_check === "PASSED"
-                      ? "bg-emerald-500/20 text-emerald-400"
-                      : verificationOutcome.match_check === "FAILED"
-                      ? "bg-pink-500/20 text-pink-400"
-                      : "bg-amber-500/20 text-amber-400"
-                  }`}
-                >
-                  {verificationOutcome.match_check.replace("_", " ")}
-                </span>
-              </div>
+            <div className="glass-surface glass p-4">
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>Match Check</div>
+              <span
+                className={`eg-badge ${
+                  verificationOutcome.match_check === "PASSED"
+                    ? "eg-badge-success"
+                    : verificationOutcome.match_check === "FAILED"
+                    ? "eg-badge-danger"
+                    : "eg-badge-warning"
+                }`}
+              >
+                {verificationOutcome.match_check.replace("_", " ")}
+              </span>
             </div>
-            <div className="bg-[#111] border border-white/10 rounded-lg p-4">
-              <div className="text-xs text-[#666] mb-1">Review Check</div>
-              <div className="text-sm">
-                <span
-                  className={`px-2 py-1 rounded-full text-xs ${
-                    verificationOutcome.review_completed
-                      ? "bg-emerald-500/20 text-emerald-400"
-                      : "bg-amber-500/20 text-amber-400"
-                  }`}
-                >
-                  {verificationOutcome.review_check.replace("_", " ")}
-                </span>
-              </div>
+            <div className="glass-surface glass p-4">
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>Review Check</div>
+              <span
+                className={`eg-badge ${
+                  verificationOutcome.review_completed
+                    ? "eg-badge-success"
+                    : "eg-badge-warning"
+                }`}
+              >
+                {verificationOutcome.review_check.replace("_", " ")}
+              </span>
             </div>
-            <div className="bg-[#111] border border-white/10 rounded-lg p-4">
-              <div className="text-xs text-[#666] mb-1">OCR Confidence</div>
-              <div className="text-sm">
+            <div className="glass-surface glass p-4">
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>OCR Confidence</div>
+              <div>
                 {verificationOutcome.ocr_avg_confidence != null
                   ? `${verificationOutcome.ocr_avg_confidence.toFixed(1)}%`
                   : "—"}
               </div>
             </div>
-            <div className="bg-[#111] border border-white/10 rounded-lg p-4">
-              <div className="text-xs text-[#666] mb-1">Match Status</div>
-              <div className="text-sm">
+            <div className="glass-surface glass p-4">
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>Match Status</div>
+              <div>
                 {verificationOutcome.match_status
                   ? verificationOutcome.match_status.replace("_", " ")
                   : "—"}
               </div>
             </div>
-            <div className="bg-[#111] border border-white/10 rounded-lg p-4">
-              <div className="text-xs text-[#666] mb-1">Student</div>
-              <div className="text-sm">
+            <div className="glass-surface glass p-4">
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>Student</div>
+              <div>
                 {verificationOutcome.student_id
                   ? `ID ${verificationOutcome.student_id}`
                   : "—"}
@@ -636,127 +621,103 @@ export default function DocumentsPage() {
           </div>
 
           {verificationOutcome.reasoning && (
-            <div className="bg-[#111] border border-white/10 rounded-lg p-4 mb-6">
-              <div className="text-xs text-[#666] mb-2">Reasoning</div>
-              <p className="text-sm">{verificationOutcome.reasoning}</p>
+            <div className="glass-surface glass p-4 mb-6">
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "8px" }}>Reasoning</div>
+              <p>{verificationOutcome.reasoning}</p>
             </div>
           )}
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   if (showMatch && matchResult) {
     return (
-      <div className="min-h-screen bg-[#050505] text-white p-8">
-        <div className="max-w-5xl mx-auto">
-          <button
-            onClick={() => {
-              setShowMatch(false);
-              setMatchResult(null);
-            }}
-            className="text-cyan-400 hover:text-cyan-300 mb-6 text-sm"
-          >
-            &larr; Back to Documents
-          </button>
-
-          <h1 className="text-3xl font-bold uppercase tracking-wider mb-2">
-            Hall Ticket Match Result
-          </h1>
-          <p className="text-[#999] mb-8">
-            Document #{matchResult.document_id} &middot;{" "}
-            <span
-              className={`px-2 py-1 rounded-full text-xs ${
-                matchResult.overall_status === "MATCHED"
-                  ? "bg-emerald-500/20 text-emerald-400"
-                  : matchResult.overall_status === "PARTIAL_MATCH"
-                  ? "bg-amber-500/20 text-amber-400"
-                  : matchResult.overall_status === "NOT_FOUND"
-                  ? "bg-pink-500/20 text-pink-400"
-                  : "bg-red-500/20 text-red-400"
-              }`}
+      <AppShell>
+        <div className="eg-page">
+          <div className="eg-page-header">
+            <button
+              onClick={() => {
+                setShowMatch(false);
+                setMatchResult(null);
+              }}
+              className="eg-btn mb-4"
             >
-              {matchResult.overall_status.replace("_", " ")}
-            </span>
-          </p>
+              ← Back to Documents
+            </button>
+            <h1 className="eg-page-title">Hall Ticket Match Result</h1>
+            <p className="eg-page-desc">
+              Document #{matchResult.document_id} ·{" "}
+              <span
+                className={`eg-badge ${
+                  matchResult.overall_status === "MATCHED"
+                    ? "eg-badge-success"
+                    : matchResult.overall_status === "PARTIAL_MATCH"
+                    ? "eg-badge-warning"
+                    : matchResult.overall_status === "NOT_FOUND"
+                    ? "eg-badge-danger"
+                    : "eg-badge-neutral"
+                }`}
+              >
+                {matchResult.overall_status.replace("_", " ")}
+              </span>
+            </p>
+          </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-[#111] border border-white/10 rounded-lg p-4">
-              <div className="text-xs text-[#666] mb-1">Student</div>
-              <div className="text-sm">
-                {matchResult.student_id ? `ID ${matchResult.student_id}` : "—"}
-              </div>
+          <div className="eg-grid-4 mb-8">
+            <div className="glass-surface glass p-4">
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>Student</div>
+              <div>{matchResult.student_id ? `ID ${matchResult.student_id}` : "—"}</div>
             </div>
-            <div className="bg-[#111] border border-white/10 rounded-lg p-4">
-              <div className="text-xs text-[#666] mb-1">Exam</div>
-              <div className="text-sm">
-                {matchResult.exam_id ? `ID ${matchResult.exam_id}` : "—"}
-              </div>
+            <div className="glass-surface glass p-4">
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>Exam</div>
+              <div>{matchResult.exam_id ? `ID ${matchResult.exam_id}` : "—"}</div>
             </div>
-            <div className="bg-[#111] border border-white/10 rounded-lg p-4">
-              <div className="text-xs text-[#666] mb-1">Registration</div>
-              <div className="text-sm">
-                {matchResult.registration_id ? `ID ${matchResult.registration_id}` : "—"}
-              </div>
+            <div className="glass-surface glass p-4">
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>Registration</div>
+              <div>{matchResult.registration_id ? `ID ${matchResult.registration_id}` : "—"}</div>
             </div>
-            <div className="bg-[#111] border border-white/10 rounded-lg p-4">
-              <div className="text-xs text-[#666] mb-1">Seat Assignment</div>
-              <div className="text-sm">
-                {matchResult.seat_assignment_id ? `ID ${matchResult.seat_assignment_id}` : "—"}
-              </div>
+            <div className="glass-surface glass p-4">
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>Seat Assignment</div>
+              <div>{matchResult.seat_assignment_id ? `ID ${matchResult.seat_assignment_id}` : "—"}</div>
             </div>
           </div>
 
-          <h2 className="text-xl font-semibold mb-4">Verification Signals</h2>
-          <div className="bg-[#111] border border-white/10 rounded-lg overflow-hidden">
-            <table className="w-full">
+          <h2 className="eg-page-title text-xl mb-4">Verification Signals</h2>
+          <div className="eg-table-wrap">
+            <table className="eg-table">
               <thead>
-                <tr className="border-b border-white/10 text-left text-sm text-[#999]">
-                  <th className="px-6 py-3">Field</th>
-                  <th className="px-6 py-3">Extracted</th>
-                  <th className="px-6 py-3">Expected</th>
-                  <th className="px-6 py-3">Match</th>
-                  <th className="px-6 py-3">Details</th>
+                <tr>
+                  <th>Field</th>
+                  <th>Extracted</th>
+                  <th>Expected</th>
+                  <th>Match</th>
+                  <th>Details</th>
                 </tr>
               </thead>
               <tbody>
                 {matchResult.signals.map((s) => (
-                  <tr
-                    key={s.id}
-                    className="border-b border-white/5 hover:bg-white/[0.02]"
-                  >
-                    <td className="px-6 py-3 text-sm font-medium">
+                  <tr key={s.id}>
+                    <td style={{ fontWeight: 500 }}>
                       {s.field_name.replace("_", " ")}
                     </td>
-                    <td className="px-6 py-3 text-sm">
-                      {s.extracted_value || (
-                        <span className="text-[#666]">—</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-3 text-sm">
-                      {s.expected_value || (
-                        <span className="text-[#666]">—</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-3">
+                    <td>{s.extracted_value || <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
+                    <td>{s.expected_value || <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
+                    <td>
                       {s.matched ? (
-                        <span className="text-emerald-400 text-xs px-2 py-1 rounded-full bg-emerald-500/20">
-                          Match
-                        </span>
+                        <span className="eg-badge eg-badge-success">Match</span>
                       ) : (
-                        <span className="text-pink-400 text-xs px-2 py-1 rounded-full bg-pink-500/20">
-                          Mismatch
-                        </span>
+                        <span className="eg-badge eg-badge-danger">Mismatch</span>
                       )}
                     </td>
-                    <td className="px-6 py-3 text-xs text-[#999]">
+                    <td style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
                       {s.details || "—"}
                     </td>
                   </tr>
                 ))}
                 {matchResult.signals.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-[#666]">
+                    <td colSpan={5} className="text-center" style={{ padding: "2rem", color: "var(--text-muted)" }}>
                       No signals recorded
                     </td>
                   </tr>
@@ -765,96 +726,88 @@ export default function DocumentsPage() {
             </table>
           </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   if (showExtraction && extractionResult) {
     return (
-      <div className="min-h-screen bg-[#050505] text-white p-8">
-        <div className="max-w-5xl mx-auto">
-          <button
-            onClick={() => {
-              setShowExtraction(false);
-              setExtractionResult(null);
-            }}
-            className="text-cyan-400 hover:text-cyan-300 mb-6 text-sm"
-          >
-            &larr; Back to Documents
-          </button>
+      <AppShell>
+        <div className="eg-page">
+          <div className="eg-page-header">
+            <button
+              onClick={() => {
+                setShowExtraction(false);
+                setExtractionResult(null);
+              }}
+              className="eg-btn mb-4"
+            >
+              ← Back to Documents
+            </button>
+            <h1 className="eg-page-title">Extraction Results</h1>
+            <p className="eg-page-desc">
+              Document #{extractionResult.document_id} · {extractionResult.ocr_engine} ·{" "}
+              {extractionResult.ocr_avg_confidence.toFixed(1)}% confidence
+              {extractionResult.processing_time_ms && (
+                <> · {extractionResult.processing_time_ms}ms</>
+              )}
+            </p>
+          </div>
 
-          <h1 className="text-3xl font-bold uppercase tracking-wider mb-2">
-            Extraction Results
-          </h1>
-          <p className="text-[#999] mb-8">
-            Document #{extractionResult.document_id} &middot; {extractionResult.ocr_engine} &middot;{" "}
-            {extractionResult.ocr_avg_confidence.toFixed(1)}% confidence
-            {extractionResult.processing_time_ms && (
-              <> &middot; {extractionResult.processing_time_ms}ms</>
-            )}
-          </p>
-
-          <div className="bg-[#111] border border-white/10 rounded-lg overflow-hidden">
-            <table className="w-full">
+          <div className="eg-table-wrap">
+            <table className="eg-table">
               <thead>
-                <tr className="border-b border-white/10 text-left text-sm text-[#999]">
-                  <th className="px-6 py-3">Field</th>
-                  <th className="px-6 py-3">Value</th>
-                  <th className="px-6 py-3">OCR Conf</th>
-                  <th className="px-6 py-3">Method</th>
-                  <th className="px-6 py-3">Label</th>
-                  <th className="px-6 py-3">Pattern</th>
-                  <th className="px-6 py-3">Status</th>
+                <tr>
+                  <th>Field</th>
+                  <th>Value</th>
+                  <th>OCR Conf</th>
+                  <th>Method</th>
+                  <th>Label</th>
+                  <th>Pattern</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {extractionResult.fields.map((f) => (
-                  <tr
-                    key={f.id}
-                    className="border-b border-white/5 hover:bg-white/[0.02]"
-                  >
-                    <td className="px-6 py-3 text-sm font-medium">
+                  <tr key={f.id}>
+                    <td style={{ fontWeight: 500 }}>
                       {f.field_name.replace("_", " ")}
                     </td>
-                    <td className="px-6 py-3 text-sm">
-                      {f.extracted_value || (
-                        <span className="text-[#666]">—</span>
-                      )}
+                    <td>
+                      {f.extracted_value || <span style={{ color: "var(--text-muted)" }}>—</span>}
                     </td>
-                    <td className="px-6 py-3 text-sm text-[#999]">
-                      {f.ocr_confidence != null
-                        ? `${f.ocr_confidence.toFixed(1)}%`
-                        : "—"}
+                    <td style={{ color: "var(--text-muted)" }}>
+                      {f.ocr_confidence != null ? `${f.ocr_confidence.toFixed(1)}%` : "—"}
                     </td>
-                    <td className="px-6 py-3 text-xs text-[#999]">
+                    <td style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
                       {f.extraction_method || "—"}
                     </td>
-                    <td className="px-6 py-3 text-sm">
+                    <td>
                       {f.label_found === true ? (
-                        <span className="text-emerald-400">Yes</span>
+                        <span style={{ color: "var(--success, #22c55e)" }}>Yes</span>
                       ) : f.label_found === false ? (
-                        <span className="text-pink-400">No</span>
+                        <span style={{ color: "var(--danger, #ef4444)" }}>No</span>
                       ) : (
                         "—"
                       )}
                     </td>
-                    <td className="px-6 py-3 text-sm">
+                    <td>
                       {f.pattern_match === true ? (
-                        <span className="text-emerald-400">Yes</span>
+                        <span style={{ color: "var(--success, #22c55e)" }}>Yes</span>
                       ) : f.pattern_match === false ? (
-                        <span className="text-pink-400">No</span>
+                        <span style={{ color: "var(--danger, #ef4444)" }}>No</span>
                       ) : (
                         "—"
                       )}
                     </td>
-                    <td className="px-6 py-3">
+                    <td>
                       <span
-                        className={`text-xs px-2 py-1 rounded-full ${
+                        className={`eg-badge ${
                           f.review_status === "AUTO_APPROVED"
-                            ? "bg-emerald-500/20 text-emerald-400"
+                            ? "eg-badge-success"
                             : f.review_status === "REVIEW_REQUIRED"
-                            ? "bg-amber-500/20 text-amber-400"
-                            : "bg-cyan-500/20 text-cyan-400"
+                            ? "eg-badge-warning"
+                            : "eg-badge-info"
                         }`}
                       >
                         {f.review_status.replace("_", " ")}
@@ -864,7 +817,7 @@ export default function DocumentsPage() {
                 ))}
                 {extractionResult.fields.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-6 py-8 text-center text-[#666]">
+                    <td colSpan={7} className="text-center" style={{ padding: "2rem", color: "var(--text-muted)" }}>
                       No fields extracted
                     </td>
                   </tr>
@@ -873,27 +826,28 @@ export default function DocumentsPage() {
             </table>
           </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-8">
-      <div className="max-w-5xl mx-auto">
-        <h1 className="text-3xl font-bold uppercase tracking-wider mb-2">
-          Documents
-        </h1>
-        <p className="text-[#999] mb-8">Upload and manage examination documents</p>
+    <AppShell>
+      <div className="eg-page">
+        <div className="eg-page-header">
+          <p className="eg-breadcrumb">HOME / DOCUMENTS</p>
+          <h1 className="eg-page-title">Documents</h1>
+          <p className="eg-page-desc">Upload and manage examination documents</p>
+        </div>
 
-        <div className="bg-[#111] border border-white/10 rounded-lg p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">Upload Document</h2>
-          {message && <p className="text-emerald-400 text-sm mb-4">{message}</p>}
-          {error && <p className="text-pink-400 text-sm mb-4">{error}</p>}
+        <div className="glass-surface glass p-6 mb-6">
+          <h2 className="eg-page-title text-lg mb-4">Upload Document</h2>
+          {message && <p className="eg-alert eg-alert-success mb-4">{message}</p>}
+          {error && <p className="eg-alert eg-alert-danger mb-4">{error}</p>}
           <div className="flex gap-4 items-center">
             <select
               value={docType}
               onChange={(e) => setDocType(e.target.value)}
-              className="bg-[#050505] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+              className="eg-select"
             >
               <option value="HALL_TICKET">Hall Ticket</option>
             </select>
@@ -901,100 +855,105 @@ export default function DocumentsPage() {
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
               onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-              className="text-sm text-[#999] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gradient-to-r file:from-cyan-500 file:to-pink-500 file:text-white file:cursor-pointer"
+              className="eg-input"
             />
             <button
               onClick={handleUpload}
               disabled={!selectedFile || uploading}
-              className="bg-gradient-to-r from-cyan-500 to-pink-500 px-6 py-2 rounded-lg font-medium hover:opacity-90 disabled:opacity-30"
+              className="eg-btn eg-btn-primary"
             >
               {uploading ? "Uploading..." : "Upload"}
             </button>
           </div>
         </div>
 
-        <div className="bg-[#111] border border-white/10 rounded-lg overflow-hidden">
-          <table className="w-full">
+        <div className="eg-table-wrap">
+          <table className="eg-table">
             <thead>
-              <tr className="border-b border-white/10 text-left text-sm text-[#999]">
-                <th className="px-6 py-3">Filename</th>
-                <th className="px-6 py-3">Type</th>
-                <th className="px-6 py-3">Size</th>
-                <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3">Uploaded</th>
-                <th className="px-6 py-3">Actions</th>
+              <tr>
+                <th>Filename</th>
+                <th>Type</th>
+                <th>Size</th>
+                <th>Status</th>
+                <th>Uploaded</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {documents.map((d) => (
-                <tr
-                  key={d.id}
-                  className="border-b border-white/5 hover:bg-white/[0.02]"
-                >
-                  <td className="px-6 py-3 text-sm">{d.original_filename}</td>
-                  <td className="px-6 py-3 text-sm text-[#999]">
+                <tr key={d.id}>
+                  <td>{d.original_filename}</td>
+                  <td style={{ color: "var(--text-muted)" }}>
                     {d.document_type.replace("_", " ")}
                   </td>
-                  <td className="px-6 py-3 text-sm text-[#999]">
+                  <td style={{ color: "var(--text-muted)" }}>
                     {formatSize(d.file_size)}
                   </td>
-                  <td className="px-6 py-3">
-                    <span className="text-xs px-2 py-1 rounded-full bg-cyan-500/20 text-cyan-400">
+                  <td>
+                    <span className="eg-badge eg-badge-info">
                       {d.status.replace("_", " ")}
                     </span>
                   </td>
-                  <td className="px-6 py-3 text-sm text-[#999]">
+                  <td style={{ color: "var(--text-muted)" }}>
                     {new Date(d.created_at).toLocaleDateString()}
                   </td>
-                  <td className="px-6 py-3 text-sm flex gap-2">
-                    {d.status === "PROCESSED" || d.status === "REVIEW_REQUIRED" ? (
-                      <>
-                        <button
-                          onClick={() => handleViewExtraction(d.id)}
-                          className="text-cyan-400 hover:text-cyan-300 text-xs"
-                        >
-                          View Extraction
-                        </button>
-                        {d.status === "REVIEW_REQUIRED" && (
+                  <td>
+                    <div className="flex gap-2">
+                      {d.status === "PROCESSED" || d.status === "REVIEW_REQUIRED" ? (
+                        <>
                           <button
-                            onClick={() => handleStartReview(d.id)}
-                            disabled={reviewingId === d.id}
-                            className="text-amber-400 hover:text-amber-300 text-xs disabled:opacity-30"
+                            onClick={() => handleViewExtraction(d.id)}
+                            className="eg-btn text-xs"
                           >
-                            {reviewingId === d.id ? "Loading..." : "Review"}
+                            View Extraction
                           </button>
-                        )}
+                          {d.status === "REVIEW_REQUIRED" && (
+                            <button
+                              onClick={() => handleStartReview(d.id)}
+                              disabled={reviewingId === d.id}
+                              className="eg-btn eg-btn-warning text-xs"
+                              style={{ opacity: reviewingId === d.id ? 0.3 : 1 }}
+                            >
+                              {reviewingId === d.id ? "Loading..." : "Review"}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleMatch(d.id)}
+                            disabled={matchingId === d.id}
+                            className="eg-btn eg-btn-primary text-xs"
+                            style={{ opacity: matchingId === d.id ? 0.3 : 1 }}
+                          >
+                            {matchingId === d.id ? "Matching..." : "Match Hall Ticket"}
+                          </button>
+                          <button
+                            onClick={() => handleVerify(d.id)}
+                            disabled={verifyingId === d.id}
+                            className="eg-btn text-xs"
+                            style={{ opacity: verifyingId === d.id ? 0.3 : 1 }}
+                          >
+                            {verifyingId === d.id ? "Verifying..." : "Verify"}
+                          </button>
+                        </>
+                      ) : (
                         <button
-                          onClick={() => handleMatch(d.id)}
-                          disabled={matchingId === d.id}
-                          className="text-emerald-400 hover:text-emerald-300 text-xs disabled:opacity-30"
+                          onClick={() => handleProcess(d.id)}
+                          disabled={processingId === d.id}
+                          className="eg-btn eg-btn-primary text-xs"
+                          style={{ opacity: processingId === d.id ? 0.3 : 1 }}
                         >
-                          {matchingId === d.id ? "Matching..." : "Match Hall Ticket"}
+                          {processingId === d.id ? "Processing..." : "Process"}
                         </button>
-                        <button
-                          onClick={() => handleVerify(d.id)}
-                          disabled={verifyingId === d.id}
-                          className="text-violet-400 hover:text-violet-300 text-xs disabled:opacity-30"
-                        >
-                          {verifyingId === d.id ? "Verifying..." : "Verify"}
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={() => handleProcess(d.id)}
-                        disabled={processingId === d.id}
-                        className="text-emerald-400 hover:text-emerald-300 text-xs disabled:opacity-30"
-                      >
-                        {processingId === d.id ? "Processing..." : "Process"}
-                      </button>
-                    )}
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
               {documents.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-[#666]">
-                    No documents uploaded
+                  <td colSpan={6}>
+                    <div className="eg-empty">
+                      <p className="eg-empty-title">No documents uploaded</p>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -1003,27 +962,27 @@ export default function DocumentsPage() {
         </div>
 
         {totalPages > 1 && (
-          <div className="flex justify-center gap-4 mt-6">
+          <div className="eg-pagination">
             <button
               onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page === 1}
-              className="border border-white/20 px-4 py-2 rounded-lg disabled:opacity-30 hover:bg-white/5"
+              className="eg-btn eg-btn-sm"
             >
               Previous
             </button>
-            <span className="py-2 text-sm text-[#999]">
+            <span className="eg-pagination-info">
               Page {page} of {totalPages} ({total} total)
             </span>
             <button
               onClick={() => setPage(Math.min(totalPages, page + 1))}
               disabled={page >= totalPages}
-              className="border border-white/20 px-4 py-2 rounded-lg disabled:opacity-30 hover:bg-white/5"
+              className="eg-btn eg-btn-sm"
             >
               Next
             </button>
           </div>
         )}
       </div>
-    </div>
+    </AppShell>
   );
 }

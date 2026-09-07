@@ -26,6 +26,7 @@ import VerificationState, {
 } from "@/components/VerificationState";
 import AuditTimeline from "@/components/AuditTimeline";
 import OverrideDialog from "@/components/OverrideDialog";
+import AppShell from "@/components/AppShell";
 
 function fileToBase64(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -163,57 +164,54 @@ export default function IdentityVerificationDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] p-8">
-        <div className="max-w-5xl mx-auto">
-          <span className="eg-mono text-[var(--text-muted)]">
-            Loading attempt...
-          </span>
+      <AppShell>
+        <div className="eg-page">
+          <div className="eg-page-header">
+            <span className="eg-mono text-[var(--text-muted)]">
+              Loading attempt...
+            </span>
+          </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   if (error || !attempt) {
     return (
-      <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] p-8">
-        <div className="max-w-5xl mx-auto">
-          <p className="text-red-400 mb-4">{error || "Not found"}</p>
-          <Link
-            href="/identity-verifications"
-            className="eg-mono-sm text-white hover:text-[var(--text-secondary)]"
-          >
-            Back to list
-          </Link>
+      <AppShell>
+        <div className="eg-page">
+          <div className="eg-page-header">
+            <p className="text-sm" style={{ color: "var(--danger)" }}>
+              {error || "Not found"}
+            </p>
+            <Link
+              href="/identity-verifications"
+              className="eg-breadcrumb mt-4 inline-block"
+            >
+              ← Back to list
+            </Link>
+          </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] p-8">
-      <div className="max-w-5xl mx-auto">
-        {/* Header */}
-        <Link
-          href="/identity-verifications"
-          className="eg-mono-sm text-[var(--text-secondary)] hover:text-white mb-6 inline-block transition-colors"
-        >
-          Identity Verifications
-        </Link>
-
-        <div className="flex flex-wrap items-center gap-3 mb-6">
-          <h1 className="eg-display text-2xl">
-            Verification #{attempt.id}
-          </h1>
-          <span className="eg-mono-sm border border-white/20 px-2 py-0.5">
-            {attempt.status}
-          </span>
-          <span className="eg-mono-sm border border-white/20 px-2 py-0.5">
-            {attempt.decision}
-          </span>
+    <AppShell>
+      <div className="eg-page">
+        <div className="eg-page-header">
+          <Link href="/identity-verifications" className="eg-breadcrumb">
+            ← Identity Verifications
+          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="eg-page-title">Verification #{attempt.id}</h1>
+            <span className="eg-badge eg-badge-info">{attempt.status}</span>
+            <span className="eg-badge eg-badge-info">{attempt.decision}</span>
+          </div>
         </div>
 
         {actionMsg && (
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-3 mb-4">
+          <div className="glass-surface p-3 mb-6">
             <span className="eg-mono-sm text-[var(--text-secondary)]">
               {actionMsg}
             </span>
@@ -255,18 +253,20 @@ export default function IdentityVerificationDetailPage() {
                 <button
                   onClick={handleVerify}
                   disabled={!referenceImage || !probeImage || uiState !== "READY"}
-                  className="eg-btn-primary eg-btn px-6 py-2 disabled:opacity-30"
+                  className="eg-btn eg-btn-primary px-6 py-2 disabled:opacity-30"
                 >
                   Verify Identity
                 </button>
                 {verifyError && (
-                  <span className="text-xs text-red-400">{verifyError}</span>
+                  <span className="text-xs" style={{ color: "var(--danger)" }}>
+                    {verifyError}
+                  </span>
                 )}
               </div>
             )}
 
             {/* Evidence */}
-            <div className="border border-white/10 bg-[var(--bg-raised)] p-4">
+            <div className="glass-surface p-4">
               <h3 className="eg-mono-sm text-[var(--text-muted)] mb-3">
                 Evidence
               </h3>
@@ -283,7 +283,7 @@ export default function IdentityVerificationDetailPage() {
           {/* Right column — Context + Actions */}
           <div className="space-y-6">
             {/* Student context */}
-            <div className="border border-white/10 bg-[var(--bg-raised)] p-4">
+            <div className="glass-surface p-4">
               <h3 className="eg-mono-sm text-[var(--text-muted)] mb-3">
                 Candidate
               </h3>
@@ -291,7 +291,9 @@ export default function IdentityVerificationDetailPage() {
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
                     <span className="text-[var(--text-secondary)]">USN</span>
-                    <span className="font-mono">{ctx.student.usn}</span>
+                    <span style={{ fontFamily: "var(--font-mono)" }}>
+                      {ctx.student.usn}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[var(--text-secondary)]">Name</span>
@@ -306,7 +308,7 @@ export default function IdentityVerificationDetailPage() {
             </div>
 
             {/* Exam context */}
-            <div className="border border-white/10 bg-[var(--bg-raised)] p-4">
+            <div className="glass-surface p-4">
               <h3 className="eg-mono-sm text-[var(--text-muted)] mb-3">
                 Exam
               </h3>
@@ -320,7 +322,9 @@ export default function IdentityVerificationDetailPage() {
                     <span className="text-[var(--text-secondary)]">
                       Subject ID
                     </span>
-                    <span className="font-mono">{ctx.exam.subject_id}</span>
+                    <span style={{ fontFamily: "var(--font-mono)" }}>
+                      {ctx.exam.subject_id}
+                    </span>
                   </div>
                 </div>
               ) : (
@@ -331,7 +335,7 @@ export default function IdentityVerificationDetailPage() {
             </div>
 
             {/* Attempt details */}
-            <div className="border border-white/10 bg-[var(--bg-raised)] p-4">
+            <div className="glass-surface p-4">
               <h3 className="eg-mono-sm text-[var(--text-muted)] mb-3">
                 Attempt
               </h3>
@@ -344,7 +348,7 @@ export default function IdentityVerificationDetailPage() {
                   <span className="text-[var(--text-secondary)]">
                     Registration
                   </span>
-                  <span className="font-mono">
+                  <span style={{ fontFamily: "var(--font-mono)" }}>
                     #{attempt.exam_registration_id}
                   </span>
                 </div>
@@ -352,7 +356,7 @@ export default function IdentityVerificationDetailPage() {
                   <span className="text-[var(--text-secondary)]">
                     Hall Ticket
                   </span>
-                  <span className="font-mono">
+                  <span style={{ fontFamily: "var(--font-mono)" }}>
                     {attempt.hall_ticket_id
                       ? `#${attempt.hall_ticket_id}`
                       : "—"}
@@ -360,14 +364,20 @@ export default function IdentityVerificationDetailPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[var(--text-secondary)]">Created</span>
-                  <span className="font-mono text-xs">
+                  <span
+                    className="text-xs"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                  >
                     {new Date(attempt.created_at).toLocaleString()}
                   </span>
                 </div>
                 {attempt.started_at && (
                   <div className="flex justify-between">
                     <span className="text-[var(--text-secondary)]">Started</span>
-                    <span className="font-mono text-xs">
+                    <span
+                      className="text-xs"
+                      style={{ fontFamily: "var(--font-mono)" }}
+                    >
                       {new Date(attempt.started_at).toLocaleString()}
                     </span>
                   </div>
@@ -377,7 +387,10 @@ export default function IdentityVerificationDetailPage() {
                     <span className="text-[var(--text-secondary)]">
                       Completed
                     </span>
-                    <span className="font-mono text-xs">
+                    <span
+                      className="text-xs"
+                      style={{ fontFamily: "var(--font-mono)" }}
+                    >
                       {new Date(attempt.completed_at).toLocaleString()}
                     </span>
                   </div>
@@ -386,7 +399,7 @@ export default function IdentityVerificationDetailPage() {
             </div>
 
             {/* Actions */}
-            <div className="border border-white/10 bg-[var(--bg-raised)] p-4">
+            <div className="glass-surface p-4">
               <h3 className="eg-mono-sm text-[var(--text-muted)] mb-3">
                 Actions
               </h3>
@@ -418,7 +431,7 @@ export default function IdentityVerificationDetailPage() {
                 {!isTerminal && attempt.status !== "CREATED" && (
                   <button
                     onClick={handleCancel}
-                    className="eg-btn w-full py-2"
+                    className="eg-btn eg-btn-danger w-full py-2"
                   >
                     Cancel
                   </button>
@@ -428,7 +441,7 @@ export default function IdentityVerificationDetailPage() {
 
             {/* Review form */}
             {showReview && (
-              <div className="border border-white/10 bg-[var(--bg-raised)] p-4">
+              <div className="glass-surface p-4">
                 <h4 className="eg-mono-sm text-[var(--text-muted)] mb-3">
                   Review Notes
                 </h4>
@@ -436,7 +449,7 @@ export default function IdentityVerificationDetailPage() {
                   value={reviewNotes}
                   onChange={(e) => setReviewNotes(e.target.value)}
                   rows={3}
-                  className="w-full bg-black border border-white/10 px-3 py-2 text-sm text-white placeholder:text-[var(--text-muted)] focus:outline-none focus:border-white/30 resize-none mb-3"
+                  className="eg-input w-full resize-none mb-3"
                   placeholder="Optional notes..."
                 />
                 <div className="flex gap-2">
@@ -449,7 +462,7 @@ export default function IdentityVerificationDetailPage() {
                   >
                     Cancel
                   </button>
-                  <button onClick={handleReview} className="eg-btn px-3 py-1">
+                  <button onClick={handleReview} className="eg-btn eg-btn-primary px-3 py-1">
                     Submit Review
                   </button>
                 </div>
@@ -466,7 +479,7 @@ export default function IdentityVerificationDetailPage() {
             )}
 
             {/* Audit timeline */}
-            <div className="border border-white/10 bg-[var(--bg-raised)] p-4">
+            <div className="glass-surface p-4">
               <h3 className="eg-mono-sm text-[var(--text-muted)] mb-3">
                 Audit Trail
               </h3>
@@ -475,6 +488,6 @@ export default function IdentityVerificationDetailPage() {
           </div>
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 }

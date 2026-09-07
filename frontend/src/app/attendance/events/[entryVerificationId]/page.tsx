@@ -7,13 +7,14 @@ import {
   listEntryEvents,
   type AttendanceEvent,
 } from "@/lib/attendance-api";
+import AppShell from "@/components/AppShell";
 
-const EVENT_TYPE_CLASSES: Record<string, string> = {
-  AUTO_RECORDED: "border-white/30 text-white",
-  MANUAL_CORRECTION: "border-white/20 text-[var(--text-secondary)]",
-  MANUAL_ABSENT: "border-white/20 text-[var(--text-secondary)]",
-  ENTRY_GRANTED: "border-white/40 text-white",
-  ENTRY_DENIED: "border-white/10 text-[var(--text-muted)]",
+const EVENT_TYPE_BADGE: Record<string, string> = {
+  AUTO_RECORDED: "eg-badge-success",
+  MANUAL_CORRECTION: "eg-badge-warning",
+  MANUAL_ABSENT: "eg-badge-warning",
+  ENTRY_GRANTED: "eg-badge-success",
+  ENTRY_DENIED: "eg-badge-danger",
 };
 
 export default function AttendanceEventsPage() {
@@ -51,109 +52,84 @@ export default function AttendanceEventsPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-6">
-          <Link
-            href="/attendance"
-            className="eg-mono-sm text-[var(--text-muted)] hover:text-white transition-colors"
-          >
+    <AppShell>
+      <div className="eg-page">
+        <div className="eg-page-header">
+          <Link href="/attendance" className="eg-breadcrumb">
             ← Attendance
           </Link>
+          <h1 className="eg-page-title">Event History</h1>
+          <p className="eg-page-desc">
+            Entry verification #{entryVerificationId}
+          </p>
         </div>
 
-        <h1 className="eg-display text-3xl mb-2">Event History</h1>
-        <p className="eg-body text-[var(--text-secondary)] mb-8">
-          Entry verification #{entryVerificationId}
-        </p>
-
         {error && (
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-4 mb-6">
-            <span className="eg-mono text-red-400">{error}</span>
+          <div className="glass-surface p-4 mb-6">
+            <span className="eg-mono text-sm" style={{ color: "var(--danger)" }}>{error}</span>
           </div>
         )}
 
         {loading ? (
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-12 text-center">
+          <div className="glass-surface p-12 text-center">
             <span className="eg-mono text-[var(--text-muted)]">
               Loading events...
             </span>
           </div>
         ) : events.length === 0 ? (
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-12 text-center">
-            <h3 className="eg-mono text-[var(--text-secondary)] mb-2">
-              No events
-            </h3>
-            <p className="text-sm text-[var(--text-muted)]">
+          <div className="eg-empty">
+            <div className="eg-empty-title">No events</div>
+            <div className="eg-empty-desc">
               No attendance events found for this entry verification.
-            </p>
+            </div>
           </div>
         ) : (
-          <div className="border border-white/10 bg-[var(--bg-raised)] overflow-x-auto">
-            <table className="w-full">
+          <div className="eg-table-wrap">
+            <table className="eg-table">
               <thead>
-                <tr className="border-b border-white/10">
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    ID
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Type
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Status Snapshot
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Student
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Exam
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Recorded By
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Reason
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Created
-                  </th>
+                <tr>
+                  <th>ID</th>
+                  <th>Type</th>
+                  <th>Status Snapshot</th>
+                  <th>Student</th>
+                  <th>Exam</th>
+                  <th>Recorded By</th>
+                  <th>Reason</th>
+                  <th>Created</th>
                 </tr>
               </thead>
               <tbody>
                 {events.map((ev) => (
-                  <tr
-                    key={ev.id}
-                    className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
-                  >
-                    <td className="px-4 py-3 font-mono text-sm">{ev.id}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`text-[10px] eg-mono border px-2 py-0.5 ${
-                          EVENT_TYPE_CLASSES[ev.event_type] ||
-                          "border-white/10 text-[var(--text-muted)]"
-                        }`}
-                      >
+                  <tr key={ev.id}>
+                    <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.8125rem" }}>{ev.id}</td>
+                    <td>
+                      <span className={`eg-badge ${EVENT_TYPE_BADGE[ev.event_type] || "eg-badge-neutral"}`}>
                         {ev.event_type}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className="text-[10px] eg-mono border border-white/10 px-2 py-0.5 text-[var(--text-secondary)]">
+                    <td>
+                      <span className="eg-badge eg-badge-info">
                         {ev.status_snapshot}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">
-                      #{ev.student_id}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">
-                      #{ev.exam_id}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">
+                    <td style={{ color: "var(--text-secondary)" }}>#{ev.student_id}</td>
+                    <td style={{ color: "var(--text-secondary)" }}>#{ev.exam_id}</td>
+                    <td style={{ color: "var(--text-secondary)" }}>
                       {ev.recorded_by ?? "—"}
                     </td>
-                    <td className="px-4 py-3 text-sm text-[var(--text-secondary)] max-w-[200px] truncate">
+                    <td
+                      className="max-w-[200px] truncate"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
                       {ev.reason ?? "—"}
                     </td>
-                    <td className="px-4 py-3 text-xs text-[var(--text-muted)] font-mono">
+                    <td
+                      style={{
+                        color: "var(--text-muted)",
+                        fontFamily: "var(--font-mono)",
+                        fontSize: "0.75rem",
+                      }}
+                    >
                       {new Date(ev.created_at).toLocaleString()}
                     </td>
                   </tr>
@@ -164,7 +140,7 @@ export default function AttendanceEventsPage() {
         )}
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-4">
+          <div className="eg-pagination mt-4">
             <button
               onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page === 1}
@@ -185,6 +161,6 @@ export default function AttendanceEventsPage() {
           </div>
         )}
       </div>
-    </div>
+    </AppShell>
   );
 }

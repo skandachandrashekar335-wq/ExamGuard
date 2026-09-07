@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AppShell from "@/components/AppShell";
 
 interface Exam {
   id: number;
@@ -157,14 +158,16 @@ export default function ExamsPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-8">
-      <div className="max-w-5xl mx-auto">
-        <h1 className="text-3xl font-bold uppercase tracking-wider mb-2">
-          Exams
-        </h1>
-        <p className="text-[#999] mb-8">Manage examination schedules</p>
+    <AppShell>
+      <div className="eg-page">
+        <div className="eg-page-header">
+          <div>
+            <h1 className="eg-page-title">Exams</h1>
+            <p className="eg-page-desc">Manage examination schedules</p>
+          </div>
+        </div>
 
-        <div className="flex gap-4 mb-6">
+        <div className="eg-filter-bar">
           <input
             type="text"
             placeholder="Search by exam name..."
@@ -173,14 +176,14 @@ export default function ExamsPage() {
               setSearch(e.target.value);
               setPage(1);
             }}
-            className="flex-1 bg-[#111] border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-[#666] focus:outline-none focus:border-cyan-500"
+            className="eg-input flex-1"
           />
-          <label className="flex items-center gap-2 text-sm text-[#999]">
+          <label className="eg-label">
             <input
               type="checkbox"
               checked={showInactive}
               onChange={(e) => setShowInactive(e.target.checked)}
-              className="accent-cyan-500"
+              className="accent-[var(--accent)]"
             />
             Show inactive
           </label>
@@ -189,19 +192,19 @@ export default function ExamsPage() {
               resetForm();
               setShowForm(true);
             }}
-            className="bg-gradient-to-r from-cyan-500 to-pink-500 px-4 py-2 rounded-lg font-medium hover:opacity-90"
+            className="eg-btn eg-btn-primary"
           >
             + Add Exam
           </button>
         </div>
 
         {showForm && (
-          <div className="bg-[#111] border border-white/10 rounded-lg p-6 mb-6">
-            <h2 className="text-lg font-semibold mb-4">
+          <div className="glass-surface p-6 mb-6">
+            <h2 className="text-lg font-semibold mb-4" style={{ color: "var(--text-primary)" }}>
               {editExam ? "Edit Exam" : "New Exam"}
             </h2>
             {error && (
-              <p className="text-pink-400 text-sm mb-4">{error}</p>
+              <p className="text-sm mb-4" style={{ color: "var(--danger)" }}>{error}</p>
             )}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <select
@@ -209,7 +212,7 @@ export default function ExamsPage() {
                 onChange={(e) =>
                   setForm({ ...form, subject_id: e.target.value })
                 }
-                className="bg-[#050505] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                className="eg-select"
               >
                 <option value="">Select Subject</option>
                 {subjects.map((s) => (
@@ -225,7 +228,7 @@ export default function ExamsPage() {
                 onChange={(e) =>
                   setForm({ ...form, exam_name: e.target.value })
                 }
-                className="bg-[#050505] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                className="eg-input"
               />
               <input
                 type="date"
@@ -233,7 +236,7 @@ export default function ExamsPage() {
                 onChange={(e) =>
                   setForm({ ...form, exam_date: e.target.value })
                 }
-                className="bg-[#050505] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                className="eg-input"
               />
               <input
                 type="time"
@@ -242,7 +245,7 @@ export default function ExamsPage() {
                 onChange={(e) =>
                   setForm({ ...form, start_time: e.target.value })
                 }
-                className="bg-[#050505] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                className="eg-input"
               />
               <input
                 type="time"
@@ -251,14 +254,14 @@ export default function ExamsPage() {
                 onChange={(e) =>
                   setForm({ ...form, end_time: e.target.value })
                 }
-                className="bg-[#050505] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                className="eg-input"
               />
               <select
                 value={form.semester}
                 onChange={(e) =>
                   setForm({ ...form, semester: Number(e.target.value) })
                 }
-                className="bg-[#050505] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                className="eg-select"
               >
                 {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
                   <option key={s} value={s}>
@@ -273,13 +276,13 @@ export default function ExamsPage() {
                 onChange={(e) =>
                   setForm({ ...form, department: e.target.value })
                 }
-                className="bg-[#050505] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                className="eg-input"
               />
             </div>
             <div className="flex gap-4 mt-4">
               <button
                 onClick={handleSubmit}
-                className="bg-gradient-to-r from-cyan-500 to-pink-500 px-6 py-2 rounded-lg font-medium hover:opacity-90"
+                className="eg-btn eg-btn-primary"
               >
                 {editExam ? "Update" : "Create"}
               </button>
@@ -288,7 +291,7 @@ export default function ExamsPage() {
                   setShowForm(false);
                   resetForm();
                 }}
-                className="border border-white/20 px-4 py-2 rounded-lg hover:bg-white/5"
+                className="eg-btn"
               >
                 Cancel
               </button>
@@ -296,64 +299,47 @@ export default function ExamsPage() {
           </div>
         )}
 
-        <div className="bg-[#111] border border-white/10 rounded-lg overflow-hidden">
-          <table className="w-full">
+        <div className="eg-table-wrap">
+          <table className="eg-table">
             <thead>
-              <tr className="border-b border-white/10 text-left text-sm text-[#999]">
-                <th className="px-6 py-3">Exam Name</th>
-                <th className="px-6 py-3">Subject</th>
-                <th className="px-6 py-3">Date</th>
-                <th className="px-6 py-3">Time</th>
-                <th className="px-6 py-3">Dept</th>
-                <th className="px-6 py-3">Sem</th>
-                <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3 text-right">Actions</th>
+              <tr>
+                <th>Exam Name</th>
+                <th>Subject</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Dept</th>
+                <th>Sem</th>
+                <th>Status</th>
+                <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {exams.map((e) => (
-                <tr
-                  key={e.id}
-                  className="border-b border-white/5 hover:bg-white/[0.02]"
-                >
-                  <td className="px-6 py-3 text-sm">{e.exam_name}</td>
-                  <td className="px-6 py-3 text-sm text-[#999]">
-                    {e.subject_code || "—"}
-                  </td>
-                  <td className="px-6 py-3 text-sm text-[#999]">
-                    {e.exam_date}
-                  </td>
-                  <td className="px-6 py-3 text-sm text-[#999]">
+                <tr key={e.id}>
+                  <td>{e.exam_name}</td>
+                  <td>{e.subject_code || "—"}</td>
+                  <td>{e.exam_date}</td>
+                  <td>
                     {e.start_time?.slice(0, 5)} — {e.end_time?.slice(0, 5)}
                   </td>
-                  <td className="px-6 py-3 text-sm text-[#999]">
-                    {e.department}
-                  </td>
-                  <td className="px-6 py-3 text-sm text-[#999]">
-                    {e.semester}
-                  </td>
-                  <td className="px-6 py-3">
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full ${
-                        e.is_active
-                          ? "bg-emerald-500/20 text-emerald-400"
-                          : "bg-red-500/20 text-red-400"
-                      }`}
-                    >
+                  <td>{e.department}</td>
+                  <td>{e.semester}</td>
+                  <td>
+                    <span className={`eg-badge ${e.is_active ? "eg-badge-success" : "eg-badge-danger"}`}>
                       {e.is_active ? "Active" : "Inactive"}
                     </span>
                   </td>
-                  <td className="px-6 py-3 text-right">
+                  <td className="text-right">
                     <button
                       onClick={() => openEdit(e)}
-                      className="text-cyan-400 hover:text-cyan-300 text-sm mr-4"
+                      className="eg-btn eg-btn-sm text-xs mr-4"
                     >
                       Edit
                     </button>
                     {e.is_active && (
                       <button
                         onClick={() => handleDeactivate(e.id)}
-                        className="text-pink-400 hover:text-pink-300 text-sm"
+                        className="eg-btn eg-btn-danger eg-btn-sm text-xs"
                       >
                         Deactivate
                       </button>
@@ -363,11 +349,11 @@ export default function ExamsPage() {
               ))}
               {exams.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={8}
-                    className="px-6 py-8 text-center text-[#666]"
-                  >
-                    No exams found
+                  <td colSpan={8}>
+                    <div className="eg-empty">
+                      <p className="eg-empty-title">No exams found</p>
+                      <p className="eg-empty-desc">Try adjusting your search or filters</p>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -376,27 +362,27 @@ export default function ExamsPage() {
         </div>
 
         {totalPages > 1 && (
-          <div className="flex justify-center gap-4 mt-6">
+          <div className="eg-pagination">
             <button
               onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page === 1}
-              className="border border-white/20 px-4 py-2 rounded-lg disabled:opacity-30 hover:bg-white/5"
+              className="eg-btn"
             >
               Previous
             </button>
-            <span className="py-2 text-sm text-[#999]">
+            <span className="eg-pagination-info">
               Page {page} of {totalPages} ({total} total)
             </span>
             <button
               onClick={() => setPage(Math.min(totalPages, page + 1))}
               disabled={page >= totalPages}
-              className="border border-white/20 px-4 py-2 rounded-lg disabled:opacity-30 hover:bg-white/5"
+              className="eg-btn"
             >
               Next
             </button>
           </div>
         )}
       </div>
-    </div>
+    </AppShell>
   );
 }

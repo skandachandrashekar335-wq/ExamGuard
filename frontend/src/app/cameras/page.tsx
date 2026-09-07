@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import AppShell from "@/components/AppShell";
 import {
   listCameras,
   createCamera,
@@ -171,41 +171,22 @@ export default function CamerasPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-8">
-      <div className="max-w-5xl mx-auto">
-        <Link
-          href="/dashboard"
-          className="text-[#999] hover:text-white text-sm mb-6 inline-block"
-        >
-          &larr; BACK TO DASHBOARD
-        </Link>
-
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold uppercase tracking-wider">
-              Cameras
-            </h1>
-            <p className="text-[#999] mt-1">
-              Manage physical camera devices for examination halls
-            </p>
-          </div>
-          <button
-            onClick={openCreate}
-            className="bg-white text-black px-4 py-2 font-mono text-sm uppercase tracking-wider hover:bg-[#E5E5E5] transition-colors"
-          >
-            + Add Camera
-          </button>
+    <AppShell>
+      <div className="eg-page">
+        <div className="eg-page-header">
+          <p className="eg-breadcrumb">HOME / CAMERAS</p>
+          <h1 className="eg-page-title">Cameras</h1>
+          <p className="eg-page-desc">Manage physical camera devices for examination halls</p>
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-3 mb-6">
+        <div className="eg-filter-bar">
           <input
             type="text"
-            placeholder="SEARCH CAMERAS..."
+            placeholder="Search cameras..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && load()}
-            className="flex-1 bg-[#111] border border-white/10 px-4 py-2 text-white placeholder:text-[#666] focus:outline-none focus:border-white/30 font-mono text-sm uppercase"
+            className="eg-input flex-1"
           />
           <select
             value={statusFilter}
@@ -213,16 +194,16 @@ export default function CamerasPage() {
               setStatusFilter(e.target.value);
               setPage(1);
             }}
-            className="bg-[#111] border border-white/10 px-4 py-2 text-white focus:outline-none focus:border-white/30 font-mono text-sm uppercase"
+            className="eg-select"
           >
-            <option value="">ALL STATUSES</option>
+            <option value="">All Statuses</option>
             {STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>
             ))}
           </select>
-          <label className="flex items-center gap-2 text-sm text-[#999] cursor-pointer select-none">
+          <label className="eg-label flex items-center gap-2">
             <input
               type="checkbox"
               checked={showInactive}
@@ -230,107 +211,98 @@ export default function CamerasPage() {
                 setShowInactive(e.target.checked);
                 setPage(1);
               }}
-              className="accent-white"
+              className="eg-checkbox"
             />
-            INCLUDE INACTIVE
+            Include inactive
           </label>
+          <button onClick={openCreate} className="eg-btn eg-btn-primary">
+            + Add Camera
+          </button>
         </div>
 
         {error && (
-          <div className="bg-red-900/20 border border-red-500/30 text-red-400 px-4 py-3 mb-6 font-mono text-sm">
+          <div className="eg-alert eg-alert-danger mb-6">
             {error}
           </div>
         )}
 
         {loading ? (
-          <div className="text-center py-20 text-[#666] font-mono text-sm uppercase">
-            Loading cameras...
+          <div className="eg-empty">
+            <p className="eg-empty-title">Loading cameras...</p>
           </div>
         ) : cameras.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-[#666] font-mono text-sm uppercase mb-4">
-              No cameras configured
-            </p>
-            <button
-              onClick={openCreate}
-              className="bg-white text-black px-4 py-2 font-mono text-sm uppercase tracking-wider hover:bg-[#E5E5E5] transition-colors"
-            >
+          <div className="eg-empty">
+            <p className="eg-empty-title">No cameras configured</p>
+            <p className="eg-empty-desc">Get started by adding your first camera.</p>
+            <button onClick={openCreate} className="eg-btn eg-btn-primary mt-4">
               + Add Camera
             </button>
           </div>
         ) : (
           <>
-            <div className="bg-[#111] border border-white/10 overflow-hidden">
-              <table className="w-full text-left">
+            <div className="eg-table-wrap">
+              <table className="eg-table">
                 <thead>
-                  <tr className="border-b border-white/10 text-xs text-[#999] uppercase tracking-wider">
-                    <th className="px-4 py-3 font-mono">Name</th>
-                    <th className="px-4 py-3 font-mono">Identifier</th>
-                    <th className="px-4 py-3 font-mono">Type</th>
-                    <th className="px-4 py-3 font-mono">Status</th>
-                    <th className="px-4 py-3 font-mono">Last Seen</th>
-                    <th className="px-4 py-3 font-mono">Hall</th>
-                    <th className="px-4 py-3 font-mono">Active</th>
-                    <th className="px-4 py-3 font-mono">Actions</th>
+                  <tr>
+                    <th>Name</th>
+                    <th>Identifier</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Last Seen</th>
+                    <th>Hall</th>
+                    <th>Active</th>
+                    <th className="text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {cameras.map((c) => (
-                    <tr
-                      key={c.id}
-                      className="border-b border-white/5 hover:bg-white/[0.02]"
-                    >
-                      <td className="px-4 py-3 text-sm">{c.name}</td>
-                      <td className="px-4 py-3 text-sm font-mono text-[#999]">
+                    <tr key={c.id}>
+                      <td>{c.name}</td>
+                      <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.8125rem" }}>
                         {c.device_identifier}
                       </td>
-                      <td className="px-4 py-3 text-sm text-[#999]">
+                      <td style={{ color: "var(--text-muted)" }}>
                         {c.camera_type || "—"}
                       </td>
-                      <td className="px-4 py-3">
+                      <td>
                         <span
-                          className={`text-xs font-mono uppercase ${
+                          className={`eg-badge ${
                             c.status === "ONLINE"
-                              ? "text-emerald-400"
+                              ? "eg-badge-success"
                               : c.status === "DISABLED"
-                                ? "text-red-400"
-                                : "text-[#999]"
+                                ? "eg-badge-danger"
+                                : "eg-badge-neutral"
                           }`}
                         >
                           {c.status}
                         </span>
                         {c.health_reason && (
-                          <div className="text-[10px] text-[#666] mt-0.5">
+                          <div style={{ fontSize: "0.6875rem", color: "var(--text-muted)", marginTop: "2px" }}>
                             {healthReasonLabel(c.health_reason)}
                           </div>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-xs text-[#666] font-mono">
+                      <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem", color: "var(--text-muted)" }}>
                         {formatTimestamp(c.last_seen_at)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-[#999]">
+                      <td style={{ color: "var(--text-muted)" }}>
                         {hallLabel(c.exam_hall_id)}
                       </td>
-                      <td className="px-4 py-3">
+                      <td>
                         <span
-                          className={`text-xs font-mono ${
-                            c.is_active ? "text-emerald-400" : "text-red-400"
-                          }`}
+                          className={`eg-badge ${c.is_active ? "eg-badge-success" : "eg-badge-danger"}`}
                         >
-                          {c.is_active ? "YES" : "NO"}
+                          {c.is_active ? "Yes" : "No"}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm space-x-3">
-                        <button
-                          onClick={() => openEdit(c)}
-                          className="text-[#999] hover:text-white text-xs font-mono uppercase"
-                        >
+                      <td className="text-right">
+                        <button onClick={() => openEdit(c)} className="eg-btn text-xs mr-4">
                           Edit
                         </button>
                         {c.is_active && (
                           <button
                             onClick={() => setConfirmDelete(c.id)}
-                            className="text-[#999] hover:text-red-400 text-xs font-mono uppercase"
+                            className="eg-btn eg-btn-danger text-xs"
                           >
                             Deactivate
                           </button>
@@ -342,154 +314,110 @@ export default function CamerasPage() {
               </table>
             </div>
 
-            {/* Pagination */}
-            <div className="flex items-center justify-between mt-4">
-              <p className="text-xs text-[#666] font-mono">
-                {total} TOTAL &middot; PAGE {page} OF {totalPages || 1}
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                  className="border border-white/20 px-3 py-1 text-xs font-mono uppercase disabled:opacity-30 hover:bg-white/5"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                  className="border border-white/20 px-3 py-1 text-xs font-mono uppercase disabled:opacity-30 hover:bg-white/5"
-                >
-                  Next
-                </button>
-              </div>
+            <div className="eg-pagination">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="eg-btn eg-btn-sm"
+              >
+                Previous
+              </button>
+              <span className="eg-pagination-info">
+                {total} total · Page {page} of {totalPages || 1}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="eg-btn eg-btn-sm"
+              >
+                Next
+              </button>
             </div>
           </>
         )}
 
-        {/* Create/Edit Form Modal */}
         {showForm && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <div className="bg-[#111] border border-white/10 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-                <h2 className="text-lg font-mono uppercase tracking-wider">
+          <div className="eg-modal-backdrop" onClick={() => setShowForm(false)}>
+            <div className="eg-modal glass-surface glass" onClick={(e) => e.stopPropagation()}>
+              <div className="eg-modal-header">
+                <h2 className="eg-page-title text-lg">
                   {editCamera ? "Edit Camera" : "Add Camera"}
                 </h2>
-                <button
-                  onClick={() => setShowForm(false)}
-                  className="text-[#666] hover:text-white text-xl"
-                >
-                  &times;
-                </button>
+                <button onClick={() => setShowForm(false)} className="eg-modal-close">&times;</button>
               </div>
-              <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <form onSubmit={handleSubmit} className="eg-modal-body">
                 {formError && (
-                  <div className="bg-red-900/20 border border-red-500/30 text-red-400 px-3 py-2 text-sm font-mono">
+                  <div className="eg-alert eg-alert-danger mb-4">
                     {formError}
                   </div>
                 )}
-                <div>
-                  <label className="block text-xs font-mono text-[#999] uppercase mb-1">
-                    Name *
-                  </label>
+                <div className="eg-field">
+                  <label className="eg-label">Name *</label>
                   <input
                     type="text"
                     required
                     value={form.name}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, name: e.target.value }))
-                    }
-                    className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 text-white text-sm focus:outline-none focus:border-white/30"
+                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    className="eg-input w-full"
                     placeholder="e.g. Main Hall Camera 1"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-mono text-[#999] uppercase mb-1">
-                    Device Identifier *
-                  </label>
+                <div className="eg-field">
+                  <label className="eg-label">Device Identifier *</label>
                   <input
                     type="text"
                     required
                     value={form.device_identifier}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        device_identifier: e.target.value,
-                      }))
-                    }
-                    className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 text-white text-sm font-mono focus:outline-none focus:border-white/30"
+                    onChange={(e) => setForm((f) => ({ ...f, device_identifier: e.target.value }))}
+                    className="eg-input w-full"
+                    style={{ fontFamily: "var(--font-mono)" }}
                     placeholder="e.g. CAM-001"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-mono text-[#999] uppercase mb-1">
-                      Camera Type
-                    </label>
+                <div className="eg-grid-2">
+                  <div className="eg-field">
+                    <label className="eg-label">Camera Type</label>
                     <input
                       type="text"
                       value={form.camera_type || ""}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          camera_type: e.target.value || null,
-                        }))
-                      }
-                      className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 text-white text-sm focus:outline-none focus:border-white/30"
+                      onChange={(e) => setForm((f) => ({ ...f, camera_type: e.target.value || null }))}
+                      className="eg-input w-full"
                       placeholder="e.g. IP, USB"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-mono text-[#999] uppercase mb-1">
-                      Manufacturer
-                    </label>
+                  <div className="eg-field">
+                    <label className="eg-label">Manufacturer</label>
                     <input
                       type="text"
                       value={form.manufacturer || ""}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          manufacturer: e.target.value || null,
-                        }))
-                      }
-                      className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 text-white text-sm focus:outline-none focus:border-white/30"
+                      onChange={(e) => setForm((f) => ({ ...f, manufacturer: e.target.value || null }))}
+                      className="eg-input w-full"
                       placeholder="e.g. Hikvision"
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-mono text-[#999] uppercase mb-1">
-                      Model Name
-                    </label>
+                <div className="eg-grid-2">
+                  <div className="eg-field">
+                    <label className="eg-label">Model Name</label>
                     <input
                       type="text"
                       value={form.model_name || ""}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          model_name: e.target.value || null,
-                        }))
-                      }
-                      className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 text-white text-sm focus:outline-none focus:border-white/30"
+                      onChange={(e) => setForm((f) => ({ ...f, model_name: e.target.value || null }))}
+                      className="eg-input w-full"
                       placeholder="e.g. DS-2CD2143"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-mono text-[#999] uppercase mb-1">
-                      Exam Hall
-                    </label>
+                  <div className="eg-field">
+                    <label className="eg-label">Exam Hall</label>
                     <select
                       value={form.exam_hall_id || ""}
                       onChange={(e) =>
                         setForm((f) => ({
                           ...f,
-                          exam_hall_id: e.target.value
-                            ? Number(e.target.value)
-                            : null,
+                          exam_hall_id: e.target.value ? Number(e.target.value) : null,
                         }))
                       }
-                      className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 text-white text-sm focus:outline-none focus:border-white/30"
+                      className="eg-select w-full"
                     >
                       <option value="">None</option>
                       {halls.map((h) => (
@@ -500,11 +428,9 @@ export default function CamerasPage() {
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-mono text-[#999] uppercase mb-1">
-                      Resolution Width
-                    </label>
+                <div className="eg-grid-2">
+                  <div className="eg-field">
+                    <label className="eg-label">Resolution Width</label>
                     <input
                       type="number"
                       min="1"
@@ -512,19 +438,15 @@ export default function CamerasPage() {
                       onChange={(e) =>
                         setForm((f) => ({
                           ...f,
-                          resolution_width: e.target.value
-                            ? Number(e.target.value)
-                            : null,
+                          resolution_width: e.target.value ? Number(e.target.value) : null,
                         }))
                       }
-                      className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 text-white text-sm focus:outline-none focus:border-white/30"
+                      className="eg-input w-full"
                       placeholder="px"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-mono text-[#999] uppercase mb-1">
-                      Resolution Height
-                    </label>
+                  <div className="eg-field">
+                    <label className="eg-label">Resolution Height</label>
                     <input
                       type="number"
                       min="1"
@@ -532,50 +454,30 @@ export default function CamerasPage() {
                       onChange={(e) =>
                         setForm((f) => ({
                           ...f,
-                          resolution_height: e.target.value
-                            ? Number(e.target.value)
-                            : null,
+                          resolution_height: e.target.value ? Number(e.target.value) : null,
                         }))
                       }
-                      className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 text-white text-sm focus:outline-none focus:border-white/30"
+                      className="eg-input w-full"
                       placeholder="px"
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-mono text-[#999] uppercase mb-1">
-                    Connection Info
-                  </label>
+                <div className="eg-field">
+                  <label className="eg-label">Connection Info</label>
                   <input
                     type="text"
                     value={form.connection_info || ""}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        connection_info: e.target.value || null,
-                      }))
-                    }
-                    className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 text-white text-sm font-mono focus:outline-none focus:border-white/30"
+                    onChange={(e) => setForm((f) => ({ ...f, connection_info: e.target.value || null }))}
+                    className="eg-input w-full"
+                    style={{ fontFamily: "var(--font-mono)" }}
                     placeholder="IP address or endpoint URL"
                   />
                 </div>
                 <div className="flex gap-3 pt-2">
-                  <button
-                    type="submit"
-                    disabled={formLoading}
-                    className="bg-white text-black px-6 py-2 font-mono text-sm uppercase tracking-wider hover:bg-[#E5E5E5] disabled:opacity-50 transition-colors"
-                  >
-                    {formLoading
-                      ? "SAVING..."
-                      : editCamera
-                        ? "UPDATE CAMERA"
-                        : "CREATE CAMERA"}
+                  <button type="submit" disabled={formLoading} className="eg-btn eg-btn-primary">
+                    {formLoading ? "Saving..." : editCamera ? "Update Camera" : "Create Camera"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowForm(false)}
-                    className="border border-white/20 px-6 py-2 font-mono text-sm uppercase text-[#999] hover:bg-white/5"
-                  >
+                  <button type="button" onClick={() => setShowForm(false)} className="eg-btn">
                     Cancel
                   </button>
                 </div>
@@ -584,28 +486,21 @@ export default function CamerasPage() {
           </div>
         )}
 
-        {/* Deactivate Confirmation */}
         {confirmDelete !== null && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <div className="bg-[#111] border border-white/10 w-full max-w-sm p-6">
-              <h2 className="text-lg font-mono uppercase tracking-wider mb-4">
-                Deactivate Camera
-              </h2>
-              <p className="text-sm text-[#999] mb-6">
-                This will deactivate the camera. It will no longer appear in
-                active operations.
+          <div className="eg-modal-backdrop" onClick={() => setConfirmDelete(null)}>
+            <div className="eg-modal glass-surface glass" onClick={(e) => e.stopPropagation()}>
+              <h2 className="eg-page-title text-lg mb-4">Deactivate Camera</h2>
+              <p className="eg-body mb-6">
+                This will deactivate the camera. It will no longer appear in active operations.
               </p>
               <div className="flex gap-3">
                 <button
                   onClick={() => handleDeactivate(confirmDelete)}
-                  className="bg-red-900/50 border border-red-500/30 text-red-400 px-4 py-2 font-mono text-sm uppercase hover:bg-red-900/80 transition-colors"
+                  className="eg-btn eg-btn-danger"
                 >
                   Deactivate
                 </button>
-                <button
-                  onClick={() => setConfirmDelete(null)}
-                  className="border border-white/20 px-4 py-2 font-mono text-sm uppercase text-[#999] hover:bg-white/5"
-                >
+                <button onClick={() => setConfirmDelete(null)} className="eg-btn">
                   Cancel
                 </button>
               </div>
@@ -613,6 +508,6 @@ export default function CamerasPage() {
           </div>
         )}
       </div>
-    </div>
+    </AppShell>
   );
 }

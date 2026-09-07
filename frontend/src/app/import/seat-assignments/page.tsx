@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import * as XLSX from "xlsx";
+import AppShell from "@/components/AppShell";
 import {
   parseSpreadsheet,
   validateRows,
@@ -231,23 +232,28 @@ export default function ImportSeatAssignmentsPage() {
   const selectedHall = halls.find((h) => h.id === selectedHallId);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-8">
-      <div className="max-w-5xl mx-auto">
-        <h1 className="text-3xl font-bold uppercase tracking-wider mb-2">
-          Import Seat Assignments
-        </h1>
-        <p className="text-[#999] mb-8">
-          Bulk assign seats in an exam hall (max {MAX_ASSIGNMENTS} per batch)
-        </p>
+    <AppShell>
+      <div className="eg-page">
+        <div className="eg-page-header">
+          <div className="eg-breadcrumb">
+            <Link href="/import">Import</Link> / Seat Assignments
+          </div>
+          <h1 className="eg-page-title">Import Seat Assignments</h1>
+          <p className="eg-page-desc">
+            Bulk assign seats in an exam hall (max {MAX_ASSIGNMENTS} per batch)
+          </p>
+        </div>
 
         {phase === "select" && (
           <div>
-            <div className="bg-[#111] border border-white/10 rounded-lg p-6 mb-6">
-              <h2 className="text-lg font-semibold mb-4">Select Exam Hall</h2>
+            <div className="glass-surface glass p-6 mb-6">
+              <h2 className="text-lg font-semibold mb-4" style={{ color: "var(--text-primary)" }}>
+                Select Exam Hall
+              </h2>
               <select
                 value={selectedHallId ?? ""}
                 onChange={(e) => setSelectedHallId(e.target.value ? Number(e.target.value) : null)}
-                className="w-full bg-[#050505] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                className="eg-select w-full"
               >
                 <option value="">Choose an exam hall...</option>
                 {halls.map((h) => (
@@ -261,9 +267,11 @@ export default function ImportSeatAssignmentsPage() {
 
             {selectedHallId && (
               <>
-                <div className="bg-[#111] border border-white/10 rounded-lg p-6 mb-6">
-                  <h2 className="text-lg font-semibold mb-4">How to import</h2>
-                  <ol className="text-sm text-[#999] space-y-2 list-decimal list-inside">
+                <div className="glass-surface glass p-6 mb-6">
+                  <h2 className="text-lg font-semibold mb-4" style={{ color: "var(--text-primary)" }}>
+                    How to import
+                  </h2>
+                  <ol className="text-sm space-y-2 list-decimal list-inside" style={{ color: "var(--text-secondary)" }}>
                     <li>Download the template file using the button below</li>
                     <li>Fill in Registration ID and Seat Number for each assignment</li>
                     <li>Optionally add Row and Column numbers</li>
@@ -272,7 +280,7 @@ export default function ImportSeatAssignmentsPage() {
                   </ol>
                   <button
                     onClick={handleDownloadTemplate}
-                    className="mt-4 border border-cyan-500/50 text-cyan-400 px-4 py-2 rounded-lg text-sm hover:bg-cyan-500/10 transition-colors"
+                    className="eg-btn mt-4"
                   >
                     Download Template
                   </button>
@@ -281,7 +289,8 @@ export default function ImportSeatAssignmentsPage() {
                 <div
                   onDrop={handleDrop}
                   onDragOver={(e) => e.preventDefault()}
-                  className="border-2 border-dashed border-white/20 rounded-lg p-16 text-center hover:border-white/40 transition-colors cursor-pointer"
+                  className="glass-surface border-2 border-dashed p-16 text-center cursor-pointer transition-colors hover:border-[var(--accent)]/50"
+                  style={{ borderColor: "var(--border)" }}
                   onClick={() => fileRef.current?.click()}
                 >
                   <input
@@ -294,8 +303,12 @@ export default function ImportSeatAssignmentsPage() {
                       if (file) handleFile(file);
                     }}
                   />
-                  <p className="text-[#999] text-lg mb-2">Drop an Excel or CSV file here</p>
-                  <p className="text-[#666] text-sm">Accepts .xlsx and .csv files</p>
+                  <p className="text-lg mb-2" style={{ color: "var(--text-secondary)" }}>
+                    Drop an Excel or CSV file here
+                  </p>
+                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                    Accepts .xlsx and .csv files
+                  </p>
                 </div>
               </>
             )}
@@ -303,36 +316,36 @@ export default function ImportSeatAssignmentsPage() {
         )}
 
         {parseError && (
-          <div className="bg-pink-500/10 border border-pink-500/30 rounded-lg p-4 mb-6">
-            <p className="text-pink-400 text-sm">{parseError}</p>
+          <div className="bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-lg p-4 mb-6">
+            <p className="text-[var(--danger)] text-sm">{parseError}</p>
           </div>
         )}
 
         {phase === "preview" && selectedHall && (
           <div>
-            <div className="bg-[#111] border border-white/10 rounded-lg p-4 mb-6">
+            <div className="glass-surface glass p-4 mb-6">
               <div className="flex items-center justify-between">
                 <div className="flex gap-6 text-sm">
-                  <span className="text-[#999]">
-                    Hall: <span className="text-white">{selectedHall.building} — Room {selectedHall.room_number}</span>
+                  <span style={{ color: "var(--text-secondary)" }}>
+                    Hall: <span style={{ color: "var(--text-primary)" }}>{selectedHall.building} — Room {selectedHall.room_number}</span>
                   </span>
-                  <span className="text-[#999]">
-                    <span className="text-white font-medium">{rows.length}</span> total rows
+                  <span style={{ color: "var(--text-secondary)" }}>
+                    <span style={{ color: "var(--text-primary)" }} className="font-medium">{rows.length}</span> total rows
                   </span>
-                  {validCount > 0 && <span className="text-emerald-400">{validCount} valid</span>}
-                  {invalidCount > 0 && <span className="text-pink-400">{invalidCount} with errors</span>}
+                  {validCount > 0 && <span className="eg-badge eg-badge-success">{validCount} valid</span>}
+                  {invalidCount > 0 && <span className="eg-badge eg-badge-danger">{invalidCount} with errors</span>}
                 </div>
                 <div className="flex gap-3">
                   {invalidCount > 0 && (
-                    <button onClick={handleExportFailed} className="border border-white/20 px-4 py-2 rounded-lg text-sm hover:bg-white/5">
+                    <button onClick={handleExportFailed} className="eg-btn">
                       Export Failed Rows
                     </button>
                   )}
-                  <button onClick={reset} className="border border-white/20 px-4 py-2 rounded-lg text-sm hover:bg-white/5">
+                  <button onClick={reset} className="eg-btn">
                     Cancel
                   </button>
                   {validCount > 0 && (
-                    <button onClick={handleSubmit} className="bg-gradient-to-r from-cyan-500 to-pink-500 px-6 py-2 rounded-lg font-medium hover:opacity-90">
+                    <button onClick={handleSubmit} className="eg-btn eg-btn-primary">
                       Assign {validCount} Seat{validCount !== 1 ? "s" : ""}
                     </button>
                   )}
@@ -342,17 +355,28 @@ export default function ImportSeatAssignmentsPage() {
 
             {invalidCount > 0 && (
               <div className="mb-6">
-                <h2 className="text-lg font-semibold mb-3 text-pink-400">Rows With Errors ({invalidCount})</h2>
-                <div className="bg-[#111] border border-pink-500/30 rounded-lg overflow-hidden">
-                  <table className="w-full">
-                    <thead><tr className="border-b border-white/10 text-left text-sm text-[#999]"><th className="px-6 py-3">Row</th><th className="px-6 py-3">Reg ID</th><th className="px-6 py-3">Seat</th><th className="px-6 py-3">Errors</th></tr></thead>
+                <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--danger)" }}>
+                  Rows With Errors ({invalidCount})
+                </h2>
+                <div className="eg-table-wrap" style={{ borderColor: "var(--danger-border)" }}>
+                  <table className="eg-table">
+                    <thead>
+                      <tr>
+                        <th>Row</th>
+                        <th>Reg ID</th>
+                        <th>Seat</th>
+                        <th>Errors</th>
+                      </tr>
+                    </thead>
                     <tbody>
                       {rows.filter((r) => !r.valid).map((r, i) => (
-                        <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02]">
-                          <td className="px-6 py-3 text-sm text-[#666]">{rows.indexOf(r) + 1}</td>
-                          <td className="px-6 py-3 font-mono text-sm">{String(r.row["Registration ID"] ?? "")}</td>
-                          <td className="px-6 py-3 font-mono text-sm">{String(r.row["Seat Number"] ?? "")}</td>
-                          <td className="px-6 py-3 text-sm text-pink-400">{r.errors.map((e) => e.message).join("; ")}</td>
+                        <tr key={i}>
+                          <td style={{ color: "var(--text-muted)" }}>{rows.indexOf(r) + 1}</td>
+                          <td className="font-mono text-sm">{String(r.row["Registration ID"] ?? "")}</td>
+                          <td className="font-mono text-sm">{String(r.row["Seat Number"] ?? "")}</td>
+                          <td className="text-sm" style={{ color: "var(--danger)" }}>
+                            {r.errors.map((e) => e.message).join("; ")}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -363,18 +387,28 @@ export default function ImportSeatAssignmentsPage() {
 
             {validCount > 0 && (
               <div>
-                <h2 className="text-lg font-semibold mb-3 text-emerald-400">Valid Rows ({validCount})</h2>
-                <div className="bg-[#111] border border-white/10 rounded-lg overflow-hidden">
-                  <table className="w-full">
-                    <thead><tr className="border-b border-white/10 text-left text-sm text-[#999]"><th className="px-6 py-3">Row</th><th className="px-6 py-3">Reg ID</th><th className="px-6 py-3">Seat</th><th className="px-6 py-3">Row #</th><th className="px-6 py-3">Col #</th></tr></thead>
+                <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--success)" }}>
+                  Valid Rows ({validCount})
+                </h2>
+                <div className="eg-table-wrap">
+                  <table className="eg-table">
+                    <thead>
+                      <tr>
+                        <th>Row</th>
+                        <th>Reg ID</th>
+                        <th>Seat</th>
+                        <th>Row #</th>
+                        <th>Col #</th>
+                      </tr>
+                    </thead>
                     <tbody>
                       {rows.filter((r) => r.valid).map((r, i) => (
-                        <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02]">
-                          <td className="px-6 py-3 text-sm text-[#666]">{rows.indexOf(r) + 1}</td>
-                          <td className="px-6 py-3 font-mono text-sm">{String(r.row["Registration ID"] ?? "")}</td>
-                          <td className="px-6 py-3 font-mono text-sm">{String(r.row["Seat Number"] ?? "")}</td>
-                          <td className="px-6 py-3 text-sm text-[#999]">{String(r.row["Row"] ?? "\u2014")}</td>
-                          <td className="px-6 py-3 text-sm text-[#999]">{String(r.row["Column"] ?? "\u2014")}</td>
+                        <tr key={i}>
+                          <td style={{ color: "var(--text-muted)" }}>{rows.indexOf(r) + 1}</td>
+                          <td className="font-mono text-sm">{String(r.row["Registration ID"] ?? "")}</td>
+                          <td className="font-mono text-sm">{String(r.row["Seat Number"] ?? "")}</td>
+                          <td className="text-sm" style={{ color: "var(--text-secondary)" }}>{String(r.row["Row"] ?? "\u2014")}</td>
+                          <td className="text-sm" style={{ color: "var(--text-secondary)" }}>{String(r.row["Column"] ?? "\u2014")}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -387,34 +421,63 @@ export default function ImportSeatAssignmentsPage() {
 
         {phase === "submitting" && (
           <div className="text-center py-16">
-            <div className="inline-block w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-[#999]">Assigning seats...</p>
+            <div className="inline-block w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mb-4" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} />
+            <p style={{ color: "var(--text-secondary)" }}>Assigning seats...</p>
           </div>
         )}
 
         {phase === "result" && response && (
           <div>
             <div className="grid grid-cols-4 gap-4 mb-6">
-              {[{ label: "Total", value: response.total, color: "text-white" }, { label: "Assigned", value: response.assigned, color: "text-emerald-400" }, { label: "Skipped", value: response.skipped, color: "text-amber-400" }, { label: "Failed", value: response.failed, color: "text-pink-400" }].map((stat) => (
-                <div key={stat.label} className="bg-[#111] border border-white/10 rounded-lg p-4 text-center">
-                  <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
-                  <p className="text-[#999] text-sm">{stat.label}</p>
+              {[
+                { label: "Total", value: response.total, color: "var(--text-primary)" },
+                { label: "Assigned", value: response.assigned, color: "var(--success)" },
+                { label: "Skipped", value: response.skipped, color: "var(--warning)" },
+                { label: "Failed", value: response.failed, color: "var(--danger)" },
+              ].map((stat) => (
+                <div key={stat.label} className="glass-surface glass p-4 text-center">
+                  <p className="text-2xl font-bold" style={{ color: stat.color }}>{stat.value}</p>
+                  <p className="text-sm" style={{ color: "var(--text-secondary)" }}>{stat.label}</p>
                 </div>
               ))}
             </div>
 
             {response.results.length > 0 && (
-              <div className="bg-[#111] border border-white/10 rounded-lg overflow-hidden mb-6">
-                <table className="w-full">
-                  <thead><tr className="border-b border-white/10 text-left text-sm text-[#999]"><th className="px-6 py-3">Registration ID</th><th className="px-6 py-3">Seat</th><th className="px-6 py-3">Status</th><th className="px-6 py-3">Assignment ID</th><th className="px-6 py-3">Error</th></tr></thead>
+              <div className="eg-table-wrap mb-6">
+                <table className="eg-table">
+                  <thead>
+                    <tr>
+                      <th>Registration ID</th>
+                      <th>Seat</th>
+                      <th>Status</th>
+                      <th>Assignment ID</th>
+                      <th>Error</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {response.results.map((r, i) => (
-                      <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02]">
-                        <td className="px-6 py-3 font-mono text-sm">{r.exam_registration_id}</td>
-                        <td className="px-6 py-3 font-mono text-sm">{r.seat_number}</td>
-                        <td className="px-6 py-3"><span className={`text-xs px-2 py-1 rounded-full ${r.status === "assigned" ? "bg-emerald-500/20 text-emerald-400" : r.status === "skipped" ? "bg-amber-500/20 text-amber-400" : "bg-pink-500/20 text-pink-400"}`}>{r.status}</span></td>
-                        <td className="px-6 py-3 text-sm text-[#999]">{r.assignment_id ?? "\u2014"}</td>
-                        <td className="px-6 py-3 text-sm text-[#999]">{r.error || "\u2014"}</td>
+                      <tr key={i}>
+                        <td className="font-mono text-sm">{r.exam_registration_id}</td>
+                        <td className="font-mono text-sm">{r.seat_number}</td>
+                        <td>
+                          <span
+                            className={`eg-badge ${
+                              r.status === "assigned"
+                                ? "eg-badge-success"
+                                : r.status === "skipped"
+                                ? "eg-badge-warning"
+                                : "eg-badge-danger"
+                            }`}
+                          >
+                            {r.status}
+                          </span>
+                        </td>
+                        <td className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                          {r.assignment_id ?? "\u2014"}
+                        </td>
+                        <td className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                          {r.error || "\u2014"}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -422,22 +485,24 @@ export default function ImportSeatAssignmentsPage() {
               </div>
             )}
 
-            <button onClick={reset} className="bg-gradient-to-r from-cyan-500 to-pink-500 px-6 py-2 rounded-lg font-medium hover:opacity-90">
+            <button onClick={reset} className="eg-btn eg-btn-primary">
               Import Another Batch
             </button>
           </div>
         )}
 
         {submitError && (
-          <div className="bg-pink-500/10 border border-pink-500/30 rounded-lg p-4 mt-4">
-            <p className="text-pink-400 text-sm">{submitError}</p>
+          <div className="bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-lg p-4 mt-4">
+            <p className="text-[var(--danger)] text-sm">{submitError}</p>
           </div>
         )}
 
         <div className="mt-8">
-          <Link href="/import" className="text-[#666] hover:text-white text-sm transition-colors">&larr; Back to Import</Link>
+          <Link href="/import" className="eg-btn text-sm">
+            &larr; Back to Import
+          </Link>
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 }

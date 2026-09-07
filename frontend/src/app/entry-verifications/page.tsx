@@ -9,20 +9,21 @@ import {
   type EntryVerificationCreate,
   ApiError,
 } from "@/lib/entry-verification-api";
+import AppShell from "@/components/AppShell";
 
-const STATUS_CLASSES: Record<string, string> = {
-  PENDING: "border-white/20 text-[var(--text-secondary)]",
-  IN_PROGRESS: "border-white/30 text-white",
-  GRANTED: "border-white/40 text-white",
-  DENIED: "border-white/20 text-[var(--text-secondary)]",
-  ESCALATED: "border-white/30 text-white",
+const STATUS_BADGE: Record<string, string> = {
+  PENDING: "eg-badge-info",
+  IN_PROGRESS: "eg-badge-info",
+  GRANTED: "eg-badge-success",
+  DENIED: "eg-badge-danger",
+  ESCALATED: "eg-badge-warning",
 };
 
-const CHECK_CLASSES: Record<string, string> = {
-  PENDING: "border-white/10 text-[var(--text-muted)]",
-  PASSED: "border-white/40 text-white",
-  FAILED: "border-white/20 text-[var(--text-secondary)]",
-  SKIPPED: "border-white/10 text-[var(--text-muted)]",
+const CHECK_BADGE: Record<string, string> = {
+  PENDING: "eg-badge-neutral",
+  PASSED: "eg-badge-success",
+  FAILED: "eg-badge-danger",
+  SKIPPED: "eg-badge-neutral",
 };
 
 export default function EntryVerificationsPage() {
@@ -98,39 +99,37 @@ export default function EntryVerificationsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-2">
-          <h1 className="eg-display text-3xl">
-            Entry Verifications
-          </h1>
+    <AppShell>
+      <div className="eg-page">
+        <div className="eg-page-header">
+          <h1 className="eg-page-title">Entry Verifications</h1>
+          <p className="eg-page-desc">
+            Examination entry verification records — hall ticket, identity, and seat checks
+          </p>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="eg-btn px-4 py-2 text-sm"
+            className="eg-btn eg-btn-primary px-4 py-2 text-sm"
           >
             {showForm ? "Cancel" : "+ New Entry Verification"}
           </button>
         </div>
-        <p className="eg-body text-[var(--text-secondary)] mb-8">
-          Examination entry verification records — hall ticket, identity, and seat checks
-        </p>
 
         {showForm && (
           <form
             onSubmit={handleCreate}
-            className="border border-white/10 bg-[var(--bg-raised)] p-6 mb-8"
+            className="glass-surface p-6 mb-8"
           >
             <h2 className="eg-mono text-sm text-[var(--text-secondary)] mb-4">
               Create Entry Verification
             </h2>
             {formError && (
-              <div className="border border-white/10 bg-[var(--bg-base)] p-3 mb-4">
-                <span className="eg-mono text-sm text-red-400">{formError}</span>
+              <div className="glass-surface p-3 mb-4" style={{ borderColor: "rgba(220,38,38,0.3)" }}>
+                <span className="eg-mono text-sm" style={{ color: "var(--danger)" }}>{formError}</span>
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block eg-mono-sm text-[var(--text-muted)] mb-1">
+                <label className="eg-label">
                   Student ID *
                 </label>
                 <input
@@ -140,11 +139,11 @@ export default function EntryVerificationsPage() {
                   onChange={(e) =>
                     setForm({ ...form, student_id: Number(e.target.value) })
                   }
-                  className="w-full bg-[var(--bg-base)] border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-white/30"
+                  className="eg-input w-full"
                 />
               </div>
               <div>
-                <label className="block eg-mono-sm text-[var(--text-muted)] mb-1">
+                <label className="eg-label">
                   Registration ID *
                 </label>
                 <input
@@ -157,11 +156,11 @@ export default function EntryVerificationsPage() {
                       exam_registration_id: Number(e.target.value),
                     })
                   }
-                  className="w-full bg-[var(--bg-base)] border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-white/30"
+                  className="eg-input w-full"
                 />
               </div>
               <div>
-                <label className="block eg-mono-sm text-[var(--text-muted)] mb-1">
+                <label className="eg-label">
                   Entry Point ID *
                 </label>
                 <input
@@ -174,11 +173,11 @@ export default function EntryVerificationsPage() {
                       entry_point_id: Number(e.target.value),
                     })
                   }
-                  className="w-full bg-[var(--bg-base)] border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-white/30"
+                  className="eg-input w-full"
                 />
               </div>
               <div>
-                <label className="block eg-mono-sm text-[var(--text-muted)] mb-1">
+                <label className="eg-label">
                   Camera ID
                 </label>
                 <input
@@ -190,12 +189,12 @@ export default function EntryVerificationsPage() {
                       camera_id: e.target.value ? Number(e.target.value) : null,
                     })
                   }
-                  className="w-full bg-[var(--bg-base)] border border-white/10 px-3 py-2 text-sm text-white placeholder:text-[var(--text-muted)] focus:outline-none focus:border-white/30"
+                  className="eg-input w-full"
                   placeholder="Optional"
                 />
               </div>
               <div>
-                <label className="block eg-mono-sm text-[var(--text-muted)] mb-1">
+                <label className="eg-label">
                   Hall Ticket ID
                 </label>
                 <input
@@ -209,7 +208,7 @@ export default function EntryVerificationsPage() {
                         : null,
                     })
                   }
-                  className="w-full bg-[var(--bg-base)] border border-white/10 px-3 py-2 text-sm text-white placeholder:text-[var(--text-muted)] focus:outline-none focus:border-white/30"
+                  className="eg-input w-full"
                   placeholder="Optional"
                 />
               </div>
@@ -217,14 +216,14 @@ export default function EntryVerificationsPage() {
             <button
               type="submit"
               disabled={formLoading}
-              className="eg-btn px-4 py-2 text-sm disabled:opacity-30"
+              className="eg-btn eg-btn-primary px-4 py-2 text-sm disabled:opacity-30"
             >
               {formLoading ? "Creating..." : "Create Entry Verification"}
             </button>
           </form>
         )}
 
-        <div className="flex flex-wrap gap-3 mb-6">
+        <div className="eg-filter-bar mb-6">
           <input
             type="text"
             placeholder="Student ID..."
@@ -233,7 +232,7 @@ export default function EntryVerificationsPage() {
               setStudentFilter(e.target.value);
               setPage(1);
             }}
-            className="bg-[var(--bg-raised)] border border-white/10 px-3 py-2 text-sm text-white placeholder:text-[var(--text-muted)] focus:outline-none focus:border-white/30 w-36"
+            className="eg-input w-36"
           />
           <select
             value={statusFilter}
@@ -241,7 +240,7 @@ export default function EntryVerificationsPage() {
               setStatusFilter(e.target.value);
               setPage(1);
             }}
-            className="bg-[var(--bg-raised)] border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-white/30"
+            className="eg-select"
           >
             <option value="">All statuses</option>
             <option value="PENDING">Pending</option>
@@ -258,135 +257,94 @@ export default function EntryVerificationsPage() {
               setEntryPointFilter(e.target.value);
               setPage(1);
             }}
-            className="bg-[var(--bg-raised)] border border-white/10 px-3 py-2 text-sm text-white placeholder:text-[var(--text-muted)] focus:outline-none focus:border-white/30 w-40"
+            className="eg-input w-40"
           />
         </div>
 
         {error && (
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-4 mb-6">
-            <span className="eg-mono text-red-400">{error}</span>
+          <div className="glass-surface p-4 mb-6">
+            <span className="eg-mono text-sm" style={{ color: "var(--danger)" }}>{error}</span>
           </div>
         )}
 
         {loading ? (
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-12 text-center">
+          <div className="glass-surface p-12 text-center">
             <span className="eg-mono text-[var(--text-muted)]">
               Loading entry verifications...
             </span>
           </div>
         ) : items.length === 0 ? (
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-12 text-center">
-            <h3 className="eg-mono text-[var(--text-secondary)] mb-2">
-              No entry verifications
-            </h3>
-            <p className="text-sm text-[var(--text-muted)]">
+          <div className="eg-empty">
+            <div className="eg-empty-title">No entry verifications</div>
+            <div className="eg-empty-desc">
               No entry verification records have been created yet.
-            </p>
+            </div>
           </div>
         ) : (
-          <div className="border border-white/10 bg-[var(--bg-raised)] overflow-x-auto">
-            <table className="w-full">
+          <div className="eg-table-wrap">
+            <table className="eg-table">
               <thead>
-                <tr className="border-b border-white/10">
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    ID
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Student
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Reg
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Entry Point
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Hall
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Ticket
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Identity
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Seat
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Created
-                  </th>
-                  <th className="px-4 py-3 text-right eg-mono-sm text-[var(--text-muted)]">
-                    Actions
-                  </th>
+                <tr>
+                  <th>ID</th>
+                  <th>Student</th>
+                  <th>Reg</th>
+                  <th>Entry Point</th>
+                  <th>Hall</th>
+                  <th>Status</th>
+                  <th>Ticket</th>
+                  <th>Identity</th>
+                  <th>Seat</th>
+                  <th>Created</th>
+                  <th className="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((ev) => (
-                  <tr
-                    key={ev.id}
-                    className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
-                  >
-                    <td className="px-4 py-3 font-mono text-sm">{ev.id}</td>
-                    <td className="px-4 py-3 text-sm">#{ev.student_id}</td>
-                    <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">
+                  <tr key={ev.id}>
+                    <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.8125rem" }}>{ev.id}</td>
+                    <td>#{ev.student_id}</td>
+                    <td style={{ color: "var(--text-secondary)" }}>
                       #{ev.exam_registration_id}
                     </td>
-                    <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">
+                    <td style={{ color: "var(--text-secondary)" }}>
                       #{ev.entry_point_id}
                     </td>
-                    <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">
+                    <td style={{ color: "var(--text-secondary)" }}>
                       #{ev.exam_hall_id}
                     </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`text-[10px] eg-mono border px-2 py-0.5 ${
-                          STATUS_CLASSES[ev.status] ||
-                          "border-white/10 text-[var(--text-muted)]"
-                        }`}
-                      >
+                    <td>
+                      <span className={`eg-badge ${STATUS_BADGE[ev.status] || "eg-badge-neutral"}`}>
                         {ev.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`text-[10px] eg-mono border px-2 py-0.5 ${
-                          CHECK_CLASSES[ev.hall_ticket_check] ||
-                          "border-white/10 text-[var(--text-muted)]"
-                        }`}
-                      >
+                    <td>
+                      <span className={`eg-badge ${CHECK_BADGE[ev.hall_ticket_check] || "eg-badge-neutral"}`}>
                         {ev.hall_ticket_check}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`text-[10px] eg-mono border px-2 py-0.5 ${
-                          CHECK_CLASSES[ev.identity_check] ||
-                          "border-white/10 text-[var(--text-muted)]"
-                        }`}
-                      >
+                    <td>
+                      <span className={`eg-badge ${CHECK_BADGE[ev.identity_check] || "eg-badge-neutral"}`}>
                         {ev.identity_check}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`text-[10px] eg-mono border px-2 py-0.5 ${
-                          CHECK_CLASSES[ev.seat_check] ||
-                          "border-white/10 text-[var(--text-muted)]"
-                        }`}
-                      >
+                    <td>
+                      <span className={`eg-badge ${CHECK_BADGE[ev.seat_check] || "eg-badge-neutral"}`}>
                         {ev.seat_check}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-[var(--text-muted)] font-mono">
+                    <td
+                      style={{
+                        color: "var(--text-muted)",
+                        fontFamily: "var(--font-mono)",
+                        fontSize: "0.75rem",
+                      }}
+                    >
                       {new Date(ev.created_at).toLocaleDateString()}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="text-right">
                       <Link
                         href={`/entry-verifications/${ev.id}`}
-                        className="eg-mono-sm text-white hover:text-[var(--text-secondary)] transition-colors"
+                        className="eg-mono-sm text-[var(--text-primary)] hover:text-[var(--text-secondary)] transition-colors"
                       >
                         Open
                       </Link>
@@ -399,7 +357,7 @@ export default function EntryVerificationsPage() {
         )}
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-4">
+          <div className="eg-pagination mt-4">
             <button
               onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page === 1}
@@ -420,6 +378,6 @@ export default function EntryVerificationsPage() {
           </div>
         )}
       </div>
-    </div>
+    </AppShell>
   );
 }

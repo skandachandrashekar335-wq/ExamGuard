@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import AppShell from "@/components/AppShell";
 import {
   listSecurityEvents,
   type SecurityEvent,
@@ -23,11 +23,11 @@ const EVENT_TYPES = [
 const SEVERITIES = ["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"];
 
 function severityClass(s: string): string {
-  if (s === "CRITICAL") return "text-white font-bold";
-  if (s === "HIGH") return "text-[var(--gray-200)]";
-  if (s === "MEDIUM") return "text-[var(--gray-300)]";
-  if (s === "LOW") return "text-[var(--gray-400)]";
-  return "text-[var(--text-muted)]";
+  if (s === "CRITICAL") return "eg-badge eg-badge-danger";
+  if (s === "HIGH") return "eg-badge eg-badge-danger";
+  if (s === "MEDIUM") return "eg-badge eg-badge-warning";
+  if (s === "LOW") return "eg-badge eg-badge-info";
+  return "eg-badge eg-badge-neutral";
 }
 
 export default function SecurityEventsPage() {
@@ -69,133 +69,126 @@ export default function SecurityEventsPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] p-8">
-      <div className="max-w-6xl mx-auto">
-        <Link
-          href="/dashboard"
-          className="eg-mono-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] mb-8 inline-block"
-        >
-          &larr; DASHBOARD
-        </Link>
+    <AppShell>
+      <div className="eg-page">
+        <div className="eg-page-header">
+          <h1 className="eg-page-title">Security Events</h1>
+          <p className="eg-page-desc">
+            Persistent, immutable audit record of security-relevant activity.
+          </p>
+        </div>
 
-        <h1 className="eg-display text-3xl mb-2">SECURITY EVENTS</h1>
-        <p className="eg-body text-[var(--text-secondary)] mb-8">
-          Persistent, immutable audit record of security-relevant activity.
-        </p>
-
-        {/* Filters */}
-        <div className="border border-white/[0.06] bg-[var(--bg-surface)] p-4 mb-6">
-          <div className="eg-mono-sm text-[var(--text-muted)] mb-3">FILTERS</div>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="eg-mono-sm text-[var(--text-muted)] block mb-1">TYPE</label>
-              <select
-                value={filterType}
-                onChange={(e) => { setFilterType(e.target.value); setPage(1); }}
-                className="w-full bg-[var(--bg-raised)] border border-white/[0.08] text-[var(--text-secondary)] eg-mono-sm px-2 py-1.5"
-              >
-                <option value="">ALL</option>
-                {EVENT_TYPES.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="eg-mono-sm text-[var(--text-muted)] block mb-1">SEVERITY</label>
-              <select
-                value={filterSeverity}
-                onChange={(e) => { setFilterSeverity(e.target.value); setPage(1); }}
-                className="w-full bg-[var(--bg-raised)] border border-white/[0.08] text-[var(--text-secondary)] eg-mono-sm px-2 py-1.5"
-              >
-                <option value="">ALL</option>
-                {SEVERITIES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="eg-mono-sm text-[var(--text-muted)] block mb-1">SOURCE</label>
-              <input
-                type="text"
-                value={filterSource}
-                onChange={(e) => { setFilterSource(e.target.value); setPage(1); }}
-                placeholder="Any"
-                className="w-full bg-[var(--bg-raised)] border border-white/[0.08] text-[var(--text-secondary)] eg-mono-sm px-2 py-1.5 placeholder:text-[var(--text-muted)]"
-              />
-            </div>
+        <div className="eg-filter-bar">
+          <div>
+            <label className="eg-label">Type</label>
+            <select
+              value={filterType}
+              onChange={(e) => { setFilterType(e.target.value); setPage(1); }}
+              className="eg-select"
+            >
+              <option value="">All</option>
+              {EVENT_TYPES.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="eg-label">Severity</label>
+            <select
+              value={filterSeverity}
+              onChange={(e) => { setFilterSeverity(e.target.value); setPage(1); }}
+              className="eg-select"
+            >
+              <option value="">All</option>
+              {SEVERITIES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="eg-label">Source</label>
+            <input
+              type="text"
+              value={filterSource}
+              onChange={(e) => { setFilterSource(e.target.value); setPage(1); }}
+              placeholder="Any"
+              className="eg-input"
+            />
           </div>
         </div>
 
         {error && (
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-4 mb-6">
-            <span className="eg-mono text-[var(--text-muted)]">{error}</span>
+          <div className="glass-surface" style={{ padding: "1rem", marginBottom: "1.5rem", borderColor: "var(--danger)" }}>
+            <span className="eg-mono" style={{ color: "var(--danger)" }}>{error}</span>
           </div>
         )}
 
         {loading ? (
-          <div className="border border-white/[0.06] bg-[var(--bg-surface)] p-12 text-center">
-            <span className="eg-mono text-[var(--text-muted)]">Loading security events...</span>
+          <div className="glass-surface" style={{ padding: "3rem", textAlign: "center" }}>
+            <span className="eg-mono" style={{ color: "var(--text-muted)" }}>Loading security events...</span>
           </div>
         ) : events.length === 0 ? (
-          <div className="border border-white/[0.06] bg-[var(--bg-surface)] p-12 text-center">
-            <h3 className="eg-mono text-[var(--text-secondary)] mb-1">NO SECURITY EVENTS</h3>
-            <p className="text-sm text-[var(--text-muted)]">No security events have been recorded.</p>
+          <div className="glass-surface">
+            <div className="eg-empty">
+              <h3 className="eg-empty-title">No Security Events</h3>
+              <p className="eg-empty-desc">No security events have been recorded.</p>
+            </div>
           </div>
         ) : (
           <>
-            <div className="border border-white/[0.06] bg-[var(--bg-surface)]">
-              <div className="px-4 py-3 border-b border-white/[0.06]">
-                <span className="eg-mono-sm text-[var(--text-muted)]">
-                  {total} EVENTS
-                </span>
-              </div>
-              <div className="divide-y divide-white/[0.04]">
-                {events.map((evt) => (
-                  <div key={evt.id} className="px-4 py-3 flex items-start gap-4">
-                    <span className={`eg-mono-sm shrink-0 w-20 ${severityClass(evt.severity)}`}>
-                      {evt.severity}
-                    </span>
-                    <span className="eg-mono-sm shrink-0 w-48 text-[var(--text-secondary)]">
-                      {evt.event_type}
-                    </span>
-                    <span className="eg-mono-sm flex-1 text-[var(--text-secondary)]">
-                      {evt.entity_type} #{evt.entity_id}
-                    </span>
-                    <span className="eg-mono-sm shrink-0 text-[var(--text-muted)]">
-                      {evt.source}
-                    </span>
-                    <span className="eg-mono-sm shrink-0 text-[var(--text-muted)]">
-                      {new Date(evt.created_at).toLocaleString()}
-                    </span>
-                  </div>
-                ))}
-              </div>
+            <div className="eg-table-wrap">
+              <table className="eg-table">
+                <thead>
+                  <tr>
+                    <th>Severity</th>
+                    <th>Event Type</th>
+                    <th>Entity</th>
+                    <th>Source</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {events.map((evt) => (
+                    <tr key={evt.id}>
+                      <td>
+                        <span className={severityClass(evt.severity)}>
+                          {evt.severity}
+                        </span>
+                      </td>
+                      <td>{evt.event_type}</td>
+                      <td>{evt.entity_type} #{evt.entity_id}</td>
+                      <td>{evt.source}</td>
+                      <td>{new Date(evt.created_at).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
             {totalPages > 1 && (
-              <div className="flex justify-between items-center mt-4">
+              <div className="eg-pagination">
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page <= 1}
                   className="eg-btn disabled:opacity-30"
                 >
-                  PREVIOUS
+                  Previous
                 </button>
-                <span className="eg-mono-sm text-[var(--text-muted)]">
-                  PAGE {page} OF {totalPages}
+                <span className="eg-pagination-info">
+                  Page {page} of {totalPages}
                 </span>
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page >= totalPages}
                   className="eg-btn disabled:opacity-30"
                 >
-                  NEXT
+                  Next
                 </button>
               </div>
             )}
           </>
         )}
       </div>
-    </div>
+    </AppShell>
   );
 }

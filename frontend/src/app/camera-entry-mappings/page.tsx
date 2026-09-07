@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import AppShell from "@/components/AppShell";
 import {
   listMappings,
   createMapping,
@@ -152,40 +152,16 @@ export default function CameraEntryMappingsPage() {
   const activeEPs = entryPoints.filter((ep) => ep.is_active);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-8">
-      <div className="max-w-5xl mx-auto">
-        <Link
-          href="/dashboard"
-          className="text-[#999] hover:text-white text-sm mb-6 inline-block"
-        >
-          &larr; BACK TO DASHBOARD
-        </Link>
-
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold uppercase tracking-wider">
-              Camera ↔ Entry Point Mappings
-            </h1>
-            <p className="text-[#999] mt-1">
-              Associate cameras with examination entry points
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              setShowForm(true);
-              setFormError("");
-              setSelectedCamera("");
-              setSelectedEP("");
-            }}
-            className="bg-white text-black px-4 py-2 font-mono text-sm uppercase tracking-wider hover:bg-[#E5E5E5] transition-colors"
-          >
-            + Create Mapping
-          </button>
+    <AppShell>
+      <div className="eg-page">
+        <div className="eg-page-header">
+          <p className="eg-breadcrumb">HOME / CAMERA-ENTRY MAPPINGS</p>
+          <h1 className="eg-page-title">Camera ↔ Entry Point Mappings</h1>
+          <p className="eg-page-desc">Associate cameras with examination entry points</p>
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-3 mb-6">
-          <label className="flex items-center gap-2 text-sm text-[#999] cursor-pointer select-none">
+        <div className="eg-filter-bar">
+          <label className="eg-label flex items-center gap-2">
             <input
               type="checkbox"
               checked={showDisabled}
@@ -193,89 +169,90 @@ export default function CameraEntryMappingsPage() {
                 setShowDisabled(e.target.checked);
                 setPage(1);
               }}
-              className="accent-white"
+              className="eg-checkbox"
             />
-            INCLUDE DISABLED
+            Include disabled
           </label>
+          <button
+            onClick={() => {
+              setShowForm(true);
+              setFormError("");
+              setSelectedCamera("");
+              setSelectedEP("");
+            }}
+            className="eg-btn eg-btn-primary"
+          >
+            + Create Mapping
+          </button>
         </div>
 
         {error && (
-          <div className="bg-red-900/20 border border-red-500/30 text-red-400 px-4 py-3 mb-6 font-mono text-sm">
+          <div className="eg-alert eg-alert-danger mb-6">
             {error}
           </div>
         )}
 
         {loading ? (
-          <div className="text-center py-20 text-[#666] font-mono text-sm uppercase">
-            Loading mappings...
+          <div className="eg-empty">
+            <p className="eg-empty-title">Loading mappings...</p>
           </div>
         ) : mappings.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-[#666] font-mono text-sm uppercase mb-4">
-              No camera mappings configured
-            </p>
+          <div className="eg-empty">
+            <p className="eg-empty-title">No camera mappings configured</p>
+            <p className="eg-empty-desc">Create a mapping to associate a camera with an entry point.</p>
             <button
               onClick={() => {
                 setShowForm(true);
                 setFormError("");
               }}
-              className="bg-white text-black px-4 py-2 font-mono text-sm uppercase tracking-wider hover:bg-[#E5E5E5] transition-colors"
+              className="eg-btn eg-btn-primary mt-4"
             >
               + Create Mapping
             </button>
           </div>
         ) : (
           <>
-            <div className="bg-[#111] border border-white/10 overflow-hidden">
-              <table className="w-full text-left">
+            <div className="eg-table-wrap">
+              <table className="eg-table">
                 <thead>
-                  <tr className="border-b border-white/10 text-xs text-[#999] uppercase tracking-wider">
-                    <th className="px-4 py-3 font-mono">Camera</th>
-                    <th className="px-4 py-3 font-mono">Entry Point</th>
-                    <th className="px-4 py-3 font-mono">Hall</th>
-                    <th className="px-4 py-3 font-mono">Enabled</th>
-                    <th className="px-4 py-3 font-mono">Actions</th>
+                  <tr>
+                    <th>Camera</th>
+                    <th>Entry Point</th>
+                    <th>Hall</th>
+                    <th>Enabled</th>
+                    <th className="text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {mappings.map((m) => (
-                    <tr
-                      key={m.id}
-                      className="border-b border-white/5 hover:bg-white/[0.02]"
-                    >
-                      <td className="px-4 py-3">
-                        <div className="text-sm">{cameraName(m.camera_id)}</div>
-                        <div className="text-xs text-[#666] font-mono">
+                    <tr key={m.id}>
+                      <td>
+                        <div>{cameraName(m.camera_id)}</div>
+                        <div style={{ fontSize: "0.75rem", fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>
                           {cameraIdentifier(m.camera_id)}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm">
-                          {entryPointName(m.entry_point_id)}
-                        </div>
-                        <div className="text-xs text-[#666] font-mono">
+                      <td>
+                        <div>{entryPointName(m.entry_point_id)}</div>
+                        <div style={{ fontSize: "0.75rem", fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>
                           {entryPointCode(m.entry_point_id)}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-[#999]">
+                      <td style={{ color: "var(--text-muted)" }}>
                         {hallLabel(cameraHallId(m.camera_id))}
                       </td>
-                      <td className="px-4 py-3">
+                      <td>
                         <span
-                          className={`text-xs font-mono ${
-                            m.is_enabled
-                              ? "text-emerald-400"
-                              : "text-red-400"
-                          }`}
+                          className={`eg-badge ${m.is_enabled ? "eg-badge-success" : "eg-badge-danger"}`}
                         >
-                          {m.is_enabled ? "YES" : "NO"}
+                          {m.is_enabled ? "Yes" : "No"}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm">
+                      <td className="text-right">
                         {m.is_enabled && (
                           <button
                             onClick={() => setConfirmDelete(m.id)}
-                            className="text-[#999] hover:text-red-400 text-xs font-mono uppercase"
+                            className="eg-btn eg-btn-danger text-xs"
                           >
                             Disable
                           </button>
@@ -287,58 +264,45 @@ export default function CameraEntryMappingsPage() {
               </table>
             </div>
 
-            {/* Pagination */}
-            <div className="flex items-center justify-between mt-4">
-              <p className="text-xs text-[#666] font-mono">
-                {total} TOTAL &middot; PAGE {page} OF {totalPages || 1}
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                  className="border border-white/20 px-3 py-1 text-xs font-mono uppercase disabled:opacity-30 hover:bg-white/5"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                  className="border border-white/20 px-3 py-1 text-xs font-mono uppercase disabled:opacity-30 hover:bg-white/5"
-                >
-                  Next
-                </button>
-              </div>
+            <div className="eg-pagination">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="eg-btn eg-btn-sm"
+              >
+                Previous
+              </button>
+              <span className="eg-pagination-info">
+                {total} total · Page {page} of {totalPages || 1}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="eg-btn eg-btn-sm"
+              >
+                Next
+              </button>
             </div>
           </>
         )}
 
-        {/* Create Mapping Modal */}
         {showForm && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <div className="bg-[#111] border border-white/10 w-full max-w-lg">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-                <h2 className="text-lg font-mono uppercase tracking-wider">
-                  Create Mapping
-                </h2>
-                <button
-                  onClick={() => setShowForm(false)}
-                  className="text-[#666] hover:text-white text-xl"
-                >
-                  &times;
-                </button>
+          <div className="eg-modal-backdrop" onClick={() => setShowForm(false)}>
+            <div className="eg-modal glass-surface glass" onClick={(e) => e.stopPropagation()}>
+              <div className="eg-modal-header">
+                <h2 className="eg-page-title text-lg">Create Mapping</h2>
+                <button onClick={() => setShowForm(false)} className="eg-modal-close">&times;</button>
               </div>
-              <form onSubmit={handleCreate} className="p-6 space-y-4">
+              <form onSubmit={handleCreate} className="eg-modal-body">
                 {formError && (
-                  <div className="bg-red-900/20 border border-red-500/30 text-red-400 px-3 py-2 text-sm font-mono">
+                  <div className="eg-alert eg-alert-danger mb-4">
                     {formError}
                   </div>
                 )}
-                <div>
-                  <label className="block text-xs font-mono text-[#999] uppercase mb-1">
-                    Camera *
-                  </label>
+                <div className="eg-field">
+                  <label className="eg-label">Camera *</label>
                   {activeCameras.length === 0 ? (
-                    <p className="text-sm text-[#666] font-mono">
+                    <p style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>
                       No active cameras available
                     </p>
                   ) : (
@@ -346,11 +310,9 @@ export default function CameraEntryMappingsPage() {
                       required
                       value={selectedCamera}
                       onChange={(e) =>
-                        setSelectedCamera(
-                          e.target.value ? Number(e.target.value) : ""
-                        )
+                        setSelectedCamera(e.target.value ? Number(e.target.value) : "")
                       }
-                      className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 text-white text-sm focus:outline-none focus:border-white/30"
+                      className="eg-select w-full"
                     >
                       <option value="">Select a camera</option>
                       {activeCameras.map((c) => (
@@ -361,12 +323,10 @@ export default function CameraEntryMappingsPage() {
                     </select>
                   )}
                 </div>
-                <div>
-                  <label className="block text-xs font-mono text-[#999] uppercase mb-1">
-                    Entry Point *
-                  </label>
+                <div className="eg-field">
+                  <label className="eg-label">Entry Point *</label>
                   {activeEPs.length === 0 ? (
-                    <p className="text-sm text-[#666] font-mono">
+                    <p style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>
                       No active entry points available
                     </p>
                   ) : (
@@ -374,11 +334,9 @@ export default function CameraEntryMappingsPage() {
                       required
                       value={selectedEP}
                       onChange={(e) =>
-                        setSelectedEP(
-                          e.target.value ? Number(e.target.value) : ""
-                        )
+                        setSelectedEP(e.target.value ? Number(e.target.value) : "")
                       }
-                      className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 text-white text-sm focus:outline-none focus:border-white/30"
+                      className="eg-select w-full"
                     >
                       <option value="">Select an entry point</option>
                       {activeEPs.map((ep) => (
@@ -393,15 +351,11 @@ export default function CameraEntryMappingsPage() {
                   <button
                     type="submit"
                     disabled={formLoading || !selectedCamera || !selectedEP}
-                    className="bg-white text-black px-6 py-2 font-mono text-sm uppercase tracking-wider hover:bg-[#E5E5E5] disabled:opacity-50 transition-colors"
+                    className="eg-btn eg-btn-primary"
                   >
-                    {formLoading ? "CREATING..." : "CREATE MAPPING"}
+                    {formLoading ? "Creating..." : "Create Mapping"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowForm(false)}
-                    className="border border-white/20 px-6 py-2 font-mono text-sm uppercase text-[#999] hover:bg-white/5"
-                  >
+                  <button type="button" onClick={() => setShowForm(false)} className="eg-btn">
                     Cancel
                   </button>
                 </div>
@@ -410,27 +364,21 @@ export default function CameraEntryMappingsPage() {
           </div>
         )}
 
-        {/* Disable Confirmation */}
         {confirmDelete !== null && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <div className="bg-[#111] border border-white/10 w-full max-w-sm p-6">
-              <h2 className="text-lg font-mono uppercase tracking-wider mb-4">
-                Disable Mapping
-              </h2>
-              <p className="text-sm text-[#999] mb-6">
+          <div className="eg-modal-backdrop" onClick={() => setConfirmDelete(null)}>
+            <div className="eg-modal glass-surface glass" onClick={(e) => e.stopPropagation()}>
+              <h2 className="eg-page-title text-lg mb-4">Disable Mapping</h2>
+              <p className="eg-body mb-6">
                 This will disable the camera-to-entry-point association.
               </p>
               <div className="flex gap-3">
                 <button
                   onClick={() => handleDeactivate(confirmDelete)}
-                  className="bg-red-900/50 border border-red-500/30 text-red-400 px-4 py-2 font-mono text-sm uppercase hover:bg-red-900/80 transition-colors"
+                  className="eg-btn eg-btn-danger"
                 >
                   Disable
                 </button>
-                <button
-                  onClick={() => setConfirmDelete(null)}
-                  className="border border-white/20 px-4 py-2 font-mono text-sm uppercase text-[#999] hover:bg-white/5"
-                >
+                <button onClick={() => setConfirmDelete(null)} className="eg-btn">
                   Cancel
                 </button>
               </div>
@@ -438,6 +386,6 @@ export default function CameraEntryMappingsPage() {
           </div>
         )}
       </div>
-    </div>
+    </AppShell>
   );
 }

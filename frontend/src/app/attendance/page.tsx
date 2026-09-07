@@ -6,6 +6,7 @@ import {
   getAttendanceSummary,
   type AttendanceSummaryResponse,
 } from "@/lib/attendance-api";
+import AppShell from "@/components/AppShell";
 
 interface Exam {
   id: number;
@@ -77,128 +78,110 @@ export default function AttendancePage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] p-8">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="eg-display text-3xl mb-2">Attendance</h1>
-        <p className="eg-body text-[var(--text-secondary)] mb-8">
-          Exam attendance tracking — select an exam to view records
-        </p>
-
-        {error && (
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-4 mb-6">
-            <span className="eg-mono text-red-400">{error}</span>
-          </div>
-        )}
-
-        {loading ? (
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-12 text-center">
-            <span className="eg-mono text-[var(--text-muted)]">
-              Loading exams...
-            </span>
-          </div>
-        ) : exams.length === 0 ? (
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-12 text-center">
-            <h3 className="eg-mono text-[var(--text-secondary)] mb-2">
-              No exams
-            </h3>
-            <p className="text-sm text-[var(--text-muted)]">
-              No exams have been created yet.
+    <AppShell>
+      <div className="bg-[var(--bg-base)]">
+        <div className="eg-page">
+          <div className="eg-page-header">
+            <Link href="/dashboard" className="eg-breadcrumb">
+              &larr; Dashboard
+            </Link>
+            <h1 className="eg-page-title">Attendance</h1>
+            <p className="eg-page-desc">
+              Exam attendance tracking — select an exam to view records
             </p>
           </div>
-        ) : (
-          <div className="border border-white/10 bg-[var(--bg-raised)] overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/10">
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    ID
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Exam
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Date
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Time
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Registered
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Present
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Rate
-                  </th>
-                  <th className="px-4 py-3 text-right eg-mono-sm text-[var(--text-muted)]">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {exams.map((exam) => {
-                  const s = summaries[exam.id];
-                  return (
-                    <tr
-                      key={exam.id}
-                      className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
-                    >
-                      <td className="px-4 py-3 font-mono text-sm">{exam.id}</td>
-                      <td className="px-4 py-3 text-sm">{exam.exam_name}</td>
-                      <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">
-                        {exam.exam_date}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">
-                        {exam.start_time} — {exam.end_time}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">
-                        {s ? s.total_registered : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">
-                        {s ? s.total_present : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">
-                        {s ? `${Math.round(s.attendance_rate)}%` : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Link
-                          href={`/attendance/${exam.id}`}
-                          className="eg-mono-sm text-white hover:text-[var(--text-secondary)] transition-colors"
-                        >
-                          View
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
 
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-4">
-            <button
-              onClick={() => setPage(Math.max(1, page - 1))}
-              disabled={page === 1}
-              className="eg-btn px-3 py-1 disabled:opacity-30"
-            >
-              Prev
-            </button>
-            <span className="eg-mono-sm text-[var(--text-muted)]">
-              {page} / {totalPages} ({total} total)
-            </span>
-            <button
-              onClick={() => setPage(Math.min(totalPages, page + 1))}
-              disabled={page >= totalPages}
-              className="eg-btn px-3 py-1 disabled:opacity-30"
-            >
-              Next
-            </button>
-          </div>
-        )}
+          {error && (
+            <div className="glass-surface border border-[var(--border)] p-4 mb-6">
+              <span className="eg-body text-[var(--text-secondary)]">{error}</span>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="glass-surface p-12 text-center">
+              <span className="eg-body text-[var(--text-muted)]">
+                Loading exams...
+              </span>
+            </div>
+          ) : exams.length === 0 ? (
+            <div className="eg-empty">
+              <h3 className="eg-empty-title">No exams</h3>
+              <p className="eg-empty-desc">No exams have been created yet.</p>
+            </div>
+          ) : (
+            <>
+              <div className="eg-table-wrap">
+                <table className="eg-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Exam</th>
+                      <th>Date</th>
+                      <th>Time</th>
+                      <th>Registered</th>
+                      <th>Present</th>
+                      <th>Rate</th>
+                      <th style={{ textAlign: "right" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {exams.map((exam) => {
+                      const s = summaries[exam.id];
+                      return (
+                        <tr key={exam.id}>
+                          <td className="font-mono text-sm">{exam.id}</td>
+                          <td>{exam.exam_name}</td>
+                          <td>{exam.exam_date}</td>
+                          <td>
+                            {exam.start_time} — {exam.end_time}
+                          </td>
+                          <td>{s ? s.total_registered : "—"}</td>
+                          <td>{s ? s.total_present : "—"}</td>
+                          <td>
+                            {s ? `${Math.round(s.attendance_rate)}%` : "—"}
+                          </td>
+                          <td style={{ textAlign: "right" }}>
+                            <Link
+                              href={`/attendance/${exam.id}`}
+                              className="eg-mono-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                            >
+                              View
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {totalPages > 1 && (
+                <div className="eg-pagination">
+                  <span className="eg-pagination-info">
+                    Page {page} of {totalPages} &middot; {total} exams
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setPage(Math.max(1, page - 1))}
+                      disabled={page === 1}
+                      className="eg-btn disabled:opacity-30"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() => setPage(Math.min(totalPages, page + 1))}
+                      disabled={page >= totalPages}
+                      className="eg-btn disabled:opacity-30"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </AppShell>
   );
 }

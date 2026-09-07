@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import AppShell from "@/components/AppShell";
 import {
   getMonitoringAlerts,
   getMonitoringEvents,
@@ -71,22 +72,22 @@ function formatTime(iso: string): string {
 }
 
 function severityColor(s: EventSeverity): string {
-  if (s === "CRITICAL") return "text-white";
-  if (s === "WARNING") return "text-[var(--gray-300)]";
-  return "text-[var(--text-muted)]";
+  if (s === "CRITICAL") return "eg-badge-danger";
+  if (s === "WARNING") return "eg-badge-warning";
+  return "eg-badge-info";
 }
 
 function severityBorder(s: EventSeverity): string {
-  if (s === "CRITICAL") return "border-l-white";
-  if (s === "WARNING") return "border-l-[var(--gray-400)]";
+  if (s === "CRITICAL") return "border-l-[var(--danger)]";
+  if (s === "WARNING") return "border-l-[var(--warning)]";
   return "border-l-transparent";
 }
 
 function statusDot(status: ConnectionStatus): string {
-  if (status === "CONNECTED") return "bg-white";
+  if (status === "CONNECTED") return "var(--success)";
   if (status === "CONNECTING" || status === "RECONNECTING")
-    return "bg-[var(--gray-500)]";
-  return "bg-[var(--gray-700)]";
+    return "var(--warning)";
+  return "var(--danger)";
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +108,7 @@ function EventRow({
 
   return (
     <div
-      className={`border border-white/[0.06] border-l-2 ${severityBorder(event.severity)} bg-[var(--bg-surface)] transition-colors duration-150`}
+      className={`border border-[var(--border)] border-l-2 ${severityBorder(event.severity)} glass-surface transition-colors duration-150`}
     >
       <button
         type="button"
@@ -116,7 +117,7 @@ function EventRow({
         aria-expanded={expanded}
       >
         <span
-          className={`eg-mono-sm mt-0.5 shrink-0 w-[5.5rem] ${severityColor(event.severity)}`}
+          className={`eg-mono-sm mt-0.5 shrink-0 w-[5.5rem] text-[var(--text-muted)]`}
         >
           {formatTime(event.timestamp)}
         </span>
@@ -126,8 +127,10 @@ function EventRow({
         <span className="eg-mono-sm mt-0.5 shrink-0 w-20 text-[var(--text-muted)]">
           {event.category}
         </span>
-        <span className="eg-mono-sm mt-0.5 shrink-0 w-16 text-[var(--text-muted)]">
-          {event.severity}
+        <span className="eg-mono-sm mt-0.5 shrink-0 w-16">
+          <span className={`eg-badge ${severityColor(event.severity)}`}>
+            {event.severity}
+          </span>
         </span>
         <span className="eg-mono-sm mt-0.5 flex-1 text-[var(--text-secondary)]">
           {event.entity_type} #{event.entity_id}
@@ -144,7 +147,7 @@ function EventRow({
         )}
       </button>
       {expanded && (
-        <div className="px-4 pb-3 border-t border-white/[0.04]">
+        <div className="px-4 pb-3 border-t border-[var(--border)]">
           <div className="pt-3 grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
             <span className="eg-mono-sm text-[var(--text-muted)]">EVENT ID</span>
             <span className="eg-mono text-[var(--text-secondary)] text-xs break-all">
@@ -176,7 +179,7 @@ function EventRow({
               <span className="eg-mono-sm text-[var(--text-muted)]">
                 PAYLOAD
               </span>
-              <pre className="mt-1 eg-mono text-xs text-[var(--text-secondary)] bg-[var(--bg-raised)] border border-white/[0.06] p-3 overflow-x-auto max-h-48">
+              <pre className="mt-1 eg-mono text-xs text-[var(--text-secondary)] glass-surface p-3 overflow-x-auto max-h-48">
                 {JSON.stringify(payload, null, 2)}
               </pre>
             </div>
@@ -198,13 +201,13 @@ function EventRow({
 function AlertRow({ alert }: { alert: MonitoringAlert }) {
   return (
     <div
-      className={`border border-white/[0.06] border-l-2 ${severityBorder(alert.severity)} bg-[var(--bg-surface)] px-4 py-3`}
+      className={`border border-[var(--border)] border-l-2 ${severityBorder(alert.severity)} glass-surface px-4 py-3`}
     >
       <div className="flex items-start gap-3">
-        <span
-          className={`eg-mono-sm mt-0.5 shrink-0 ${severityColor(alert.severity)}`}
-        >
-          {alert.severity}
+        <span className="eg-mono-sm mt-0.5 shrink-0">
+          <span className={`eg-badge ${severityColor(alert.severity)}`}>
+            {alert.severity}
+          </span>
         </span>
         <span className="eg-mono-sm mt-0.5 flex-1 text-[var(--text-secondary)]">
           {alert.message}
@@ -443,44 +446,44 @@ export default function MonitoringPage() {
   // -------------------------------------------------------------------------
 
   return (
-    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
-      <div className="max-w-[1600px] mx-auto px-6 py-8">
+    <AppShell>
+      <div className="eg-page">
         {/* Header */}
-        <div className="flex items-start justify-between mb-8">
-          <div>
-            <Link
-              href="/dashboard"
-              className="eg-mono-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] mb-3 inline-block"
-            >
-              &larr; DASHBOARD
-            </Link>
-            <h1 className="eg-display text-3xl tracking-tight">MONITORING</h1>
-            <p className="eg-body text-[var(--text-secondary)] mt-1">
-              Live examination entry activity and operational signals.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 mt-2">
-            <span
-              className={`w-2 h-2 rounded-full ${statusDot(wsStatus)}`}
-            />
-            <span className="eg-mono-sm text-[var(--text-secondary)]">
-              {wsStatus === "CONNECTED"
-                ? "CONNECTED"
-                : wsStatus === "CONNECTING"
-                  ? "CONNECTING"
-                  : wsStatus === "RECONNECTING"
-                    ? "RECONNECTING"
-                    : wsStatus === "DISCONNECTED"
-                      ? "DISCONNECTED"
-                      : wsStatus === "ERROR"
-                        ? "ERROR"
-                        : "INITIALIZING"}
-            </span>
+        <div className="eg-page-header">
+          <Link href="/dashboard" className="eg-breadcrumb">
+            &larr; DASHBOARD
+          </Link>
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="eg-page-title">MONITORING</h1>
+              <p className="eg-page-desc">
+                Live examination entry activity and operational signals.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 mt-2">
+              <span
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: statusDot(wsStatus) }}
+              />
+              <span className="eg-mono-sm text-[var(--text-secondary)]">
+                {wsStatus === "CONNECTED"
+                  ? "CONNECTED"
+                  : wsStatus === "CONNECTING"
+                    ? "CONNECTING"
+                    : wsStatus === "RECONNECTING"
+                      ? "RECONNECTING"
+                      : wsStatus === "DISCONNECTED"
+                        ? "DISCONNECTED"
+                        : wsStatus === "ERROR"
+                          ? "ERROR"
+                          : "INITIALIZING"}
+              </span>
+            </div>
           </div>
         </div>
 
         {/* Status Strip */}
-        <div className="border border-white/[0.06] bg-[var(--bg-surface)] mb-6">
+        <div className="glass-surface mb-6">
           {statusError ? (
             <div className="px-4 py-3">
               <span className="eg-mono-sm text-[var(--text-muted)]">
@@ -491,7 +494,7 @@ export default function MonitoringPage() {
               </p>
             </div>
           ) : status ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-white/[0.06]">
+            <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-[var(--border)]">
               <StatusCell
                 label="CONNECTIONS"
                 value={String(status.active_connections)}
@@ -525,7 +528,7 @@ export default function MonitoringPage() {
           {/* Left: Events */}
           <div>
             {/* Event Filters */}
-            <div className="border border-white/[0.06] bg-[var(--bg-surface)] p-4 mb-4">
+            <div className="glass-surface p-4 mb-4">
               <div className="eg-mono-sm text-[var(--text-muted)] mb-3">
                 EVENT FILTERS
               </div>
@@ -582,8 +585,8 @@ export default function MonitoringPage() {
             </div>
 
             {/* Event Stream */}
-            <div className="border border-white/[0.06] bg-[var(--bg-surface)]">
-              <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
+            <div className="eg-table-wrap">
+              <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
                 <span className="eg-mono-sm text-[var(--text-muted)]">
                   EVENT STREAM
                 </span>
@@ -592,7 +595,7 @@ export default function MonitoringPage() {
                 </span>
               </div>
               {eventsError ? (
-                <div className="px-4 py-8 text-center">
+                <div className="eg-empty py-8">
                   <span className="eg-mono-sm text-[var(--text-muted)]">
                     EVENTS UNAVAILABLE
                   </span>
@@ -601,22 +604,20 @@ export default function MonitoringPage() {
                   </p>
                 </div>
               ) : eventsLoading && mergedEvents.length === 0 ? (
-                <div className="px-4 py-12 text-center">
+                <div className="eg-empty">
                   <span className="eg-mono-sm text-[var(--text-muted)]">
                     Loading event stream...
                   </span>
                 </div>
               ) : mergedEvents.length === 0 ? (
-                <div className="px-4 py-12 text-center">
-                  <h3 className="eg-mono text-[var(--text-secondary)] mb-1">
-                    NO RETAINED EVENTS
-                  </h3>
-                  <p className="text-sm text-[var(--text-muted)]">
+                <div className="eg-empty">
+                  <h3 className="eg-empty-title">NO RETAINED EVENTS</h3>
+                  <p className="eg-empty-desc">
                     No monitoring events are currently available.
                   </p>
                 </div>
               ) : (
-                <div className="divide-y divide-white/[0.04]">
+                <div>
                   {mergedEvents.map((evt) => (
                     <EventRow
                       key={evt.event_id}
@@ -637,7 +638,7 @@ export default function MonitoringPage() {
           {/* Right: Alerts */}
           <div>
             {/* Alert Filters */}
-            <div className="border border-white/[0.06] bg-[var(--bg-surface)] p-4 mb-4">
+            <div className="glass-surface p-4 mb-4">
               <div className="eg-mono-sm text-[var(--text-muted)] mb-3">
                 ALERT FILTERS
               </div>
@@ -669,8 +670,8 @@ export default function MonitoringPage() {
             </div>
 
             {/* Alert Panel */}
-            <div className="border border-white/[0.06] bg-[var(--bg-surface)]">
-              <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
+            <div className="eg-table-wrap">
+              <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
                 <span className="eg-mono-sm text-[var(--text-muted)]">
                   ALERTS
                 </span>
@@ -679,7 +680,7 @@ export default function MonitoringPage() {
                 </span>
               </div>
               {alertsError ? (
-                <div className="px-4 py-8 text-center">
+                <div className="eg-empty py-8">
                   <span className="eg-mono-sm text-[var(--text-muted)]">
                     ALERTS UNAVAILABLE
                   </span>
@@ -688,22 +689,20 @@ export default function MonitoringPage() {
                   </p>
                 </div>
               ) : alertsLoading && alerts.length === 0 ? (
-                <div className="px-4 py-12 text-center">
+                <div className="eg-empty">
                   <span className="eg-mono-sm text-[var(--text-muted)]">
                     Loading alerts...
                   </span>
                 </div>
               ) : alerts.length === 0 ? (
-                <div className="px-4 py-12 text-center">
-                  <h3 className="eg-mono text-[var(--text-secondary)] mb-1">
-                    NO RETAINED ALERTS
-                  </h3>
-                  <p className="text-sm text-[var(--text-muted)]">
+                <div className="eg-empty">
+                  <h3 className="eg-empty-title">NO RETAINED ALERTS</h3>
+                  <p className="eg-empty-desc">
                     No operational alerts are currently available.
                   </p>
                 </div>
               ) : (
-                <div className="divide-y divide-white/[0.04]">
+                <div>
                   {alerts.map((a) => (
                     <AlertRow key={a.alert_id} alert={a} />
                   ))}
@@ -713,7 +712,7 @@ export default function MonitoringPage() {
           </div>
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 }
 
@@ -758,13 +757,11 @@ function FilterSelect({
 }) {
   return (
     <div>
-      <label className="eg-mono-sm text-[var(--text-muted)] block mb-1">
-        {label}
-      </label>
+      <label className="eg-label">{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-[var(--bg-raised)] border border-white/[0.08] text-[var(--text-secondary)] eg-mono-sm px-2 py-1.5 focus:outline-none focus:border-white/20"
+        className="eg-select w-full"
       >
         <option value="">{blank}</option>
         {options.map((o) => (
@@ -790,15 +787,13 @@ function FilterInput({
 }) {
   return (
     <div>
-      <label className="eg-mono-sm text-[var(--text-muted)] block mb-1">
-        {label}
-      </label>
+      <label className="eg-label">{label}</label>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full bg-[var(--bg-raised)] border border-white/[0.08] text-[var(--text-secondary)] eg-mono-sm px-2 py-1.5 placeholder:text-[var(--text-muted)] focus:outline-none focus:border-white/20"
+        className="eg-input"
       />
     </div>
   );

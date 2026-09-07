@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AppShell from "@/components/AppShell";
 
 const IMPORT_TYPES = [
   {
@@ -6,75 +7,70 @@ const IMPORT_TYPES = [
     href: "/import/students",
     description: "Bulk import student records from Excel or CSV",
     limit: "Max 500 per batch",
-    color: "from-cyan-500 to-blue-500",
+    icon: "🎓",
   },
   {
     title: "Subjects & Exams",
     href: "/import/subjects-exams",
     description: "Import subjects and examination schedules",
     limit: "Subjects: 200, Exams: 500",
-    color: "from-emerald-500 to-cyan-500",
+    icon: "📚",
   },
   {
     title: "Registrations",
     href: "/import/registrations",
     description: "Bulk register students for exams",
     limit: "Max 500 per batch",
-    color: "from-pink-500 to-purple-500",
+    icon: "📝",
   },
   {
     title: "Seat Assignments",
     href: "/import/seat-assignments",
     description: "Bulk assign seats in exam halls",
     limit: "Max 200 per batch",
-    color: "from-amber-500 to-pink-500",
+    icon: "💺",
   },
 ];
 
 export default function ImportHubPage() {
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-8">
-      <div className="max-w-5xl mx-auto">
-        <h1 className="text-3xl font-bold uppercase tracking-wider mb-2">
-          Data Import
-        </h1>
-        <p className="text-[#999] mb-8">
-          Upload Excel or CSV files to bulk import data
-        </p>
+    <AppShell>
+      <div className="eg-page">
+        <div className="eg-page-header">
+          <h1 className="eg-page-title">Data Import</h1>
+          <p className="eg-page-desc">Upload Excel or CSV files to bulk import data</p>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {IMPORT_TYPES.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className="block bg-[#111] border border-white/10 rounded-lg p-6 hover:border-white/20 transition-colors group"
+              className="glass-surface glass-medium p-6 hover:border-[var(--accent)]/30 transition-all group block"
             >
-              <h2
-                className={`text-xl font-semibold mb-2 bg-gradient-to-r ${item.color} bg-clip-text text-transparent`}
-              >
-                {item.title}
-              </h2>
-              <p className="text-[#999] text-sm mb-4">{item.description}</p>
-              <p className="text-[#666] text-xs">{item.limit}</p>
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-2xl">{item.icon}</span>
+                <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {item.title}
+                </h2>
+              </div>
+              <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>
+                {item.description}
+              </p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>{item.limit}</p>
             </Link>
           ))}
         </div>
 
         <div className="mt-8 flex gap-4">
-          <Link
-            href="/import/history"
-            className="border border-white/20 rounded-lg px-4 py-2 text-sm text-[#999] hover:text-white hover:border-white/40 transition-colors"
-          >
+          <Link href="/import/history" className="eg-btn eg-btn-secondary">
             View Import History
           </Link>
-          <Link
-            href="/"
-            className="text-[#666] hover:text-white text-sm transition-colors self-center"
-          >
+          <Link href="/" className="eg-btn text-sm" style={{ color: "var(--text-muted)" }}>
             &larr; Back to Home
           </Link>
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 }

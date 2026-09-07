@@ -9,19 +9,20 @@ import {
   cancelSession,
   type ExaminationSession,
 } from "@/lib/session-api";
+import AppShell from "@/components/AppShell";
 
 const STATUSES = ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "CANCELLED"];
 
-function statusClass(s: string): string {
-  if (s === "IN_PROGRESS") return "text-white font-bold";
-  if (s === "NOT_STARTED") return "text-[var(--gray-300)]";
-  if (s === "COMPLETED") return "text-[var(--text-muted)]";
-  return "text-[var(--text-muted)]";
+function statusBadgeClass(s: string): string {
+  if (s === "IN_PROGRESS") return "eg-badge-success";
+  if (s === "NOT_STARTED") return "eg-badge-info";
+  if (s === "COMPLETED") return "eg-badge-neutral";
+  return "eg-badge-warning";
 }
 
-function gateClass(s: string): string {
-  if (s === "GATES_OPEN") return "border border-white/20 px-2 py-0.5";
-  return "border border-white/[0.06] px-2 py-0.5 text-[var(--text-muted)]";
+function gateBadgeClass(s: string): string {
+  if (s === "GATES_OPEN") return "eg-badge-success";
+  return "eg-badge-neutral";
 }
 
 export default function ExaminationSessionsPage() {
@@ -98,160 +99,182 @@ export default function ExaminationSessionsPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] p-8">
-      <div className="max-w-6xl mx-auto">
-        <Link
-          href="/dashboard"
-          className="eg-mono-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] mb-8 inline-block"
-        >
-          &larr; DASHBOARD
-        </Link>
+    <AppShell>
+      <div className="bg-[var(--bg-base)]">
+        <div className="eg-page">
+          <div className="eg-page-header">
+            <Link href="/dashboard" className="eg-breadcrumb">
+              &larr; Dashboard
+            </Link>
+            <h1 className="eg-page-title">Examination Sessions</h1>
+            <p className="eg-page-desc">
+              Manage session lifecycle, gate operations, and active hall monitoring.
+            </p>
+          </div>
 
-        <h1 className="eg-display text-3xl mb-2">EXAMINATION SESSIONS</h1>
-        <p className="eg-body text-[var(--text-secondary)] mb-8">
-          Manage session lifecycle, gate operations, and active hall monitoring.
-        </p>
-
-        {/* Filters */}
-        <div className="border border-white/[0.06] bg-[var(--bg-surface)] p-4 mb-6">
-          <div className="eg-mono-sm text-[var(--text-muted)] mb-3">FILTERS</div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="eg-mono-sm text-[var(--text-muted)] block mb-1">STATUS</label>
-              <select
-                value={filterStatus}
-                onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
-                className="w-full bg-[var(--bg-raised)] border border-white/[0.08] text-[var(--text-secondary)] eg-mono-sm px-2 py-1.5"
-              >
-                <option value="">ALL</option>
-                {STATUSES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+          {/* Filters */}
+          <div className="eg-filter-bar">
+            <div className="eg-label">Filters</div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="eg-label block mb-1">Status</label>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
+                  className="eg-select w-full"
+                >
+                  <option value="">All</option>
+                  {STATUSES.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
-        </div>
 
-        {error && (
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-4 mb-6">
-            <span className="eg-mono text-[var(--text-muted)]">{error}</span>
-          </div>
-        )}
+          {error && (
+            <div className="glass-surface border border-[var(--border)] p-4 mb-6">
+              <span className="eg-body text-[var(--text-secondary)]">{error}</span>
+            </div>
+          )}
 
-        {loading ? (
-          <div className="border border-white/[0.06] bg-[var(--bg-surface)] p-12 text-center">
-            <span className="eg-mono text-[var(--text-muted)]">Loading sessions...</span>
-          </div>
-        ) : sessions.length === 0 ? (
-          <div className="border border-white/[0.06] bg-[var(--bg-surface)] p-12 text-center">
-            <h3 className="eg-mono text-[var(--text-secondary)] mb-1">NO SESSIONS</h3>
-            <p className="text-sm text-[var(--text-muted)]">No examination sessions match the current filters.</p>
-          </div>
-        ) : (
-          <>
-            <div className="border border-white/[0.06] bg-[var(--bg-surface)]">
-              <div className="px-4 py-3 border-b border-white/[0.06]">
-                <span className="eg-mono-sm text-[var(--text-muted)]">
-                  {total} SESSIONS
-                </span>
+          {loading ? (
+            <div className="glass-surface p-12 text-center">
+              <span className="eg-body text-[var(--text-muted)]">Loading sessions...</span>
+            </div>
+          ) : sessions.length === 0 ? (
+            <div className="eg-empty">
+              <h3 className="eg-empty-title">No sessions</h3>
+              <p className="eg-empty-desc">No examination sessions match the current filters.</p>
+            </div>
+          ) : (
+            <>
+              <div className="eg-table-wrap">
+                <table className="eg-table">
+                  <thead>
+                    <tr>
+                      <th>Status</th>
+                      <th>Gate</th>
+                      <th>Session</th>
+                      <th>Date</th>
+                      <th>Details</th>
+                      <th style={{ textAlign: "right" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sessions.map((session) => (
+                      <tr key={session.id}>
+                        <td>
+                          <span className={`eg-badge ${statusBadgeClass(session.status)}`}>
+                            {session.status}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`eg-badge ${gateBadgeClass(session.gate_status)}`}>
+                            {session.gate_status}
+                          </span>
+                        </td>
+                        <td>
+                          <Link
+                            href={`/examination-sessions/${session.id}`}
+                            className="eg-mono-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                          >
+                            Session #{session.id}
+                          </Link>
+                        </td>
+                        <td>
+                          <span className="eg-mono-sm text-[var(--text-muted)]">
+                            {new Date(session.created_at).toLocaleString()}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="flex items-center gap-3">
+                            <span className="eg-mono-sm text-[var(--text-muted)]">
+                              Exam #{session.exam_id} / Hall #{session.exam_hall_id}
+                            </span>
+                            {session.expected_capacity && (
+                              <span className="eg-mono-sm text-[var(--text-muted)]">
+                                Cap: {session.expected_capacity}
+                              </span>
+                            )}
+                            {session.created_by && (
+                              <span className="eg-mono-sm text-[var(--text-muted)]">
+                                By: {session.created_by}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          {session.status === "NOT_STARTED" && (
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => handleStart(session.id)}
+                                disabled={actionLoading === session.id}
+                                className="eg-btn eg-btn-primary text-xs"
+                              >
+                                Start
+                              </button>
+                              <button
+                                onClick={() => handleCancel(session.id)}
+                                disabled={actionLoading === session.id}
+                                className="eg-btn text-xs"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+                          {session.status === "IN_PROGRESS" && (
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => handleEnd(session.id)}
+                                disabled={actionLoading === session.id}
+                                className="eg-btn eg-btn-primary text-xs"
+                              >
+                                End
+                              </button>
+                              <button
+                                onClick={() => handleCancel(session.id)}
+                                disabled={actionLoading === session.id}
+                                className="eg-btn text-xs"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <div className="divide-y divide-white/[0.04]">
-                {sessions.map((session) => (
-                  <div key={session.id} className="px-4 py-3">
-                    <div className="flex items-start gap-4">
-                      <span className={`eg-mono-sm shrink-0 w-28 ${statusClass(session.status)}`}>
-                        {session.status}
-                      </span>
-                      <span className={`eg-mono-sm shrink-0 ${gateClass(session.gate_status)}`}>
-                        {session.gate_status}
-                      </span>
-                      <Link
-                        href={`/examination-sessions/${session.id}`}
-                        className="eg-mono-sm flex-1 text-[var(--text-secondary)] hover:text-white"
-                      >
-                        SESSION #{session.id} — EXAM #{session.exam_id} / HALL #{session.exam_hall_id}
-                      </Link>
-                      <span className="eg-mono-sm shrink-0 text-[var(--text-muted)]">
-                        {new Date(session.created_at).toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="mt-2 flex items-center gap-3 text-xs">
-                      {session.expected_capacity && (
-                        <span className="eg-mono-sm text-[var(--text-muted)]">
-                          CAPACITY: {session.expected_capacity}
-                        </span>
-                      )}
-                      {session.created_by && (
-                        <span className="eg-mono-sm text-[var(--text-muted)]">
-                          BY: {session.created_by}
-                        </span>
-                      )}
-                      {session.status === "NOT_STARTED" && (
-                        <div className="flex gap-2 ml-auto">
-                          <button
-                            onClick={() => handleStart(session.id)}
-                            disabled={actionLoading === session.id}
-                            className="eg-btn text-xs"
-                          >
-                            START
-                          </button>
-                          <button
-                            onClick={() => handleCancel(session.id)}
-                            disabled={actionLoading === session.id}
-                            className="eg-btn text-xs"
-                          >
-                            CANCEL
-                          </button>
-                        </div>
-                      )}
-                      {session.status === "IN_PROGRESS" && (
-                        <div className="flex gap-2 ml-auto">
-                          <button
-                            onClick={() => handleEnd(session.id)}
-                            disabled={actionLoading === session.id}
-                            className="eg-btn text-xs"
-                          >
-                            END
-                          </button>
-                          <button
-                            onClick={() => handleCancel(session.id)}
-                            disabled={actionLoading === session.id}
-                            className="eg-btn text-xs"
-                          >
-                            CANCEL
-                          </button>
-                        </div>
-                      )}
-                    </div>
+
+              {totalPages > 1 && (
+                <div className="eg-pagination">
+                  <span className="eg-pagination-info">
+                    Page {page} of {totalPages} &middot; {total} sessions
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page <= 1}
+                      className="eg-btn disabled:opacity-30"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page >= totalPages}
+                      className="eg-btn disabled:opacity-30"
+                    >
+                      Next
+                    </button>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {totalPages > 1 && (
-              <div className="flex justify-between items-center mt-4">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                  className="eg-btn disabled:opacity-30"
-                >
-                  PREVIOUS
-                </button>
-                <span className="eg-mono-sm text-[var(--text-muted)]">
-                  PAGE {page} OF {totalPages}
-                </span>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                  className="eg-btn disabled:opacity-30"
-                >
-                  NEXT
-                </button>
-              </div>
-            )}
-          </>
-        )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </AppShell>
   );
 }

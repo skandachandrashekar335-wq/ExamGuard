@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AppShell from "@/components/AppShell";
 
 interface Student {
   id: number;
@@ -104,14 +105,15 @@ export default function StudentsPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-8">
-      <div className="max-w-5xl mx-auto">
-        <h1 className="text-3xl font-bold uppercase tracking-wider mb-2">
-          Students
-        </h1>
-        <p className="text-[#999] mb-8">Manage student records</p>
+    <AppShell>
+      <div className="eg-page">
+        <div className="eg-page-header">
+          <p className="eg-breadcrumb">HOME / STUDENTS</p>
+          <h1 className="eg-page-title">Students</h1>
+          <p className="eg-page-desc">Manage student records</p>
+        </div>
 
-        <div className="flex gap-4 mb-6">
+        <div className="eg-filter-bar">
           <input
             type="text"
             placeholder="Search by USN or name..."
@@ -120,14 +122,14 @@ export default function StudentsPage() {
               setSearch(e.target.value);
               setPage(1);
             }}
-            className="flex-1 bg-[#111] border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-[#666] focus:outline-none focus:border-cyan-500"
+            className="eg-input flex-1"
           />
-          <label className="flex items-center gap-2 text-sm text-[#999]">
+          <label className="eg-label flex items-center gap-2">
             <input
               type="checkbox"
               checked={showInactive}
               onChange={(e) => setShowInactive(e.target.checked)}
-              className="accent-cyan-500"
+              className="eg-checkbox"
             />
             Show inactive
           </label>
@@ -138,19 +140,19 @@ export default function StudentsPage() {
               setFormName("");
               setShowForm(true);
             }}
-            className="bg-gradient-to-r from-cyan-500 to-pink-500 px-4 py-2 rounded-lg font-medium hover:opacity-90"
+            className="eg-btn eg-btn-primary"
           >
             + Add Student
           </button>
         </div>
 
         {showForm && (
-          <div className="bg-[#111] border border-white/10 rounded-lg p-6 mb-6">
-            <h2 className="text-lg font-semibold mb-4">
+          <div className="glass-surface glass p-6 mb-6">
+            <h2 className="eg-page-title text-lg mb-4">
               {editStudent ? "Edit Student" : "New Student"}
             </h2>
             {error && (
-              <p className="text-pink-400 text-sm mb-4">{error}</p>
+              <p className="text-sm mb-4" style={{ color: "var(--danger)" }}>{error}</p>
             )}
             <div className="flex gap-4">
               <input
@@ -158,18 +160,18 @@ export default function StudentsPage() {
                 placeholder="USN"
                 value={formUsn}
                 onChange={(e) => setFormUsn(e.target.value)}
-                className="flex-1 bg-[#050505] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                className="eg-input flex-1"
               />
               <input
                 type="text"
                 placeholder="Name"
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
-                className="flex-1 bg-[#050505] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                className="eg-input flex-1"
               />
               <button
                 onClick={editStudent ? handleUpdate : handleCreate}
-                className="bg-gradient-to-r from-cyan-500 to-pink-500 px-6 py-2 rounded-lg font-medium hover:opacity-90"
+                className="eg-btn eg-btn-primary"
               >
                 {editStudent ? "Update" : "Create"}
               </button>
@@ -179,7 +181,7 @@ export default function StudentsPage() {
                   setEditStudent(null);
                   setError("");
                 }}
-                className="border border-white/20 px-4 py-2 rounded-lg hover:bg-white/5"
+                className="eg-btn"
               >
                 Cancel
               </button>
@@ -187,46 +189,39 @@ export default function StudentsPage() {
           </div>
         )}
 
-        <div className="bg-[#111] border border-white/10 rounded-lg overflow-hidden">
-          <table className="w-full">
+        <div className="eg-table-wrap">
+          <table className="eg-table">
             <thead>
-              <tr className="border-b border-white/10 text-left text-sm text-[#999]">
-                <th className="px-6 py-3">USN</th>
-                <th className="px-6 py-3">Name</th>
-                <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3 text-right">Actions</th>
+              <tr>
+                <th>USN</th>
+                <th>Name</th>
+                <th>Status</th>
+                <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {students.map((s) => (
-                <tr
-                  key={s.id}
-                  className="border-b border-white/5 hover:bg-white/[0.02]"
-                >
-                  <td className="px-6 py-3 font-mono text-sm">{s.usn}</td>
-                  <td className="px-6 py-3">{s.name}</td>
-                  <td className="px-6 py-3">
+                <tr key={s.id}>
+                  <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.8125rem" }}>{s.usn}</td>
+                  <td>{s.name}</td>
+                  <td>
                     <span
-                      className={`text-xs px-2 py-1 rounded-full ${
-                        s.is_active
-                          ? "bg-emerald-500/20 text-emerald-400"
-                          : "bg-red-500/20 text-red-400"
-                      }`}
+                      className={`eg-badge ${s.is_active ? "eg-badge-success" : "eg-badge-danger"}`}
                     >
                       {s.is_active ? "Active" : "Inactive"}
                     </span>
                   </td>
-                  <td className="px-6 py-3 text-right">
+                  <td className="text-right">
                     <button
                       onClick={() => openEdit(s)}
-                      className="text-cyan-400 hover:text-cyan-300 text-sm mr-4"
+                      className="eg-btn text-xs mr-4"
                     >
                       Edit
                     </button>
                     {s.is_active && (
                       <button
                         onClick={() => handleDeactivate(s.id)}
-                        className="text-pink-400 hover:text-pink-300 text-sm"
+                        className="eg-btn eg-btn-danger text-xs"
                       >
                         Deactivate
                       </button>
@@ -236,11 +231,10 @@ export default function StudentsPage() {
               ))}
               {students.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={4}
-                    className="px-6 py-8 text-center text-[#666]"
-                  >
-                    No students found
+                  <td colSpan={4}>
+                    <div className="eg-empty">
+                      <p className="eg-empty-title">No students found</p>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -249,27 +243,27 @@ export default function StudentsPage() {
         </div>
 
         {totalPages > 1 && (
-          <div className="flex justify-center gap-4 mt-6">
+          <div className="eg-pagination">
             <button
               onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page === 1}
-              className="border border-white/20 px-4 py-2 rounded-lg disabled:opacity-30 hover:bg-white/5"
+              className="eg-btn eg-btn-sm"
             >
               Previous
             </button>
-            <span className="py-2 text-sm text-[#999]">
+            <span className="eg-mono-sm" style={{ color: "var(--text-muted)" }}>
               Page {page} of {totalPages} ({total} total)
             </span>
             <button
               onClick={() => setPage(Math.min(totalPages, page + 1))}
               disabled={page >= totalPages}
-              className="border border-white/20 px-4 py-2 rounded-lg disabled:opacity-30 hover:bg-white/5"
+              className="eg-btn eg-btn-sm"
             >
               Next
             </button>
           </div>
         )}
       </div>
-    </div>
+    </AppShell>
   );
 }

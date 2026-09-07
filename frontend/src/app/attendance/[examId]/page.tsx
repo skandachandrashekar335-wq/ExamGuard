@@ -13,12 +13,13 @@ import {
   type AttendanceEvent,
   ApiError,
 } from "@/lib/attendance-api";
+import AppShell from "@/components/AppShell";
 
-const STATUS_CLASSES: Record<string, string> = {
-  PRESENT: "border-white/40 text-white",
-  ABSENT: "border-white/20 text-[var(--text-secondary)]",
-  EXCUSED: "border-white/30 text-white",
-  NOT_RECORDED: "border-white/10 text-[var(--text-muted)]",
+const STATUS_BADGE: Record<string, string> = {
+  PRESENT: "eg-badge-success",
+  ABSENT: "eg-badge-danger",
+  EXCUSED: "eg-badge-warning",
+  NOT_RECORDED: "eg-badge-neutral",
 };
 
 export default function ExamAttendancePage() {
@@ -129,30 +130,24 @@ export default function ExamAttendancePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-6">
-          <Link
-            href="/attendance"
-            className="eg-mono-sm text-[var(--text-muted)] hover:text-white transition-colors"
-          >
+    <AppShell>
+      <div className="eg-page">
+        <div className="eg-page-header">
+          <Link href="/attendance" className="eg-breadcrumb">
             ← Attendance
           </Link>
+          <h1 className="eg-page-title">Exam Attendance</h1>
+          <p className="eg-page-desc">Exam #{examId}</p>
         </div>
 
-        <h1 className="eg-display text-3xl mb-2">Exam Attendance</h1>
-        <p className="eg-body text-[var(--text-secondary)] mb-8">
-          Exam #{examId}
-        </p>
-
         {summary && (
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-6 mb-8">
+          <div className="glass-surface p-6 mb-8">
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-6">
               <div>
                 <div className="eg-mono text-xs text-[var(--text-muted)] mb-1">
                   Registered
                 </div>
-                <div className="eg-display text-2xl">
+                <div className="eg-metric-value">
                   {summary.total_registered}
                 </div>
               </div>
@@ -160,7 +155,7 @@ export default function ExamAttendancePage() {
                 <div className="eg-mono text-xs text-[var(--text-muted)] mb-1">
                   Present
                 </div>
-                <div className="eg-display text-2xl">
+                <div className="eg-metric-value">
                   {summary.total_present}
                 </div>
               </div>
@@ -168,7 +163,7 @@ export default function ExamAttendancePage() {
                 <div className="eg-mono text-xs text-[var(--text-muted)] mb-1">
                   Absent
                 </div>
-                <div className="eg-display text-2xl">
+                <div className="eg-metric-value">
                   {summary.total_absent}
                 </div>
               </div>
@@ -176,7 +171,7 @@ export default function ExamAttendancePage() {
                 <div className="eg-mono text-xs text-[var(--text-muted)] mb-1">
                   Excused
                 </div>
-                <div className="eg-display text-2xl">
+                <div className="eg-metric-value">
                   {summary.total_excused}
                 </div>
               </div>
@@ -184,14 +179,14 @@ export default function ExamAttendancePage() {
                 <div className="eg-mono text-xs text-[var(--text-muted)] mb-1">
                   Rate
                 </div>
-                <div className="eg-display text-2xl">
+                <div className="eg-metric-value">
                   {Math.round(summary.attendance_rate)}%
                 </div>
               </div>
             </div>
 
             {summary.by_hall.length > 0 && (
-              <div className="mt-6 border-t border-white/10 pt-4">
+              <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
                 <div className="eg-mono text-xs text-[var(--text-muted)] mb-3">
                   By Hall
                 </div>
@@ -199,9 +194,9 @@ export default function ExamAttendancePage() {
                   {summary.by_hall.map((h) => (
                     <div
                       key={h.hall_id}
-                      className="border border-white/10 px-4 py-2 text-sm"
+                      className="glass px-4 py-2 text-sm"
                     >
-                      <span className="text-white">{h.hall_name}</span>
+                      <span className="text-[var(--text-primary)]">{h.hall_name}</span>
                       <span className="text-[var(--text-muted)] ml-2">
                         {h.present}/{h.total}
                       </span>
@@ -213,7 +208,7 @@ export default function ExamAttendancePage() {
           </div>
         )}
 
-        <div className="flex flex-wrap gap-3 mb-6">
+        <div className="eg-filter-bar mb-6">
           <input
             type="text"
             placeholder="Hall ID..."
@@ -222,7 +217,7 @@ export default function ExamAttendancePage() {
               setHallFilter(e.target.value);
               setPage(1);
             }}
-            className="bg-[var(--bg-raised)] border border-white/10 px-3 py-2 text-sm text-white placeholder:text-[var(--text-muted)] focus:outline-none focus:border-white/30 w-32"
+            className="eg-input w-32"
           />
           <select
             value={statusFilter}
@@ -230,7 +225,7 @@ export default function ExamAttendancePage() {
               setStatusFilter(e.target.value);
               setPage(1);
             }}
-            className="bg-[var(--bg-raised)] border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-white/30"
+            className="eg-select"
           >
             <option value="">All statuses</option>
             <option value="PRESENT">Present</option>
@@ -241,126 +236,97 @@ export default function ExamAttendancePage() {
         </div>
 
         {error && (
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-4 mb-6">
-            <span className="eg-mono text-red-400">{error}</span>
+          <div className="glass-surface p-4 mb-6">
+            <span className="eg-mono text-sm" style={{ color: "var(--danger)" }}>{error}</span>
           </div>
         )}
 
         {loading ? (
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-12 text-center">
+          <div className="glass-surface p-12 text-center">
             <span className="eg-mono text-[var(--text-muted)]">
               Loading attendance records...
             </span>
           </div>
         ) : records.length === 0 ? (
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-12 text-center">
-            <h3 className="eg-mono text-[var(--text-secondary)] mb-2">
-              No records
-            </h3>
-            <p className="text-sm text-[var(--text-muted)]">
+          <div className="eg-empty">
+            <div className="eg-empty-title">No records</div>
+            <div className="eg-empty-desc">
               No attendance records found for this exam.
-            </p>
+            </div>
           </div>
         ) : (
-          <div className="border border-white/10 bg-[var(--bg-raised)] overflow-x-auto">
-            <table className="w-full">
+          <div className="eg-table-wrap">
+            <table className="eg-table">
               <thead>
-                <tr className="border-b border-white/10">
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    ID
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Student
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Hall
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Seat
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Method
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    Entry Time
-                  </th>
-                  <th className="px-4 py-3 text-left eg-mono-sm text-[var(--text-muted)]">
-                    EV
-                  </th>
-                  <th className="px-4 py-3 text-right eg-mono-sm text-[var(--text-muted)]">
-                    Actions
-                  </th>
+                <tr>
+                  <th>ID</th>
+                  <th>Student</th>
+                  <th>Hall</th>
+                  <th>Seat</th>
+                  <th>Status</th>
+                  <th>Method</th>
+                  <th>Entry Time</th>
+                  <th>EV</th>
+                  <th className="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {records.map((r) => (
                   <Fragment key={r.id}>
-                    <tr
-                      className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
-                    >
-                      <td className="px-4 py-3 font-mono text-sm">{r.id}</td>
-                      <td className="px-4 py-3 text-sm">#{r.student_id}</td>
-                      <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">
-                        #{r.hall_id}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">
+                    <tr>
+                      <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.8125rem" }}>{r.id}</td>
+                      <td>#{r.student_id}</td>
+                      <td style={{ color: "var(--text-secondary)" }}>#{r.hall_id}</td>
+                      <td style={{ color: "var(--text-secondary)" }}>
                         {r.seat_number ?? "—"}
                       </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`text-[10px] eg-mono border px-2 py-0.5 ${
-                            STATUS_CLASSES[r.status] ||
-                            "border-white/10 text-[var(--text-muted)]"
-                          }`}
-                        >
+                      <td>
+                        <span className={`eg-badge ${STATUS_BADGE[r.status] || "eg-badge-neutral"}`}>
                           {r.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-[var(--text-muted)] font-mono">
+                      <td style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: "0.75rem" }}>
                         {r.entry_method}
                       </td>
-                      <td className="px-4 py-3 text-xs text-[var(--text-muted)] font-mono">
+                      <td style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: "0.75rem" }}>
                         {new Date(r.entry_time).toLocaleString()}
                       </td>
-                      <td className="px-4 py-3">
+                      <td>
                         <button
                           onClick={() => loadEvents(r.entry_verification_id)}
-                          className="eg-mono-sm text-white hover:text-[var(--text-secondary)] transition-colors"
+                          className="eg-mono-sm text-[var(--text-primary)] hover:text-[var(--text-secondary)] transition-colors"
                         >
                           #{r.entry_verification_id}
                         </button>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="text-right">
                         <button
                           onClick={() =>
                             setShowCorrect(showCorrect === r.id ? null : r.id)
                           }
-                          className="eg-mono-sm text-white hover:text-[var(--text-secondary)] transition-colors"
+                          className="eg-mono-sm text-[var(--text-primary)] hover:text-[var(--text-secondary)] transition-colors"
                         >
                           Correct
                         </button>
                       </td>
                     </tr>
                     {showCorrect === r.id && (
-                      <tr key={`${r.id}-correct`} className="border-b border-white/5">
-                        <td colSpan={9} className="px-4 py-4 bg-[var(--bg-base)]">
-                          <div className="border border-white/10 p-4">
+                      <tr key={`${r.id}-correct`}>
+                        <td colSpan={9} className="p-4">
+                          <div className="glass-surface p-4">
                             <h4 className="eg-mono text-sm text-[var(--text-secondary)] mb-3">
                               Manual Correction — Student #{r.student_id}
                             </h4>
                             {correctError && (
-                              <div className="border border-white/10 bg-[var(--bg-raised)] p-3 mb-3">
-                                <span className="eg-mono text-sm text-red-400">
+                              <div className="glass-surface p-3 mb-3" style={{ borderColor: "rgba(220,38,38,0.3)" }}>
+                                <span className="eg-mono text-sm" style={{ color: "var(--danger)" }}>
                                   {correctError}
                                 </span>
                               </div>
                             )}
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
                               <div>
-                                <label className="block eg-mono-sm text-[var(--text-muted)] mb-1">
+                                <label className="eg-label">
                                   Status
                                 </label>
                                 <select
@@ -368,14 +334,14 @@ export default function ExamAttendancePage() {
                                   onChange={(e) =>
                                     setCorrectStatus(e.target.value)
                                   }
-                                  className="w-full bg-[var(--bg-raised)] border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-white/30"
+                                  className="eg-select w-full"
                                 >
                                   <option value="EXCUSED">EXCUSED</option>
                                   <option value="PRESENT">PRESENT</option>
                                 </select>
                               </div>
                               <div>
-                                <label className="block eg-mono-sm text-[var(--text-muted)] mb-1">
+                                <label className="eg-label">
                                   Reason *
                                 </label>
                                 <input
@@ -386,11 +352,11 @@ export default function ExamAttendancePage() {
                                     setCorrectReason(e.target.value)
                                   }
                                   placeholder="Reason for correction"
-                                  className="w-full bg-[var(--bg-raised)] border border-white/10 px-3 py-2 text-sm text-white placeholder:text-[var(--text-muted)] focus:outline-none focus:border-white/30"
+                                  className="eg-input w-full"
                                 />
                               </div>
                               <div>
-                                <label className="block eg-mono-sm text-[var(--text-muted)] mb-1">
+                                <label className="eg-label">
                                   Corrected By *
                                 </label>
                                 <input
@@ -399,7 +365,7 @@ export default function ExamAttendancePage() {
                                   value={correctBy}
                                   onChange={(e) => setCorrectBy(e.target.value)}
                                   placeholder="Admin ID"
-                                  className="w-full bg-[var(--bg-raised)] border border-white/10 px-3 py-2 text-sm text-white placeholder:text-[var(--text-muted)] focus:outline-none focus:border-white/30"
+                                  className="eg-input w-full"
                                 />
                               </div>
                             </div>
@@ -411,7 +377,7 @@ export default function ExamAttendancePage() {
                                   !correctReason.trim() ||
                                   !correctBy.trim()
                                 }
-                                className="eg-btn px-4 py-2 text-sm disabled:opacity-30"
+                                className="eg-btn eg-btn-primary px-4 py-2 text-sm disabled:opacity-30"
                               >
                                 {correctLoading ? "Saving..." : "Save Correction"}
                               </button>
@@ -429,17 +395,16 @@ export default function ExamAttendancePage() {
                     {showEvents === r.entry_verification_id && (
                       <tr
                         key={`${r.id}-events`}
-                        className="border-b border-white/5"
                       >
-                        <td colSpan={9} className="px-4 py-4 bg-[var(--bg-base)]">
-                          <div className="border border-white/10 p-4">
+                        <td colSpan={9} className="p-4">
+                          <div className="glass-surface p-4">
                             <div className="flex items-center justify-between mb-3">
                               <h4 className="eg-mono text-sm text-[var(--text-secondary)]">
                                 Events for EV #{r.entry_verification_id}
                               </h4>
                               <Link
                                 href={`/attendance/events/${r.entry_verification_id}`}
-                                className="eg-mono-sm text-white hover:text-[var(--text-secondary)] transition-colors"
+                                className="eg-mono-sm text-[var(--text-primary)] hover:text-[var(--text-secondary)] transition-colors"
                               >
                                 Full History →
                               </Link>
@@ -463,12 +428,12 @@ export default function ExamAttendancePage() {
                                       #{ev.id}
                                     </span>
                                     <span
-                                      className={`text-[10px] eg-mono border px-2 py-0.5 ${
+                                      className={`eg-badge ${
                                         ev.event_type === "AUTO_RECORDED"
-                                          ? "border-white/30 text-white"
+                                          ? "eg-badge-success"
                                           : ev.event_type === "MANUAL_CORRECTION"
-                                            ? "border-white/20 text-[var(--text-secondary)]"
-                                            : "border-white/10 text-[var(--text-muted)]"
+                                            ? "eg-badge-warning"
+                                            : "eg-badge-neutral"
                                       }`}
                                     >
                                       {ev.event_type}
@@ -481,7 +446,10 @@ export default function ExamAttendancePage() {
                                         by {ev.recorded_by}
                                       </span>
                                     )}
-                                    <span className="text-[var(--text-muted)] font-mono text-xs">
+                                    <span
+                                      className="text-[var(--text-muted)] text-xs"
+                                      style={{ fontFamily: "var(--font-mono)" }}
+                                    >
                                       {new Date(ev.created_at).toLocaleString()}
                                     </span>
                                   </div>
@@ -500,7 +468,7 @@ export default function ExamAttendancePage() {
         )}
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-4">
+          <div className="eg-pagination mt-4">
             <button
               onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page === 1}
@@ -521,6 +489,6 @@ export default function ExamAttendancePage() {
           </div>
         )}
       </div>
-    </div>
+    </AppShell>
   );
 }

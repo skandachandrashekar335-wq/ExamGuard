@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import AppShell from "@/components/AppShell";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -37,13 +38,6 @@ const TYPE_LABELS: Record<string, string> = {
   registration_cancellations: "Reg. Cancellations",
   seat_assignments: "Seat Assignments",
   seat_assignment_cancellations: "Seat Assign. Cancellations",
-};
-
-const STATUS_STYLES: Record<string, string> = {
-  started: "bg-blue-500/20 text-blue-400",
-  completed: "bg-emerald-500/20 text-emerald-400",
-  completed_with_errors: "bg-amber-500/20 text-amber-400",
-  failed: "bg-pink-500/20 text-pink-400",
 };
 
 function formatDate(iso: string): string {
@@ -102,23 +96,24 @@ export default function ImportHistoryPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-8">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold uppercase tracking-wider mb-2">
-          Import History
-        </h1>
-        <p className="text-[#999] mb-8">
-          Audit log of all bulk import operations
-        </p>
+    <AppShell>
+      <div className="eg-page">
+        <div className="eg-page-header">
+          <div className="eg-breadcrumb">
+            <Link href="/import">Import</Link> / History
+          </div>
+          <h1 className="eg-page-title">Import History</h1>
+          <p className="eg-page-desc">Audit log of all bulk import operations</p>
+        </div>
 
-        <div className="flex gap-4 mb-6">
+        <div className="eg-filter-bar mb-6">
           <select
             value={filterType}
             onChange={(e) => {
               setFilterType(e.target.value);
               setPage(1);
             }}
-            className="bg-[#111] border border-white/10 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"
+            className="eg-select"
           >
             <option value="">All Types</option>
             {Object.entries(TYPE_LABELS).map(([key, label]) => (
@@ -134,7 +129,7 @@ export default function ImportHistoryPage() {
               setFilterStatus(e.target.value);
               setPage(1);
             }}
-            className="bg-[#111] border border-white/10 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"
+            className="eg-select"
           >
             <option value="">All Statuses</option>
             <option value="started">Started</option>
@@ -143,71 +138,79 @@ export default function ImportHistoryPage() {
             <option value="failed">Failed</option>
           </select>
 
-          <span className="text-[#666] text-sm self-center">
+          <span className="text-sm self-center" style={{ color: "var(--text-muted)" }}>
             {total} record{total !== 1 ? "s" : ""}
           </span>
         </div>
 
         {loading ? (
           <div className="text-center py-16">
-            <div className="inline-block w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+            <div className="inline-block w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} />
           </div>
         ) : logs.length === 0 ? (
-          <div className="text-center py-16 text-[#666]">
-            No audit records found
+          <div className="eg-empty">
+            <p className="eg-empty-title">No audit records found</p>
           </div>
         ) : (
-          <div className="bg-[#111] border border-white/10 rounded-lg overflow-hidden mb-6">
-            <table className="w-full">
+          <div className="eg-table-wrap mb-6">
+            <table className="eg-table">
               <thead>
-                <tr className="border-b border-white/10 text-left text-sm text-[#999]">
-                  <th className="px-6 py-3">Date/Time</th>
-                  <th className="px-6 py-3">Type</th>
-                  <th className="px-6 py-3">Operation</th>
-                  <th className="px-6 py-3">Status</th>
-                  <th className="px-6 py-3 text-right">Total</th>
-                  <th className="px-6 py-3 text-right">OK</th>
-                  <th className="px-6 py-3 text-right">Skipped</th>
-                  <th className="px-6 py-3 text-right">Failed</th>
-                  <th className="px-6 py-3"></th>
+                <tr>
+                  <th>Date/Time</th>
+                  <th>Type</th>
+                  <th>Operation</th>
+                  <th>Status</th>
+                  <th className="text-right">Total</th>
+                  <th className="text-right">OK</th>
+                  <th className="text-right">Skipped</th>
+                  <th className="text-right">Failed</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
                 {logs.map((log) => (
                   <tr
                     key={log.id}
-                    className="border-b border-white/5 hover:bg-white/[0.02] cursor-pointer"
+                    className="cursor-pointer"
                     onClick={() => handleDetail(log.id)}
                   >
-                    <td className="px-6 py-3 text-sm text-[#ccc]">
+                    <td className="text-sm" style={{ color: "var(--text-secondary)" }}>
                       {formatDate(log.started_at)}
                     </td>
-                    <td className="px-6 py-3 text-sm">
+                    <td className="text-sm">
                       {TYPE_LABELS[log.import_type] || log.import_type}
                     </td>
-                    <td className="px-6 py-3 text-sm capitalize">
+                    <td className="text-sm capitalize">
                       {log.operation}
                     </td>
-                    <td className="px-6 py-3">
+                    <td>
                       <span
-                        className={`text-xs px-2 py-1 rounded-full ${STATUS_STYLES[log.status] || "bg-white/10 text-white"}`}
+                        className={`eg-badge ${
+                          log.status === "completed"
+                            ? "eg-badge-success"
+                            : log.status === "completed_with_errors"
+                            ? "eg-badge-warning"
+                            : log.status === "failed"
+                            ? "eg-badge-danger"
+                            : "eg-badge-info"
+                        }`}
                       >
                         {log.status.replace(/_/g, " ")}
                       </span>
                     </td>
-                    <td className="px-6 py-3 text-sm text-right">
+                    <td className="text-sm text-right">
                       {log.total_rows}
                     </td>
-                    <td className="px-6 py-3 text-sm text-right text-emerald-400">
+                    <td className="text-sm text-right" style={{ color: "var(--success)" }}>
                       {log.successful_rows}
                     </td>
-                    <td className="px-6 py-3 text-sm text-right text-amber-400">
+                    <td className="text-sm text-right" style={{ color: "var(--warning)" }}>
                       {log.skipped_rows}
                     </td>
-                    <td className="px-6 py-3 text-sm text-right text-pink-400">
+                    <td className="text-sm text-right" style={{ color: "var(--danger)" }}>
                       {log.failed_rows}
                     </td>
-                    <td className="px-6 py-3 text-sm text-[#666]">
+                    <td className="text-sm" style={{ color: "var(--text-muted)" }}>
                       &rarr;
                     </td>
                   </tr>
@@ -222,17 +225,17 @@ export default function ImportHistoryPage() {
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-3 py-1 rounded border border-white/10 text-sm disabled:opacity-30 hover:bg-white/5"
+              className="eg-btn disabled:opacity-30"
             >
               Prev
             </button>
-            <span className="px-3 py-1 text-sm text-[#999]">
+            <span className="px-3 py-1 text-sm" style={{ color: "var(--text-secondary)" }}>
               Page {page} of {totalPages}
             </span>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="px-3 py-1 rounded border border-white/10 text-sm disabled:opacity-30 hover:bg-white/5"
+              className="eg-btn disabled:opacity-30"
             >
               Next
             </button>
@@ -241,12 +244,13 @@ export default function ImportHistoryPage() {
 
         {detail && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-            <div className="bg-[#111] border border-white/10 rounded-lg p-6 max-w-lg w-full">
+            <div className="glass-surface glass-medium p-6 max-w-lg w-full rounded-lg">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold">Audit Detail</h2>
+                <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>Audit Detail</h2>
                 <button
                   onClick={() => setDetail(null)}
-                  className="text-[#666] hover:text-white text-xl"
+                  className="text-xl"
+                  style={{ color: "var(--text-muted)" }}
                 >
                   &times;
                 </button>
@@ -254,82 +258,90 @@ export default function ImportHistoryPage() {
 
               {detailLoading ? (
                 <div className="text-center py-8">
-                  <div className="inline-block w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+                  <div className="inline-block w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} />
                 </div>
               ) : (
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-[#999]">ID</span>
+                    <span style={{ color: "var(--text-secondary)" }}>ID</span>
                     <span>{detail.id}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#999]">Type</span>
+                    <span style={{ color: "var(--text-secondary)" }}>Type</span>
                     <span>
                       {TYPE_LABELS[detail.import_type] || detail.import_type}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#999]">Operation</span>
+                    <span style={{ color: "var(--text-secondary)" }}>Operation</span>
                     <span className="capitalize">{detail.operation}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#999]">Status</span>
+                    <span style={{ color: "var(--text-secondary)" }}>Status</span>
                     <span
-                      className={`text-xs px-2 py-1 rounded-full ${STATUS_STYLES[detail.status] || ""}`}
+                      className={`eg-badge ${
+                        detail.status === "completed"
+                          ? "eg-badge-success"
+                          : detail.status === "completed_with_errors"
+                          ? "eg-badge-warning"
+                          : detail.status === "failed"
+                          ? "eg-badge-danger"
+                          : "eg-badge-info"
+                      }`}
                     >
                       {detail.status.replace(/_/g, " ")}
                     </span>
                   </div>
 
-                  <hr className="border-white/10" />
+                  <hr style={{ borderColor: "var(--border)" }} />
 
                   <div className="grid grid-cols-4 gap-2 text-center">
                     <div>
                       <p className="text-lg font-bold">{detail.total_rows}</p>
-                      <p className="text-[#666] text-xs">Total</p>
+                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>Total</p>
                     </div>
                     <div>
-                      <p className="text-lg font-bold text-emerald-400">
+                      <p className="text-lg font-bold" style={{ color: "var(--success)" }}>
                         {detail.successful_rows}
                       </p>
-                      <p className="text-[#666] text-xs">OK</p>
+                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>OK</p>
                     </div>
                     <div>
-                      <p className="text-lg font-bold text-amber-400">
+                      <p className="text-lg font-bold" style={{ color: "var(--warning)" }}>
                         {detail.skipped_rows}
                       </p>
-                      <p className="text-[#666] text-xs">Skipped</p>
+                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>Skipped</p>
                     </div>
                     <div>
-                      <p className="text-lg font-bold text-pink-400">
+                      <p className="text-lg font-bold" style={{ color: "var(--danger)" }}>
                         {detail.failed_rows}
                       </p>
-                      <p className="text-[#666] text-xs">Failed</p>
+                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>Failed</p>
                     </div>
                   </div>
 
-                  <hr className="border-white/10" />
+                  <hr style={{ borderColor: "var(--border)" }} />
 
                   <div className="flex justify-between">
-                    <span className="text-[#999]">Started</span>
+                    <span style={{ color: "var(--text-secondary)" }}>Started</span>
                     <span>{formatDate(detail.started_at)}</span>
                   </div>
                   {detail.completed_at && (
                     <div className="flex justify-between">
-                      <span className="text-[#999]">Completed</span>
+                      <span style={{ color: "var(--text-secondary)" }}>Completed</span>
                       <span>{formatDate(detail.completed_at)}</span>
                     </div>
                   )}
                   {detail.actor && (
                     <div className="flex justify-between">
-                      <span className="text-[#999]">Actor</span>
+                      <span style={{ color: "var(--text-secondary)" }}>Actor</span>
                       <span>{detail.actor}</span>
                     </div>
                   )}
                   {detail.error_summary && (
                     <div>
-                      <p className="text-[#999] mb-1">Errors</p>
-                      <p className="bg-pink-500/10 border border-pink-500/30 rounded p-3 text-pink-300 text-xs whitespace-pre-wrap">
+                      <p className="mb-1" style={{ color: "var(--text-secondary)" }}>Errors</p>
+                      <p className="bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded p-3 text-xs whitespace-pre-wrap" style={{ color: "var(--danger)" }}>
                         {detail.error_summary}
                       </p>
                     </div>
@@ -341,14 +353,11 @@ export default function ImportHistoryPage() {
         )}
 
         <div className="mt-8">
-          <Link
-            href="/import"
-            className="text-[#666] hover:text-white text-sm transition-colors"
-          >
+          <Link href="/import" className="eg-btn text-sm">
             &larr; Back to Import
           </Link>
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 }

@@ -23,20 +23,21 @@ import {
   type SecuritySignal,
   type ProxyRiskAssessment,
 } from "@/lib/proxy-risk-api";
+import AppShell from "@/components/AppShell";
 
-const STATUS_CLASSES: Record<string, string> = {
-  PENDING: "border-white/20 text-[var(--text-secondary)]",
-  IN_PROGRESS: "border-white/30 text-white",
-  GRANTED: "border-white/40 text-white",
-  DENIED: "border-white/20 text-[var(--text-secondary)]",
-  ESCALATED: "border-white/30 text-white",
+const STATUS_BADGE: Record<string, string> = {
+  PENDING: "eg-badge-info",
+  IN_PROGRESS: "eg-badge-info",
+  GRANTED: "eg-badge-success",
+  DENIED: "eg-badge-danger",
+  ESCALATED: "eg-badge-warning",
 };
 
-const CHECK_CLASSES: Record<string, string> = {
-  PENDING: "border-white/10 text-[var(--text-muted)]",
-  PASSED: "border-white/40 text-white",
-  FAILED: "border-white/20 text-[var(--text-secondary)]",
-  SKIPPED: "border-white/10 text-[var(--text-muted)]",
+const CHECK_BADGE: Record<string, string> = {
+  PENDING: "eg-badge-neutral",
+  PASSED: "eg-badge-success",
+  FAILED: "eg-badge-danger",
+  SKIPPED: "eg-badge-neutral",
 };
 
 export default function EntryVerificationDetailPage() {
@@ -139,13 +140,13 @@ export default function EntryVerificationDetailPage() {
 
   function renderRiskLevelBadge(level: string) {
     const cls: Record<string, string> = {
-      LOW: "border-white/20 text-[var(--text-secondary)]",
-      ELEVATED: "border-white/30 text-white",
-      HIGH: "border-white/40 text-white",
-      CRITICAL: "border-white/40 text-white",
+      LOW: "eg-badge-neutral",
+      ELEVATED: "eg-badge-info",
+      HIGH: "eg-badge-warning",
+      CRITICAL: "eg-badge-danger",
     };
     return (
-      <span className={`text-[10px] eg-mono border px-2 py-0.5 ${cls[level] || "border-white/10 text-[var(--text-muted)]"}`}>
+      <span className={`eg-badge ${cls[level] || "eg-badge-neutral"}`}>
         {level}
       </span>
     );
@@ -153,13 +154,13 @@ export default function EntryVerificationDetailPage() {
 
   function renderStrengthBadge(strength: string) {
     const cls: Record<string, string> = {
-      STRONG: "border-white/40 text-white",
-      MODERATE: "border-white/30 text-white",
-      WEAK: "border-white/20 text-[var(--text-secondary)]",
-      INFORMATIONAL: "border-white/10 text-[var(--text-muted)]",
+      STRONG: "eg-badge-success",
+      MODERATE: "eg-badge-info",
+      WEAK: "eg-badge-warning",
+      INFORMATIONAL: "eg-badge-neutral",
     };
     return (
-      <span className={`text-[10px] eg-mono border px-2 py-0.5 ${cls[strength] || "border-white/10 text-[var(--text-muted)]"}`}>
+      <span className={`eg-badge ${cls[strength] || "eg-badge-neutral"}`}>
         {strength}
       </span>
     );
@@ -167,35 +168,39 @@ export default function EntryVerificationDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] p-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-12 text-center">
-            <span className="eg-mono text-[var(--text-muted)]">
-              Loading entry verification...
-            </span>
+      <AppShell>
+        <div className="eg-page">
+          <div className="eg-page-header">
+            <div className="glass-surface p-12 text-center">
+              <span className="eg-mono text-[var(--text-muted)]">
+                Loading entry verification...
+              </span>
+            </div>
           </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   if (error || !ev) {
     return (
-      <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] p-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-12 text-center">
-            <span className="eg-mono text-red-400">
-              {error || "Entry verification not found"}
-            </span>
+      <AppShell>
+        <div className="eg-page">
+          <div className="eg-page-header">
+            <div className="glass-surface p-12 text-center">
+              <span className="eg-mono" style={{ color: "var(--danger)" }}>
+                {error || "Entry verification not found"}
+              </span>
+            </div>
+            <Link
+              href="/entry-verifications"
+              className="eg-breadcrumb mt-4 inline-block"
+            >
+              ← Back to list
+            </Link>
           </div>
-          <Link
-            href="/entry-verifications"
-            className="eg-mono-sm text-white hover:text-[var(--text-secondary)] mt-4 inline-block"
-          >
-            &larr; Back to list
-          </Link>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
@@ -211,7 +216,7 @@ export default function EntryVerificationDetailPage() {
             runAction("Begin processing", () => beginEntryVerification(current.id))
           }
           disabled={actionLoading !== ""}
-          className="eg-btn px-4 py-2 text-sm disabled:opacity-30"
+          className="eg-btn eg-btn-primary px-4 py-2 text-sm disabled:opacity-30"
         >
           {actionLoading === "Begin processing" ? "Working..." : "Begin Processing"}
         </button>,
@@ -262,7 +267,7 @@ export default function EntryVerificationDetailPage() {
             runAction("Evaluate", () => evaluateEntryVerification(current.id))
           }
           disabled={actionLoading !== ""}
-          className="eg-btn px-4 py-2 text-sm disabled:opacity-30"
+          className="eg-btn eg-btn-primary px-4 py-2 text-sm disabled:opacity-30"
         >
           {actionLoading === "Evaluate" ? "Working..." : "Evaluate"}
         </button>,
@@ -292,7 +297,7 @@ export default function EntryVerificationDetailPage() {
           key="resolve-grant"
           onClick={() => setShowResolve(true)}
           disabled={actionLoading !== ""}
-          className="eg-btn px-4 py-2 text-sm disabled:opacity-30"
+          className="eg-btn eg-btn-primary px-4 py-2 text-sm disabled:opacity-30"
         >
           Resolve
         </button>,
@@ -305,35 +310,26 @@ export default function EntryVerificationDetailPage() {
   if (!ev) return null;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] p-8">
-      <div className="max-w-4xl mx-auto">
-        <Link
-          href="/entry-verifications"
-          className="eg-mono-sm text-[var(--text-secondary)] hover:text-white mb-4 inline-block"
-        >
-          &larr; Entry Verifications
-        </Link>
-
-        <div className="flex items-center gap-4 mb-2">
-          <h1 className="eg-display text-3xl">
-            Entry Verification #{ev.id}
-          </h1>
-          <span
-            className={`text-[11px] eg-mono border px-3 py-1 ${
-              STATUS_CLASSES[ev.status] ||
-              "border-white/10 text-[var(--text-muted)]"
-            }`}
-          >
-            {ev.status}
-          </span>
+    <AppShell>
+      <div className="eg-page">
+        <div className="eg-page-header">
+          <Link href="/entry-verifications" className="eg-breadcrumb">
+            ← Entry Verifications
+          </Link>
+          <div className="flex items-center gap-4">
+            <h1 className="eg-page-title">Entry Verification #{ev.id}</h1>
+            <span className={`eg-badge ${STATUS_BADGE[ev.status] || "eg-badge-neutral"}`}>
+              {ev.status}
+            </span>
+          </div>
+          <p className="eg-page-desc">
+            Created {new Date(ev.created_at).toLocaleString()}
+          </p>
         </div>
-        <p className="eg-body text-[var(--text-secondary)] mb-8">
-          Created {new Date(ev.created_at).toLocaleString()}
-        </p>
 
         {actionError && (
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-4 mb-6">
-            <span className="eg-mono text-sm text-red-400">{actionError}</span>
+          <div className="glass-surface p-4 mb-6">
+            <span className="eg-mono text-sm" style={{ color: "var(--danger)" }}>{actionError}</span>
           </div>
         )}
 
@@ -348,7 +344,7 @@ export default function EntryVerificationDetailPage() {
                 setEscalateReason("");
               });
             }}
-            className="border border-white/10 bg-[var(--bg-raised)] p-6 mb-6"
+            className="glass-surface p-6 mb-6"
           >
             <h3 className="eg-mono text-sm text-[var(--text-secondary)] mb-3">
               Escalate for Human Review
@@ -359,13 +355,13 @@ export default function EntryVerificationDetailPage() {
               onChange={(e) => setEscalateReason(e.target.value)}
               placeholder="Reason for escalation..."
               rows={3}
-              className="w-full bg-[var(--bg-base)] border border-white/10 px-3 py-2 text-sm text-white placeholder:text-[var(--text-muted)] focus:outline-none focus:border-white/30 mb-3"
+              className="eg-input w-full resize-none mb-3"
             />
             <div className="flex gap-3">
               <button
                 type="submit"
                 disabled={actionLoading !== "" || !escalateReason.trim()}
-                className="eg-btn px-4 py-2 text-sm disabled:opacity-30"
+                className="eg-btn eg-btn-primary px-4 py-2 text-sm disabled:opacity-30"
               >
                 {actionLoading === "Escalate" ? "Working..." : "Confirm Escalation"}
               </button>
@@ -388,13 +384,13 @@ export default function EntryVerificationDetailPage() {
             onSubmit={(e) => {
               e.preventDefault();
             }}
-            className="border border-white/10 bg-[var(--bg-raised)] p-6 mb-6"
+            className="glass-surface p-6 mb-6"
           >
             <h3 className="eg-mono text-sm text-[var(--text-secondary)] mb-3">
               Resolve Escalation
             </h3>
             {ev.escalation_reason && (
-              <div className="border border-white/10 bg-[var(--bg-base)] p-3 mb-3">
+              <div className="glass p-3 mb-3">
                 <span className="eg-mono-sm text-[var(--text-muted)]">
                   Reason: {ev.escalation_reason}
                 </span>
@@ -405,7 +401,7 @@ export default function EntryVerificationDetailPage() {
               onChange={(e) => setResolveReason(e.target.value)}
               placeholder="Resolution notes (optional)..."
               rows={2}
-              className="w-full bg-[var(--bg-base)] border border-white/10 px-3 py-2 text-sm text-white placeholder:text-[var(--text-muted)] focus:outline-none focus:border-white/30 mb-3"
+              className="eg-input w-full resize-none mb-3"
             />
             <div className="flex gap-3">
               <button
@@ -419,7 +415,7 @@ export default function EntryVerificationDetailPage() {
                   })
                 }
                 disabled={actionLoading !== ""}
-                className="eg-btn px-4 py-2 text-sm disabled:opacity-30"
+                className="eg-btn eg-btn-primary px-4 py-2 text-sm disabled:opacity-30"
               >
                 {actionLoading === "Resolve grant" ? "Working..." : "Grant Entry"}
               </button>
@@ -434,7 +430,7 @@ export default function EntryVerificationDetailPage() {
                   })
                 }
                 disabled={actionLoading !== ""}
-                className="eg-btn px-4 py-2 text-sm disabled:opacity-30"
+                className="eg-btn eg-btn-danger px-4 py-2 text-sm disabled:opacity-30"
               >
                 {actionLoading === "Resolve deny" ? "Working..." : "Deny Entry"}
               </button>
@@ -455,36 +451,36 @@ export default function EntryVerificationDetailPage() {
         <div className="flex flex-wrap gap-3 mb-8">{renderActions()}</div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-6">
+          <div className="glass-surface p-6">
             <h2 className="eg-mono text-sm text-[var(--text-secondary)] mb-4">
               References
             </h2>
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <dt className="eg-mono-sm text-[var(--text-muted)]">Student</dt>
-                <dd className="font-mono">#{ev.student_id}</dd>
+                <dd style={{ fontFamily: "var(--font-mono)" }}>#{ev.student_id}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="eg-mono-sm text-[var(--text-muted)]">Registration</dt>
-                <dd className="font-mono">#{ev.exam_registration_id}</dd>
+                <dd style={{ fontFamily: "var(--font-mono)" }}>#{ev.exam_registration_id}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="eg-mono-sm text-[var(--text-muted)]">Entry Point</dt>
-                <dd className="font-mono">#{ev.entry_point_id}</dd>
+                <dd style={{ fontFamily: "var(--font-mono)" }}>#{ev.entry_point_id}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="eg-mono-sm text-[var(--text-muted)]">Exam Hall</dt>
-                <dd className="font-mono">#{ev.exam_hall_id}</dd>
+                <dd style={{ fontFamily: "var(--font-mono)" }}>#{ev.exam_hall_id}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="eg-mono-sm text-[var(--text-muted)]">Camera</dt>
-                <dd className="font-mono">
+                <dd style={{ fontFamily: "var(--font-mono)" }}>
                   {ev.camera_id !== null ? `#${ev.camera_id}` : "—"}
                 </dd>
               </div>
               <div className="flex justify-between">
                 <dt className="eg-mono-sm text-[var(--text-muted)]">Hall Ticket</dt>
-                <dd className="font-mono">
+                <dd style={{ fontFamily: "var(--font-mono)" }}>
                   {ev.hall_ticket_id !== null ? `#${ev.hall_ticket_id}` : "—"}
                 </dd>
               </div>
@@ -492,7 +488,7 @@ export default function EntryVerificationDetailPage() {
                 <dt className="eg-mono-sm text-[var(--text-muted)]">
                   Identity Attempt
                 </dt>
-                <dd className="font-mono">
+                <dd style={{ fontFamily: "var(--font-mono)" }}>
                   {ev.identity_verification_attempt_id !== null
                     ? `#${ev.identity_verification_attempt_id}`
                     : "—"}
@@ -501,7 +497,7 @@ export default function EntryVerificationDetailPage() {
             </dl>
           </div>
 
-          <div className="border border-white/10 bg-[var(--bg-raised)] p-6">
+          <div className="glass-surface p-6">
             <h2 className="eg-mono text-sm text-[var(--text-secondary)] mb-4">
               Checks
             </h2>
@@ -511,12 +507,7 @@ export default function EntryVerificationDetailPage() {
                   Hall Ticket
                 </dt>
                 <dd>
-                  <span
-                    className={`text-[10px] eg-mono border px-2 py-0.5 ${
-                      CHECK_CLASSES[ev.hall_ticket_check] ||
-                      "border-white/10 text-[var(--text-muted)]"
-                    }`}
-                  >
+                  <span className={`eg-badge ${CHECK_BADGE[ev.hall_ticket_check] || "eg-badge-neutral"}`}>
                     {ev.hall_ticket_check}
                   </span>
                 </dd>
@@ -524,12 +515,7 @@ export default function EntryVerificationDetailPage() {
               <div className="flex items-center justify-between">
                 <dt className="eg-mono-sm text-[var(--text-muted)]">Identity</dt>
                 <dd>
-                  <span
-                    className={`text-[10px] eg-mono border px-2 py-0.5 ${
-                      CHECK_CLASSES[ev.identity_check] ||
-                      "border-white/10 text-[var(--text-muted)]"
-                    }`}
-                  >
+                  <span className={`eg-badge ${CHECK_BADGE[ev.identity_check] || "eg-badge-neutral"}`}>
                     {ev.identity_check}
                   </span>
                 </dd>
@@ -537,12 +523,7 @@ export default function EntryVerificationDetailPage() {
               <div className="flex items-center justify-between">
                 <dt className="eg-mono-sm text-[var(--text-muted)]">Seat</dt>
                 <dd>
-                  <span
-                    className={`text-[10px] eg-mono border px-2 py-0.5 ${
-                      CHECK_CLASSES[ev.seat_check] ||
-                      "border-white/10 text-[var(--text-muted)]"
-                    }`}
-                  >
+                  <span className={`eg-badge ${CHECK_BADGE[ev.seat_check] || "eg-badge-neutral"}`}>
                     {ev.seat_check}
                   </span>
                 </dd>
@@ -550,7 +531,7 @@ export default function EntryVerificationDetailPage() {
             </dl>
 
             {ev.escalation_reason && (
-              <div className="mt-4 pt-4 border-t border-white/10">
+              <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
                 <h3 className="eg-mono-sm text-[var(--text-muted)] mb-1">
                   Escalation Reason
                 </h3>
@@ -559,11 +540,14 @@ export default function EntryVerificationDetailPage() {
             )}
 
             {ev.resolved_at && (
-              <div className="mt-4 pt-4 border-t border-white/10">
+              <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
                 <h3 className="eg-mono-sm text-[var(--text-muted)] mb-1">
                   Resolved At
                 </h3>
-                <p className="text-sm font-mono">
+                <p
+                  className="text-sm"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
                   {new Date(ev.resolved_at).toLocaleString()}
                 </p>
               </div>
@@ -571,27 +555,27 @@ export default function EntryVerificationDetailPage() {
           </div>
         </div>
 
-        <div className="border border-white/10 bg-[var(--bg-raised)] p-6 mb-8">
+        <div className="glass-surface p-6 mb-8">
           <h2 className="eg-mono text-sm text-[var(--text-secondary)] mb-4">
             Timestamps
           </h2>
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
             <div className="flex justify-between">
               <dt className="eg-mono-sm text-[var(--text-muted)]">Created</dt>
-              <dd className="font-mono">
+              <dd style={{ fontFamily: "var(--font-mono)" }}>
                 {new Date(ev.created_at).toLocaleString()}
               </dd>
             </div>
             <div className="flex justify-between">
               <dt className="eg-mono-sm text-[var(--text-muted)]">Updated</dt>
-              <dd className="font-mono">
+              <dd style={{ fontFamily: "var(--font-mono)" }}>
                 {new Date(ev.updated_at).toLocaleString()}
               </dd>
             </div>
           </dl>
         </div>
 
-        <div className="border border-white/10 bg-[var(--bg-raised)] p-6">
+        <div className="glass-surface p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="eg-mono text-sm text-[var(--text-secondary)]">
               Proxy Risk Assessment
@@ -611,7 +595,7 @@ export default function EntryVerificationDetailPage() {
                   runRiskAction("Assess risk", () => assessRisk(ev.id))
                 }
                 disabled={riskAction !== ""}
-                className="eg-btn px-4 py-2 text-sm disabled:opacity-30"
+                className="eg-btn eg-btn-primary px-4 py-2 text-sm disabled:opacity-30"
               >
                 {riskAction === "Assess risk" ? "Working..." : "Assess Risk"}
               </button>
@@ -619,32 +603,32 @@ export default function EntryVerificationDetailPage() {
           </div>
 
           {riskError && (
-            <div className="border border-white/10 bg-[var(--bg-base)] p-3 mb-4">
-              <span className="eg-mono text-sm text-red-400">{riskError}</span>
+            <div className="glass p-3 mb-4" style={{ borderColor: "rgba(220,38,38,0.3)" }}>
+              <span className="eg-mono text-sm" style={{ color: "var(--danger)" }}>{riskError}</span>
             </div>
           )}
 
           {assessment && (
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
-              <div className="border border-white/10 bg-[var(--bg-base)] p-4">
+              <div className="glass p-4">
                 <span className="eg-mono-sm text-[var(--text-muted)] block mb-1">
                   Risk Level
                 </span>
                 {renderRiskLevelBadge(assessment.risk_level)}
               </div>
-              <div className="border border-white/10 bg-[var(--bg-base)] p-4">
+              <div className="glass p-4">
                 <span className="eg-mono-sm text-[var(--text-muted)] block mb-1">
                   Score
                 </span>
-                <span className="eg-display text-lg">
+                <span className="eg-metric-value">
                   {assessment.risk_score.toFixed(1)}
                 </span>
               </div>
-              <div className="border border-white/10 bg-[var(--bg-base)] p-4">
+              <div className="glass p-4">
                 <span className="eg-mono-sm text-[var(--text-muted)] block mb-1">
                   Signals
                 </span>
-                <span className="eg-display text-lg">
+                <span className="eg-metric-value">
                   {assessment.signal_count ?? "—"}
                 </span>
                 {assessment.strong_signal_count !== null && (
@@ -653,11 +637,14 @@ export default function EntryVerificationDetailPage() {
                   </span>
                 )}
               </div>
-              <div className="border border-white/10 bg-[var(--bg-base)] p-4">
+              <div className="glass p-4">
                 <span className="eg-mono-sm text-[var(--text-muted)] block mb-1">
                   Assessed
                 </span>
-                <span className="font-mono text-sm">
+                <span
+                  className="text-sm"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
                   {new Date(assessment.assessed_at).toLocaleString()}
                 </span>
               </div>
@@ -665,11 +652,11 @@ export default function EntryVerificationDetailPage() {
           )}
 
           {assessment?.explanation && (
-            <div className="border border-white/10 bg-[var(--bg-base)] p-4 mb-6">
+            <div className="glass p-4 mb-6">
               <h3 className="eg-mono-sm text-[var(--text-muted)] mb-2">
                 Explanation
               </h3>
-              <p className="eg-body text-sm">{assessment.explanation}</p>
+              <p className="text-sm">{assessment.explanation}</p>
             </div>
           )}
 
@@ -678,33 +665,25 @@ export default function EntryVerificationDetailPage() {
               <h3 className="eg-mono-sm text-[var(--text-muted)] mb-3">
                 Detected Signals ({signalsTotal})
               </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="eg-table-wrap">
+                <table className="eg-table text-sm">
                   <thead>
-                    <tr className="border-b border-white/10">
-                      <th className="eg-mono-sm text-left text-[var(--text-muted)] py-2 pr-4">
-                        Type
-                      </th>
-                      <th className="eg-mono-sm text-left text-[var(--text-muted)] py-2 pr-4">
-                        Strength
-                      </th>
-                      <th className="eg-mono-sm text-left text-[var(--text-muted)] py-2 pr-4">
-                        Source
-                      </th>
-                      <th className="eg-mono-sm text-left text-[var(--text-muted)] py-2">
-                        Description
-                      </th>
+                    <tr>
+                      <th>Type</th>
+                      <th>Strength</th>
+                      <th>Source</th>
+                      <th>Description</th>
                     </tr>
                   </thead>
                   <tbody>
                     {signals.map((s) => (
-                      <tr key={s.id} className="border-b border-white/5">
-                        <td className="py-2 pr-4 font-mono">{s.signal_type}</td>
-                        <td className="py-2 pr-4">{renderStrengthBadge(s.strength)}</td>
-                        <td className="py-2 pr-4 font-mono text-[var(--text-secondary)]">
+                      <tr key={s.id}>
+                        <td style={{ fontFamily: "var(--font-mono)" }}>{s.signal_type}</td>
+                        <td>{renderStrengthBadge(s.strength)}</td>
+                        <td style={{ fontFamily: "var(--font-mono)", color: "var(--text-secondary)" }}>
                           {s.source}
                         </td>
-                        <td className="py-2 text-[var(--text-secondary)]">
+                        <td style={{ color: "var(--text-secondary)" }}>
                           {s.description || "—"}
                         </td>
                       </tr>
@@ -724,11 +703,14 @@ export default function EntryVerificationDetailPage() {
                 {assessments.map((a) => (
                   <div
                     key={a.id}
-                    className="border border-white/10 bg-[var(--bg-base)] p-3 flex items-center justify-between"
+                    className="glass p-3 flex items-center justify-between"
                   >
                     <div className="flex items-center gap-3">
                       {renderRiskLevelBadge(a.risk_level)}
-                      <span className="font-mono text-sm">
+                      <span
+                        className="text-sm"
+                        style={{ fontFamily: "var(--font-mono)" }}
+                      >
                         {a.risk_score.toFixed(1)}
                       </span>
                       {a.policy_version && (
@@ -737,7 +719,10 @@ export default function EntryVerificationDetailPage() {
                         </span>
                       )}
                     </div>
-                    <span className="font-mono text-sm text-[var(--text-secondary)]">
+                    <span
+                      className="text-sm"
+                      style={{ fontFamily: "var(--font-mono)", color: "var(--text-secondary)" }}
+                    >
                       {new Date(a.assessed_at).toLocaleString()}
                     </span>
                   </div>
@@ -747,12 +732,12 @@ export default function EntryVerificationDetailPage() {
           )}
 
           {!assessment && signals.length === 0 && riskAction === "" && (
-            <p className="eg-body text-sm text-[var(--text-secondary)]">
+            <p className="text-sm text-[var(--text-secondary)]">
               No risk data yet. Click Detect Signals or Assess Risk to begin analysis.
             </p>
           )}
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 }

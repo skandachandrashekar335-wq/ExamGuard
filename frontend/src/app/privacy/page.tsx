@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AppShell from "@/components/AppShell";
 
 export const metadata = {
   title: "Privacy Policy — ExamGuard",
@@ -7,72 +8,63 @@ export const metadata = {
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
-      <div className="max-w-3xl mx-auto px-6 sm:px-10 py-16 sm:py-24">
-        <Link href="/" className="eg-focusable inline-block eg-mono-sm mb-8 hover:text-[var(--text-secondary)] transition-colors">
-          ← BACK TO EXAMGUARD
-        </Link>
+    <AppShell>
+      <div className="eg-page">
+        <div className="eg-page-header">
+          <Link href="/" className="eg-breadcrumb">
+            ← BACK TO EXAMGUARD
+          </Link>
+          <h1 className="eg-page-title">Privacy Policy</h1>
+          <p className="eg-page-desc">EXAMGUARD — EXAMINATION ENTRY VERIFICATION SYSTEM</p>
+        </div>
 
-        <h1 className="eg-display text-3xl sm:text-4xl mb-2">
-          Privacy Policy
-        </h1>
-        <p className="eg-mono-sm text-[var(--gray-500)] mb-12">EXAMGUARD — EXAMINATION ENTRY VERIFICATION SYSTEM</p>
-
-        <div className="space-y-12">
-          <section>
-            <h2 className="eg-display text-xl mb-4">1. Overview</h2>
-            <p className="eg-body text-sm text-[var(--gray-400)] leading-relaxed mb-4">
+        <div className="eg-content-sections">
+          <section className="eg-content-section">
+            <h2 className="eg-content-heading">1. Overview</h2>
+            <p className="eg-body">
               ExamGuard is an automated examination entry verification system.
               This privacy policy describes how the system handles data related
               to students, examination registrations, hall tickets, and identity
               verification attempts.
             </p>
-            <p className="eg-body text-sm text-[var(--gray-400)] leading-relaxed">
+            <p className="eg-body">
               This policy applies to the ExamGuard system operated as described
               in the project documentation. It covers data collection, processing,
               storage, and the specific handling of identity verification data.
             </p>
           </section>
 
-          <section>
-            <h2 className="eg-display text-xl mb-4">2. Data Collected</h2>
-            <div className="space-y-4">
-              <div className="eg-card">
-                <h3 className="eg-mono-sm text-[var(--gray-500)] mb-2">
-                  Student Information
-                </h3>
-                <p className="eg-body text-sm text-[var(--gray-400)] leading-relaxed">
+          <section className="eg-content-section">
+            <h2 className="eg-content-heading">2. Data Collected</h2>
+            <div className="eg-content-cards">
+              <div className="glass-surface glass p-4">
+                <h3 className="eg-content-subheading">Student Information</h3>
+                <p className="eg-body">
                   USN (University Seat Number), student name. These are stored
                   as part of the student management system and are required for
                   examination registration and verification.
                 </p>
               </div>
-              <div className="eg-card">
-                <h3 className="eg-mono-sm text-[var(--gray-500)] mb-2">
-                  Examination Data
-                </h3>
-                <p className="eg-body text-sm text-[var(--gray-400)] leading-relaxed">
+              <div className="glass-surface glass p-4">
+                <h3 className="eg-content-subheading">Examination Data</h3>
+                <p className="eg-body">
                   Examination details (subject, date, time, semester, department),
                   exam hall assignments, seat assignments, and examination
                   registrations. This data is managed by the examination
                   administration.
                 </p>
               </div>
-              <div className="eg-card">
-                <h3 className="eg-mono-sm text-[var(--gray-500)] mb-2">
-                  Hall Ticket Documents
-                </h3>
-                <p className="eg-body text-sm text-[var(--gray-400)] leading-relaxed">
+              <div className="glass-surface glass p-4">
+                <h3 className="eg-content-subheading">Hall Ticket Documents</h3>
+                <p className="eg-body">
                   Uploaded hall ticket documents (PDF, images) processed through
                   OCR for text extraction. Document content is used for
                   verification matching against student and examination records.
                 </p>
               </div>
-              <div className="eg-card">
-                <h3 className="eg-mono-sm text-[var(--gray-500)] mb-2">
-                  Identity Verification Data
-                </h3>
-                <p className="eg-body text-sm text-[var(--gray-400)] leading-relaxed">
+              <div className="glass-surface glass p-4">
+                <h3 className="eg-content-subheading">Identity Verification Data</h3>
+                <p className="eg-body">
                   Identity verification attempts, verification method used,
                   verification decisions (MATCH, NO_MATCH, INCONCLUSIVE),
                   and verification status. <strong>Currently implemented:
@@ -82,21 +74,21 @@ export default function PrivacyPage() {
             </div>
           </section>
 
-          <section>
-            <h2 className="eg-display text-xl mb-4">3. Biometric Data</h2>
-            <div className="eg-card border-[var(--gray-600)]">
-              <p className="eg-body text-sm text-[var(--gray-400)] leading-relaxed mb-3">
+          <section className="eg-content-section">
+            <h2 className="eg-content-heading">3. Biometric Data</h2>
+            <div className="glass-surface glass p-4">
+              <p className="eg-body">
                 <strong>Currently implemented:</strong> No biometric
                 data is collected, stored, or processed. The system does not
                 currently perform face recognition, fingerprint scanning, or any
                 other biometric identification.
               </p>
-              <p className="eg-body text-sm text-[var(--gray-400)] leading-relaxed mb-3">
+              <p className="eg-body">
                 <strong>Planned for future:</strong> Phase 8 of the
                 project plans to introduce face verification through a third-party
                 provider. If implemented:
               </p>
-              <ul className="eg-body text-sm text-[var(--gray-400)] leading-relaxed list-disc list-inside space-y-1">
+              <ul className="eg-body eg-content-list">
                 <li>Raw facial images are NOT stored by ExamGuard</li>
                 <li>Biometric templates would be managed by the third-party provider</li>
                 <li>ExamGuard would store only verification evidence signals (similarity scores, liveness results)</li>
@@ -105,12 +97,12 @@ export default function PrivacyPage() {
             </div>
           </section>
 
-          <section>
-            <h2 className="eg-display text-xl mb-4">4. Data Processing</h2>
-            <p className="eg-body text-sm text-[var(--gray-400)] leading-relaxed mb-4">
+          <section className="eg-content-section">
+            <h2 className="eg-content-heading">4. Data Processing</h2>
+            <p className="eg-body">
               Data is processed for the following purposes:
             </p>
-            <ul className="eg-body text-sm text-[var(--gray-400)] leading-relaxed list-disc list-inside space-y-2">
+            <ul className="eg-body eg-content-list">
               <li>Examination registration management</li>
               <li>Hall ticket verification through OCR and document matching</li>
               <li>Identity verification (manual and document-based, currently)</li>
@@ -120,9 +112,9 @@ export default function PrivacyPage() {
             </ul>
           </section>
 
-          <section>
-            <h2 className="eg-display text-xl mb-4">5. Data Storage</h2>
-            <p className="eg-body text-sm text-[var(--gray-400)] leading-relaxed">
+          <section className="eg-content-section">
+            <h2 className="eg-content-heading">5. Data Storage</h2>
+            <p className="eg-body">
               All data is stored in the system database. Document files are
               stored in the configured storage location. The system maintains
               audit trails for verification activities. No data is transmitted
@@ -131,9 +123,9 @@ export default function PrivacyPage() {
             </p>
           </section>
 
-          <section>
-            <h2 className="eg-display text-xl mb-4">6. Data Retention</h2>
-            <p className="eg-body text-sm text-[var(--gray-400)] leading-relaxed">
+          <section className="eg-content-section">
+            <h2 className="eg-content-heading">6. Data Retention</h2>
+            <p className="eg-body">
               Data is retained as long as necessary for examination
               administration purposes. Audit logs are maintained for
               accountability. Specific retention periods are configured
@@ -141,9 +133,9 @@ export default function PrivacyPage() {
             </p>
           </section>
 
-          <section>
-            <h2 className="eg-display text-xl mb-4">7. Access Controls</h2>
-            <p className="eg-body text-sm text-[var(--gray-400)] leading-relaxed">
+          <section className="eg-content-section">
+            <h2 className="eg-content-heading">7. Access Controls</h2>
+            <p className="eg-body">
               Access to student data, verification results, and system
               administration is controlled through role-based access
               controls (currently planned for Phase 19). System
@@ -152,9 +144,9 @@ export default function PrivacyPage() {
             </p>
           </section>
 
-          <section>
-            <h2 className="eg-display text-xl mb-4">8. Third-Party Services</h2>
-            <p className="eg-body text-sm text-[var(--gray-400)] leading-relaxed">
+          <section className="eg-content-section">
+            <h2 className="eg-content-heading">8. Third-Party Services</h2>
+            <p className="eg-body">
               Currently, no third-party AI or cloud services are connected
               to the system. All processing is performed locally. Future
               integrations (such as face verification providers) will be
@@ -162,9 +154,9 @@ export default function PrivacyPage() {
             </p>
           </section>
 
-          <section>
-            <h2 className="eg-display text-xl mb-4">9. Changes to This Policy</h2>
-            <p className="eg-body text-sm text-[var(--gray-400)] leading-relaxed">
+          <section className="eg-content-section">
+            <h2 className="eg-content-heading">9. Changes to This Policy</h2>
+            <p className="eg-body">
               This privacy policy may be updated as the system evolves.
               Changes will be reflected in the project documentation and
               this page. Significant changes to data handling practices
@@ -172,9 +164,9 @@ export default function PrivacyPage() {
             </p>
           </section>
 
-          <section>
-            <h2 className="eg-display text-xl mb-4">10. Contact</h2>
-            <p className="eg-body text-sm text-[var(--gray-400)] leading-relaxed">
+          <section className="eg-content-section">
+            <h2 className="eg-content-heading">10. Contact</h2>
+            <p className="eg-body">
               For questions about this privacy policy or the ExamGuard
               system&apos;s data handling practices, refer to the project
               documentation or contact the system administrator.
@@ -182,12 +174,12 @@ export default function PrivacyPage() {
           </section>
         </div>
 
-        <div className="mt-16 pt-8 border-t border-[var(--border)]">
-          <Link href="/" className="eg-focusable eg-mono-sm text-[var(--gray-500)] hover:text-[var(--text-secondary)] transition-colors">
+        <div className="mt-16 pt-8" style={{ borderTop: "1px solid var(--border)" }}>
+          <Link href="/" className="eg-btn">
             ← Back to ExamGuard
           </Link>
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 }
