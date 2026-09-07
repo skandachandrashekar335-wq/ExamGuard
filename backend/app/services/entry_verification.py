@@ -27,6 +27,7 @@ from app.models.entry_verification import (
 from app.models.exam import Exam
 from app.models.exam_hall import ExamHall
 from app.models.exam_registration import ExamRegistration, RegistrationStatus
+from app.models.examination_session import ExaminationSession, SessionStatus
 from app.models.hall_ticket import HallTicket, HallTicketStatus
 from app.models.identity_verification import (
     IdentityVerificationAttempt,
@@ -113,19 +114,21 @@ def create_entry_verification(
     exam_registration_id: int,
     entry_point_id: int,
     *,
+    session_id: int | None = None,
     camera_id: int | None = None,
     hall_ticket_id: int | None = None,
 ) -> EntryVerification:
     """Create a new entry verification attempt.
 
     Validates core relationships: student, registration, entry point,
-    exam hall compatibility, camera mapping, and optional hall ticket.
+    exam hall compatibility, session status, camera mapping, and optional hall ticket.
 
     Args:
         db: Database session.
         student_id: ID of the student attempting entry.
         exam_registration_id: ID of the student's exam registration.
         entry_point_id: ID of the physical entry point.
+        session_id: Optional examination session (validated as IN_PROGRESS if provided).
         camera_id: Optional camera observing the entry.
         hall_ticket_id: Optional hall ticket to link.
 
@@ -161,6 +164,25 @@ def create_entry_verification(
 
     # Exam hall exists
     exam_hall = _get_exam_hall(db, entry_point.exam_hall_id)
+
+    # Session validation (if provided)
+    if session_id is not None:
+        session = db.query(ExaminationSession).filter(
+            ExaminationSession.id == session_id
+        ).first()
+        if not session:
+            raise LookupError(f"Examination session with id {session_id} not found")
+        if session.status != SessionStatus.IN_PROGRESS.value:
+            raise ValueError(
+                f"Examination session {session_id} is not IN_PROGRESS "
+                f"(current status: {session.status})"
+            )
+        # Session must be for the same exam hall as the entry point
+        if session.exam_hall_id != exam_hall.id:
+            raise ValueError(
+                f"Examination session {session_id} is for exam hall "
+                f"{session.exam_hall_id}, not {exam_hall.id}"
+            )
 
     # Registration's exam is compatible with the entry point's hall
     # The seat assignment links registration → exam_hall; we don't enforce
@@ -202,6 +224,7 @@ def create_entry_verification(
         exam_registration_id=exam_registration_id,
         exam_hall_id=exam_hall.id,
         entry_point_id=entry_point_id,
+        session_id=session_id,
         camera_id=camera_id,
         hall_ticket_id=hall_ticket_id,
         status=EntryVerificationStatus.PENDING.value,

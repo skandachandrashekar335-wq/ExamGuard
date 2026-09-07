@@ -16,6 +16,10 @@ class EntryVerificationCreate(BaseModel):
         ...,
         description="ID of the physical entry point",
     )
+    session_id: int | None = Field(
+        default=None,
+        description="ID of the examination session (optional, validated if provided)",
+    )
     camera_id: int | None = Field(
         default=None,
         description="ID of the camera observing the entry (optional)",
@@ -34,6 +38,7 @@ class EntryVerificationResponse(BaseModel):
     exam_registration_id: int
     exam_hall_id: int
     entry_point_id: int
+    session_id: int | None
     camera_id: int | None
     hall_ticket_id: int | None
     identity_verification_attempt_id: int | None

@@ -48,6 +48,7 @@ def create_entry_verification(
             student_id=data.student_id,
             exam_registration_id=data.exam_registration_id,
             entry_point_id=data.entry_point_id,
+            session_id=data.session_id,
             camera_id=data.camera_id,
             hall_ticket_id=data.hall_ticket_id,
         )

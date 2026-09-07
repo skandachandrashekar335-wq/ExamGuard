@@ -508,7 +508,7 @@ class TestCreateEntryVerification:
                                   test_entry_point)
         expected_keys = {
             "id", "student_id", "exam_registration_id", "exam_hall_id",
-            "entry_point_id", "camera_id", "hall_ticket_id",
+            "entry_point_id", "session_id", "camera_id", "hall_ticket_id",
             "identity_verification_attempt_id", "status",
             "hall_ticket_check", "identity_check", "seat_check",
             "escalation_reason", "resolved_at", "created_at", "updated_at",
