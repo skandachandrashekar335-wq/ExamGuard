@@ -156,6 +156,7 @@ async def firebase_token_exchange(
 
     # Step 4: Check if initial admin provisioning is needed
     # Only if no ADMIN currently exists in the system
+    settings = get_settings()
     result = db.execute(select(User).filter(User.role == "ADMIN"))
     existing_admin = result.scalar_one_or_none()
 

@@ -34,12 +34,10 @@ def _verify_firebase_token_http(token: str) -> Optional[Dict[str, Any]]:
 
     project_id = settings.FIREBASE_PROJECT_ID
     if not project_id:
-        # If no project ID configured, still attempt verification via https://identitytoolkit.googleapis.com
-        # Fall back to generic verification
-        pass
+        # Cannot verify without project ID
+        return None
 
-    url = f"https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyIdToken?key={project_id}" if project_id else \
-        "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyIdToken"
+    url = f"https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyIdToken?key={project_id}"
 
     try:
         response = httpx.post(url, json={"idToken": token}, timeout=10)
@@ -81,10 +79,9 @@ def verify_firebase_id_token(token: str) -> Optional[Dict[str, Any]]:
 
     Verification steps:
     1. Check token is present and non-empty
-    2. Verify signature via Firebase's REST API (or local HS256 if dev)
+    2. Verify signature via Firebase's REST API
     3. Extract uid, email, name, and other claims
-    4. Validate email_verified status if needed
-    5. Return claims dict or None if invalid
+    4. Return claims dict or None if invalid
 
     Args:
         token: The Firebase ID token string
@@ -97,36 +94,10 @@ def verify_firebase_id_token(token: str) -> Optional[Dict[str, Any]]:
     if not token or not token.strip():
         return None
 
-    # Step 2: Try HTTP verification first (works without Admin SDK)
+    # Step 2: Verify via Firebase REST API (requires FIREBASE_PROJECT_ID)
     claims = _verify_firebase_token_http(token.strip())
     if claims is not None:
         return claims
 
-    # Step 3: If HTTP verification failed (e.g., no project ID configured),
-    # attempt a local HS256 verification if a client ID is available
-    # This is a fallback for development/testing
-    client_id = settings.FIREBASE_CLIENT_ID
-    if client_id:
-        try:
-            # Decode without verification just to extract uid for lookup
-            # In production, the HTTP verification above should succeed
-            import jwt as jwt_module
-            # Try decoding with the client secret / project config
-            # This is NOT secure for production but allows development
-            decoded = jwt_module.decode(
-                token,
-                options={"verify_signature": False},
-            )
-            # Return basic claims from unverified decode
-            return {
-                "uid": decoded.get("sub") or decoded.get("uid"),
-                "email": decoded.get("email"),
-                "name": decoded.get("name"),
-                "firebase_fallback": True,
-                "warning": "Token signature not verified - use proper Firebase config",
-            }
-        except Exception:
-            return None
-
-    # No valid verification method available
+    # No verification succeeded - token is invalid or Firebase is not configured
     return None

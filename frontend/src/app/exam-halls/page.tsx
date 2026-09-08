@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
+import { apiRequest, qs } from "@/lib/api";
 
 interface ExamHall {
   id: number;
@@ -24,8 +25,6 @@ interface ListResponse {
   total: number;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 export default function ExamHallsPage() {
   const [halls, setHalls] = useState<ExamHall[]>([]);
   const [total, setTotal] = useState(0);
@@ -46,15 +45,11 @@ export default function ExamHallsPage() {
   const [error, setError] = useState("");
 
   const fetchHalls = async () => {
-    const params = new URLSearchParams({
-      page: String(page),
-      page_size: String(pageSize),
-    });
-    if (search) params.set("search", search);
-    if (showInactive) params.set("include_inactive", "true");
+    const params: Record<string, string | number> = { page, page_size: pageSize };
+    if (search) params.search = search;
+    if (showInactive) params.include_inactive = "true";
 
-    const res = await fetch(`${API}/api/v1/exam-halls?${params}`);
-    const data: ListResponse = await res.json();
+    const data = await apiRequest<ListResponse>(`/api/v1/exam-halls${qs(params)}`);
     setHalls(data.items);
     setTotal(data.total);
   };
@@ -101,29 +96,23 @@ export default function ExamHallsPage() {
     if (form.columns) body.columns = Number(form.columns);
 
     const url = editHall
-      ? `${API}/api/v1/exam-halls/${editHall.id}`
-      : `${API}/api/v1/exam-halls`;
+      ? `/api/v1/exam-halls/${editHall.id}`
+      : "/api/v1/exam-halls";
     const method = editHall ? "PATCH" : "POST";
 
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    if (res.ok) {
+    try {
+      await apiRequest(url, { method, body: JSON.stringify(body) });
       setShowForm(false);
       resetForm();
       fetchHalls();
-    } else {
-      const err = await res.json();
-      setError(err.detail || "Failed to save hall");
+    } catch (err: any) {
+      setError(err.message || "Failed to save hall");
     }
   };
 
   const handleDeactivate = async (id: number) => {
     if (!confirm("Deactivate this hall?")) return;
-    await fetch(`${API}/api/v1/exam-halls/${id}`, { method: "DELETE" });
+    await apiRequest(`/api/v1/exam-halls/${id}`, { method: "DELETE" });
     fetchHalls();
   };
 

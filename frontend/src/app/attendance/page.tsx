@@ -28,8 +28,6 @@ interface ExamListResponse {
   page_size: number;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 export default function AttendancePage() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [summaries, setSummaries] = useState<

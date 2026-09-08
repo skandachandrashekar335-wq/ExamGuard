@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import * as XLSX from "xlsx";
 import AppShell from "@/components/AppShell";
+import { apiRequest, qs } from "@/lib/api";
 import {
   parseSpreadsheet,
   validateRows,
@@ -11,7 +12,6 @@ import {
   type ValidationError,
 } from "@/lib/spreadsheet";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const MAX_STUDENT_IDS = 500;
 
 const HEADERS = ["Student ID"];
@@ -61,8 +61,7 @@ export default function ImportRegistrationsPage() {
   const invalidCount = rows.filter((r) => !r.valid).length;
 
   useEffect(() => {
-    fetch(`${API}/api/v1/exams?page=1&page_size=100`)
-      .then((r) => r.json())
+    apiRequest<{ items: ExamOption[] }>(`/api/v1/exams${qs({ page: "1", page_size: "100" })}`)
       .then((data) => setExams(data.items || []))
       .catch(() => {});
   }, []);
@@ -139,18 +138,11 @@ export default function ImportRegistrationsPage() {
       .map((r) => Number(r.row["Student ID"]));
 
     try {
-      const res = await fetch(`${API}/api/v1/import/registrations`, {
+      const data: RegistrationResponse = await apiRequest("/api/v1/import/registrations", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ exam_id: selectedExamId, student_ids: studentIds }),
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || `HTTP ${res.status}`);
-      }
-
-      const data: RegistrationResponse = await res.json();
       setResponse(data);
       setPhase("result");
     } catch (err) {

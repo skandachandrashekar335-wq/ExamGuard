@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { apiRequest, qs } from "@/lib/api";
 
 interface Subject {
   id: number;
@@ -22,8 +23,6 @@ interface ListResponse {
   total: number;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 export default function SubjectsPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [total, setTotal] = useState(0);
@@ -43,15 +42,11 @@ export default function SubjectsPage() {
   const [error, setError] = useState("");
 
   const fetchSubjects = async () => {
-    const params = new URLSearchParams({
-      page: String(page),
-      page_size: String(pageSize),
-    });
-    if (search) params.set("search", search);
-    if (showInactive) params.set("include_inactive", "true");
+    const params: Record<string, string | number> = { page, page_size: pageSize };
+    if (search) params.search = search;
+    if (showInactive) params.include_inactive = "true";
 
-    const res = await fetch(`${API}/api/v1/subjects?${params}`);
-    const data: ListResponse = await res.json();
+    const data = await apiRequest<ListResponse>(`/api/v1/subjects${qs(params)}`);
     setSubjects(data.items);
     setTotal(data.total);
   };
@@ -89,29 +84,23 @@ export default function SubjectsPage() {
     if (form.credits) body.credits = Number(form.credits);
 
     const url = editSubject
-      ? `${API}/api/v1/subjects/${editSubject.id}`
-      : `${API}/api/v1/subjects`;
+      ? `/api/v1/subjects/${editSubject.id}`
+      : "/api/v1/subjects";
     const method = editSubject ? "PATCH" : "POST";
 
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    if (res.ok) {
+    try {
+      await apiRequest(url, { method, body: JSON.stringify(body) });
       setShowForm(false);
       resetForm();
       fetchSubjects();
-    } else {
-      const err = await res.json();
-      setError(err.detail || "Failed to save subject");
+    } catch (err: any) {
+      setError(err.message || "Failed to save subject");
     }
   };
 
   const handleDeactivate = async (id: number) => {
     if (!confirm("Deactivate this subject?")) return;
-    await fetch(`${API}/api/v1/subjects/${id}`, { method: "DELETE" });
+    await apiRequest(`/api/v1/subjects/${id}`, { method: "DELETE" });
     fetchSubjects();
   };
 

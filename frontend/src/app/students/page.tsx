@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { apiRequest, qs } from "@/lib/api";
 
 interface Student {
   id: number;
@@ -19,8 +20,6 @@ interface ListResponse {
   total: number;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [total, setTotal] = useState(0);
@@ -35,15 +34,11 @@ export default function StudentsPage() {
   const [error, setError] = useState("");
 
   const fetchStudents = async () => {
-    const params = new URLSearchParams({
-      page: String(page),
-      page_size: String(pageSize),
-    });
-    if (search) params.set("search", search);
-    if (showInactive) params.set("include_inactive", "true");
+    const params: Record<string, string | number> = { page, page_size: pageSize };
+    if (search) params.search = search;
+    if (showInactive) params.include_inactive = "true";
 
-    const res = await fetch(`${API}/api/v1/students?${params}`);
-    const data: ListResponse = await res.json();
+    const data = await apiRequest<ListResponse>(`/api/v1/students${qs(params)}`);
     setStudents(data.items);
     setTotal(data.total);
   };
@@ -54,44 +49,40 @@ export default function StudentsPage() {
 
   const handleCreate = async () => {
     setError("");
-    const res = await fetch(`${API}/api/v1/students`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ usn: formUsn, name: formName }),
-    });
-    if (res.ok) {
+    try {
+      await apiRequest("/api/v1/students", {
+        method: "POST",
+        body: JSON.stringify({ usn: formUsn, name: formName }),
+      });
       setShowForm(false);
       setFormUsn("");
       setFormName("");
       fetchStudents();
-    } else {
-      const err = await res.json();
-      setError(err.detail || "Failed to create student");
+    } catch (err: any) {
+      setError(err.message || "Failed to create student");
     }
   };
 
   const handleUpdate = async () => {
     if (!editStudent) return;
     setError("");
-    const res = await fetch(`${API}/api/v1/students/${editStudent.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ usn: formUsn, name: formName }),
-    });
-    if (res.ok) {
+    try {
+      await apiRequest(`/api/v1/students/${editStudent.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ usn: formUsn, name: formName }),
+      });
       setEditStudent(null);
       setFormUsn("");
       setFormName("");
       fetchStudents();
-    } else {
-      const err = await res.json();
-      setError(err.detail || "Failed to update student");
+    } catch (err: any) {
+      setError(err.message || "Failed to update student");
     }
   };
 
   const handleDeactivate = async (id: number) => {
     if (!confirm("Deactivate this student?")) return;
-    await fetch(`${API}/api/v1/students/${id}`, { method: "DELETE" });
+    await apiRequest(`/api/v1/students/${id}`, { method: "DELETE" });
     fetchStudents();
   };
 

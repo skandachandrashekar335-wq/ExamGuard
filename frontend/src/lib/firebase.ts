@@ -143,7 +143,8 @@ export async function exchangeFirebaseForExamGuard(
   token: string; // ExamGuard JWT
   requires_onboarding: boolean;
 }> {
-  const response = await fetch("/api/v1/auth/firebase/exchange", {
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const response = await fetch(`${API_BASE}/api/v1/auth/firebase/exchange`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

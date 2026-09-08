@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { apiRequest, qs } from "@/lib/api";
 
 interface Document {
   id: number;
@@ -125,8 +126,6 @@ interface VerificationOutcome {
   created_at: string;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 export default function DocumentsPage() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [total, setTotal] = useState(0);
@@ -153,12 +152,12 @@ export default function DocumentsPage() {
   const [showVerification, setShowVerification] = useState(false);
 
   const fetchDocuments = async () => {
-    const params = new URLSearchParams({
-      page: String(page),
-      page_size: "10",
-    });
-    const res = await fetch(`${API}/api/v1/documents?${params}`);
-    const data = await res.json();
+    const data = await apiRequest<{ items: Document[]; total: number }>(
+      `/api/v1/documents${qs({
+        page: String(page),
+        page_size: "10",
+      })}`
+    );
     setDocuments(data.items);
     setTotal(data.total);
   };
@@ -176,18 +175,22 @@ export default function DocumentsPage() {
     const formData = new FormData();
     formData.append("file", selectedFile);
 
-    const res = await fetch(
-      `${API}/api/v1/documents?document_type=${docType}`,
-      { method: "POST", body: formData }
-    );
-
-    if (res.ok) {
-      setMessage("Document uploaded successfully");
-      setSelectedFile(null);
-      fetchDocuments();
-    } else {
-      const err = await res.json();
-      setError(err.detail || "Upload failed");
+    try {
+      const { API_BASE } = await import("@/lib/api");
+      const res = await fetch(
+        `${API_BASE}/api/v1/documents?document_type=${docType}`,
+        { method: "POST", body: formData }
+      );
+      if (res.ok) {
+        setMessage("Document uploaded successfully");
+        setSelectedFile(null);
+        fetchDocuments();
+      } else {
+        const err = await res.json();
+        setError(err.detail || "Upload failed");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
     }
     setUploading(false);
   };
@@ -197,17 +200,15 @@ export default function DocumentsPage() {
     setMessage("");
     setError("");
 
-    const res = await fetch(`${API}/api/v1/documents/${docId}/process`, {
-      method: "POST",
-    });
-
-    if (res.ok) {
-      const result: ProcessResponse = await res.json();
+    try {
+      const result = await apiRequest<ProcessResponse>(
+        `/api/v1/documents/${docId}/process`,
+        { method: "POST" }
+      );
       setMessage(`Document processed: ${result.fields_count} fields extracted`);
       fetchDocuments();
-    } else {
-      const err = await res.json();
-      setError(err.detail || "Processing failed");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Processing failed");
     }
     setProcessingId(null);
   };
@@ -216,15 +217,14 @@ export default function DocumentsPage() {
     setMessage("");
     setError("");
 
-    const res = await fetch(`${API}/api/v1/documents/${docId}/extraction`);
-
-    if (res.ok) {
-      const result: ExtractionResult = await res.json();
+    try {
+      const result = await apiRequest<ExtractionResult>(
+        `/api/v1/documents/${docId}/extraction`
+      );
       setExtractionResult(result);
       setShowExtraction(true);
-    } else {
-      const err = await res.json();
-      setError(err.detail || "No extraction results found");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No extraction results found");
     }
   };
 
@@ -233,15 +233,14 @@ export default function DocumentsPage() {
     setMessage("");
     setError("");
 
-    const res = await fetch(`${API}/api/v1/documents/${docId}/review`);
-
-    if (res.ok) {
-      const data: ReviewData = await res.json();
+    try {
+      const data = await apiRequest<ReviewData>(
+        `/api/v1/documents/${docId}/review`
+      );
       setReviewData(data);
       setShowReview(true);
-    } else {
-      const err = await res.json();
-      setError(err.detail || "Failed to load review data");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load review data");
     }
     setReviewingId(null);
   };
@@ -249,20 +248,17 @@ export default function DocumentsPage() {
   const handleCorrectField = async (fieldId: number) => {
     if (!reviewData || !editValue.trim()) return;
 
-    const res = await fetch(
-      `${API}/api/v1/documents/${reviewData.document_id}/review/fields/${fieldId}`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          corrected_value: editValue.trim(),
-          review_status: "REVIEWED",
-        }),
-      }
-    );
-
-    if (res.ok) {
-      const updated: ReviewField = await res.json();
+    try {
+      const updated = await apiRequest<ReviewField>(
+        `/api/v1/documents/${reviewData.document_id}/review/fields/${fieldId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            corrected_value: editValue.trim(),
+            review_status: "REVIEWED",
+          }),
+        }
+      );
       setReviewData((prev) => {
         if (!prev) return prev;
         const fields = prev.fields.map((f) => (f.id === fieldId ? updated : f));
@@ -285,9 +281,8 @@ export default function DocumentsPage() {
       setEditingFieldId(null);
       setEditValue("");
       setMessage("Field corrected");
-    } else {
-      const err = await res.json();
-      setError(err.detail || "Failed to correct field");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to correct field");
     }
   };
 
@@ -297,19 +292,17 @@ export default function DocumentsPage() {
     setMessage("");
     setError("");
 
-    const res = await fetch(
-      `${API}/api/v1/documents/${reviewData.document_id}/review/complete`,
-      { method: "POST" }
-    );
-
-    if (res.ok) {
+    try {
+      await apiRequest(
+        `/api/v1/documents/${reviewData.document_id}/review/complete`,
+        { method: "POST" }
+      );
       setMessage("Review completed successfully");
       setShowReview(false);
       setReviewData(null);
       fetchDocuments();
-    } else {
-      const err = await res.json();
-      setError(err.detail || "Failed to complete review");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to complete review");
     }
     setCompletingReview(false);
   };
@@ -319,18 +312,16 @@ export default function DocumentsPage() {
     setMessage("");
     setError("");
 
-    const res = await fetch(`${API}/api/v1/documents/${docId}/verification`, {
-      method: "POST",
-    });
-
-    if (res.ok) {
-      const outcome: VerificationOutcome = await res.json();
+    try {
+      const outcome = await apiRequest<VerificationOutcome>(
+        `/api/v1/documents/${docId}/verification`,
+        { method: "POST" }
+      );
       setVerificationOutcome(outcome);
       setShowVerification(true);
       setMessage(`Verification: ${outcome.decision.replace("_", " ")}`);
-    } else {
-      const err = await res.json();
-      setError(err.detail || "Verification failed");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Verification failed");
     }
     setVerifyingId(null);
   };
@@ -340,18 +331,16 @@ export default function DocumentsPage() {
     setMessage("");
     setError("");
 
-    const res = await fetch(`${API}/api/v1/documents/${docId}/match`, {
-      method: "POST",
-    });
-
-    if (res.ok) {
-      const result: MatchResult = await res.json();
+    try {
+      const result = await apiRequest<MatchResult>(
+        `/api/v1/documents/${docId}/match`,
+        { method: "POST" }
+      );
       setMatchResult(result);
       setShowMatch(true);
       setMessage(`Match completed: ${result.overall_status.replace("_", " ")}`);
-    } else {
-      const err = await res.json();
-      setError(err.detail || "Matching failed");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Matching failed");
     }
     setMatchingId(null);
   };

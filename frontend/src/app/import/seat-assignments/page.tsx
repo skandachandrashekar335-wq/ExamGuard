@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import * as XLSX from "xlsx";
 import AppShell from "@/components/AppShell";
+import { apiRequest, qs } from "@/lib/api";
 import {
   parseSpreadsheet,
   validateRows,
@@ -11,7 +12,6 @@ import {
   type ValidationError,
 } from "@/lib/spreadsheet";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const MAX_ASSIGNMENTS = 200;
 
 const HEADERS = ["Registration ID", "Seat Number", "Row", "Column"];
@@ -70,8 +70,7 @@ export default function ImportSeatAssignmentsPage() {
   const invalidCount = rows.filter((r) => !r.valid).length;
 
   useEffect(() => {
-    fetch(`${API}/api/v1/exam-halls?page=1&page_size=100`)
-      .then((r) => r.json())
+    apiRequest<{ items: HallOption[] }>(`/api/v1/exam-halls${qs({ page: "1", page_size: "100" })}`)
       .then((data) => setHalls(data.items || []))
       .catch(() => {});
   }, []);
@@ -175,18 +174,11 @@ export default function ImportSeatAssignmentsPage() {
       }));
 
     try {
-      const res = await fetch(`${API}/api/v1/import/seat-assignments`, {
+      const data: AssignmentResponse = await apiRequest("/api/v1/import/seat-assignments", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ exam_hall_id: selectedHallId, assignments }),
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || `HTTP ${res.status}`);
-      }
-
-      const data: AssignmentResponse = await res.json();
       setResponse(data);
       setPhase("result");
     } catch (err) {

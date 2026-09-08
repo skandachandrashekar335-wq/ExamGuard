@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
+import { apiRequest } from "@/lib/api";
 import {
   parseSpreadsheet,
   generateTemplate,
@@ -10,8 +11,6 @@ import {
   exportFailedRows,
   type ValidationError,
 } from "@/lib/spreadsheet";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const MAX_STUDENTS = 500;
 
 const HEADERS = ["USN", "Name"];
@@ -147,18 +146,11 @@ export default function ImportStudentsPage() {
       }));
 
     try {
-      const res = await fetch(`${API}/api/v1/import/students`, {
+      const data: ImportResponse = await apiRequest("/api/v1/import/students", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ students: validStudents }),
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || `HTTP ${res.status}`);
-      }
-
-      const data: ImportResponse = await res.json();
       setResponse(data);
       setPhase("result");
     } catch (err) {

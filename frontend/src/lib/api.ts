@@ -6,7 +6,7 @@
  * Handles error responses consistently.
  */
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 let _tokenGetter: (() => string | null) | null = null;
 
@@ -41,7 +41,7 @@ export async function apiRequest<T>(
     headers["Content-Type"] = "application/json";
   }
 
-  const res = await fetch(`${API}${path}`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers,
   });

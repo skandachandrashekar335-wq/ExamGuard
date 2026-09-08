@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MonitoringEvent } from "@/lib/monitoring-api";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_BASE } from "@/lib/api";
 
 export type ConnectionStatus =
   | "INITIALIZING"
@@ -39,7 +38,7 @@ export function useMonitoringSocket(opts: UseMonitoringSocketOptions) {
   optsRef.current = opts;
 
   const buildWsUrl = useCallback(() => {
-    const base = API.replace(/^http/, "ws");
+    const base = API_BASE.replace(/^http/, "ws");
     const sp = new URLSearchParams();
     if (optsRef.current.examId) sp.set("exam_id", String(optsRef.current.examId));
     if (optsRef.current.hallId) sp.set("hall_id", String(optsRef.current.hallId));

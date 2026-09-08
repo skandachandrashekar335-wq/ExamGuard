@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
 import * as XLSX from "xlsx";
 import AppShell from "@/components/AppShell";
+import { apiRequest } from "@/lib/api";
 import {
   parseSpreadsheet,
   validateRows,
@@ -13,7 +14,6 @@ import {
   type ValidationError,
 } from "@/lib/spreadsheet";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const MAX_SUBJECTS = 200;
 const MAX_EXAMS = 500;
 
@@ -281,18 +281,11 @@ export default function ImportSubjectsExamsPage() {
       if (validSubj.length > 0) body.subjects = validSubj;
       if (validExam.length > 0) body.exams = validExam;
 
-      const res = await fetch(`${API}/api/v1/import/subjects-exams`, {
+      const data: ImportResponse = await apiRequest("/api/v1/import/subjects-exams", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || `HTTP ${res.status}`);
-      }
-
-      const data: ImportResponse = await res.json();
       setResponse(data);
       setPhase("result");
     } catch (err) {

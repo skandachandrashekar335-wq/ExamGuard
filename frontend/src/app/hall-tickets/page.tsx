@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
+import { apiRequest, qs } from "@/lib/api";
 
 interface HallTicket {
   id: number;
@@ -24,8 +25,6 @@ interface ListResponse {
   page_size: number;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 const STATUS_COLORS: Record<string, string> = {
   CREATED: "eg-badge eg-badge-info",
   EXTRACTED: "eg-badge eg-badge-info",
@@ -46,24 +45,24 @@ export default function HallTicketsPage() {
 
   const fetchTickets = async () => {
     if (useSearch && usnSearch) {
-      const params = new URLSearchParams({
-        page: String(page),
-        page_size: String(pageSize),
-        usn: usnSearch,
-      });
-      if (statusFilter) params.set("status", statusFilter);
-      const res = await fetch(`${API}/api/v1/hall-tickets/search?${params}`);
-      const data: ListResponse = await res.json();
+      const data = await apiRequest<ListResponse>(
+        `/api/v1/hall-tickets/search${qs({
+          page: String(page),
+          page_size: String(pageSize),
+          usn: usnSearch,
+          ...(statusFilter ? { status: statusFilter } : {}),
+        })}`
+      );
       setTickets(data.items);
       setTotal(data.total);
     } else {
-      const params = new URLSearchParams({
-        page: String(page),
-        page_size: String(pageSize),
-      });
-      if (statusFilter) params.set("status", statusFilter);
-      const res = await fetch(`${API}/api/v1/hall-tickets?${params}`);
-      const data: ListResponse = await res.json();
+      const data = await apiRequest<ListResponse>(
+        `/api/v1/hall-tickets${qs({
+          page: String(page),
+          page_size: String(pageSize),
+          ...(statusFilter ? { status: statusFilter } : {}),
+        })}`
+      );
       setTickets(data.items);
       setTotal(data.total);
     }

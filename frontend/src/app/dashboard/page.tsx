@@ -72,8 +72,6 @@ interface BatchResult {
   }[];
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 import { apiRequest, qs } from "@/lib/api";
 
 const STATUS_BADGE: Record<string, string> = {

@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { apiRequest, qs } from "@/lib/api";
 
 interface AuditLog {
   id: number;
@@ -57,20 +56,17 @@ export default function ImportHistoryPage() {
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams({
-      page: String(page),
-      page_size: String(pageSize),
-    });
-    if (filterType) params.set("import_type", filterType);
-    if (filterStatus) params.set("status", filterStatus);
-
     try {
-      const res = await fetch(`${API}/api/v1/import/audit?${params}`);
-      if (res.ok) {
-        const data: AuditListResponse = await res.json();
-        setLogs(data.items);
-        setTotal(data.total);
-      }
+      const data = await apiRequest<AuditListResponse>(
+        `/api/v1/import/audit${qs({
+          page: String(page),
+          page_size: String(pageSize),
+          ...(filterType ? { import_type: filterType } : {}),
+          ...(filterStatus ? { status: filterStatus } : {}),
+        })}`
+      );
+      setLogs(data.items);
+      setTotal(data.total);
     } finally {
       setLoading(false);
     }
@@ -83,11 +79,10 @@ export default function ImportHistoryPage() {
   const handleDetail = async (id: number) => {
     setDetailLoading(true);
     try {
-      const res = await fetch(`${API}/api/v1/import/audit/${id}`);
-      if (res.ok) {
-        const data: AuditLogDetail = await res.json();
-        setDetail(data);
-      }
+      const data = await apiRequest<AuditLogDetail>(
+        `/api/v1/import/audit/${id}`
+      );
+      setDetail(data);
     } finally {
       setDetailLoading(false);
     }

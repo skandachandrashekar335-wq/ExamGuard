@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
+import { apiRequest } from "@/lib/api";
 
 interface HallTicket {
   id: number;
@@ -45,8 +46,6 @@ interface DetailedResponse {
   } | null;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 const STATUS_BADGE: Record<string, string> = {
   CREATED: "eg-badge-info",
   EXTRACTED: "eg-badge-info",
@@ -67,13 +66,12 @@ export default function HallTicketDetailPage() {
   const [actionMsg, setActionMsg] = useState("");
 
   const fetchDetail = async () => {
-    const res = await fetch(`${API}/api/v1/hall-tickets/${id}/detailed`);
-    if (!res.ok) {
+    try {
+      const json = await apiRequest<DetailedResponse>(`/api/v1/hall-tickets/${id}/detailed`);
+      setData(json);
+    } catch {
       setError("Hall ticket not found");
-      return;
     }
-    const json: DetailedResponse = await res.json();
-    setData(json);
   };
 
   useEffect(() => {
@@ -82,17 +80,15 @@ export default function HallTicketDetailPage() {
 
   const approve = async () => {
     setActionMsg("");
-    const res = await fetch(`${API}/api/v1/hall-tickets/${id}/approve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    if (res.ok) {
+    try {
+      await apiRequest(`/api/v1/hall-tickets/${id}/approve`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
       setActionMsg("Hall ticket approved");
       fetchDetail();
-    } else {
-      const err = await res.json();
-      setActionMsg(err.detail || "Failed to approve");
+    } catch (err) {
+      setActionMsg(err instanceof Error ? err.message : "Failed to approve");
     }
   };
 
@@ -102,18 +98,16 @@ export default function HallTicketDetailPage() {
       return;
     }
     setActionMsg("");
-    const res = await fetch(`${API}/api/v1/hall-tickets/${id}/reject`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason: rejectReason }),
-    });
-    if (res.ok) {
+    try {
+      await apiRequest(`/api/v1/hall-tickets/${id}/reject`, {
+        method: "POST",
+        body: JSON.stringify({ reason: rejectReason }),
+      });
       setActionMsg("Hall ticket rejected");
       setRejectReason("");
       fetchDetail();
-    } else {
-      const err = await res.json();
-      setActionMsg(err.detail || "Failed to reject");
+    } catch (err) {
+      setActionMsg(err instanceof Error ? err.message : "Failed to reject");
     }
   };
 

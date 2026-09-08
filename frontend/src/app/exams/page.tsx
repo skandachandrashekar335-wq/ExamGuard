@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { apiRequest, qs } from "@/lib/api";
 
 interface Exam {
   id: number;
@@ -37,8 +38,6 @@ interface SubjectListResponse {
   total: number;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 export default function ExamsPage() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
@@ -61,22 +60,17 @@ export default function ExamsPage() {
   const [error, setError] = useState("");
 
   const fetchExams = async () => {
-    const params = new URLSearchParams({
-      page: String(page),
-      page_size: String(pageSize),
-    });
-    if (search) params.set("search", search);
-    if (showInactive) params.set("include_inactive", "true");
+    const params: Record<string, string | number> = { page, page_size: pageSize };
+    if (search) params.search = search;
+    if (showInactive) params.include_inactive = "true";
 
-    const res = await fetch(`${API}/api/v1/exams?${params}`);
-    const data: ListResponse = await res.json();
+    const data = await apiRequest<ListResponse>(`/api/v1/exams${qs(params)}`);
     setExams(data.items);
     setTotal(data.total);
   };
 
   const fetchSubjects = async () => {
-    const res = await fetch(`${API}/api/v1/subjects?page=1&page_size=100`);
-    const data: SubjectListResponse = await res.json();
+    const data = await apiRequest<SubjectListResponse>(`/api/v1/subjects${qs({ page: 1, page_size: 100 })}`);
     setSubjects(data.items || []);
   };
 
@@ -129,29 +123,23 @@ export default function ExamsPage() {
     };
 
     const url = editExam
-      ? `${API}/api/v1/exams/${editExam.id}`
-      : `${API}/api/v1/exams`;
+      ? `/api/v1/exams/${editExam.id}`
+      : "/api/v1/exams";
     const method = editExam ? "PATCH" : "POST";
 
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    if (res.ok) {
+    try {
+      await apiRequest(url, { method, body: JSON.stringify(body) });
       setShowForm(false);
       resetForm();
       fetchExams();
-    } else {
-      const err = await res.json();
-      setError(err.detail || "Failed to save exam");
+    } catch (err: any) {
+      setError(err.message || "Failed to save exam");
     }
   };
 
   const handleDeactivate = async (id: number) => {
     if (!confirm("Deactivate this exam?")) return;
-    await fetch(`${API}/api/v1/exams/${id}`, { method: "DELETE" });
+    await apiRequest(`/api/v1/exams/${id}`, { method: "DELETE" });
     fetchExams();
   };
 
