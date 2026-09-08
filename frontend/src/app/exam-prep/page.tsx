@@ -336,7 +336,9 @@ export default function ExamPrepPage() {
 
           <div style={{ marginTop: "1.5rem", display: "flex", gap: "0.75rem" }}>
             <button onClick={() => setStep(1)} className="eg-btn">← Back</button>
-            <button onClick={() => setStep(3)} className="eg-btn eg-btn-primary">Continue to Step 3 →</button>
+            <button onClick={() => setStep(3)} className="eg-btn eg-btn-primary" disabled={examTickets.length === 0}>
+              {examTickets.length === 0 ? "Upload Hall Tickets First" : "Continue to Step 3 →"}
+            </button>
           </div>
         </div>
       )}
@@ -380,7 +382,9 @@ export default function ExamPrepPage() {
 
           <div style={{ marginTop: "1.5rem", display: "flex", gap: "0.75rem" }}>
             <button onClick={() => setStep(2)} className="eg-btn">← Back</button>
-            <button onClick={() => setStep(4)} className="eg-btn eg-btn-primary">Continue to Step 4 →</button>
+            <button onClick={() => setStep(4)} className="eg-btn eg-btn-primary" disabled={examStudents.length === 0}>
+              {examStudents.length === 0 ? "Register Students First" : "Continue to Step 4 →"}
+            </button>
           </div>
         </div>
       )}
@@ -441,7 +445,9 @@ export default function ExamPrepPage() {
 
           <div style={{ marginTop: "1.5rem", display: "flex", gap: "0.75rem" }}>
             <button onClick={() => setStep(3)} className="eg-btn">← Back</button>
-            <button onClick={() => setStep(5)} className="eg-btn eg-btn-primary">Continue to Step 5 →</button>
+            <button onClick={() => setStep(5)} className="eg-btn eg-btn-primary" disabled={examSeats.length === 0}>
+              {examSeats.length === 0 ? "Assign Seats First" : "Continue to Step 5 →"}
+            </button>
           </div>
         </div>
       )}
@@ -494,7 +500,9 @@ export default function ExamPrepPage() {
 
           <div style={{ marginTop: "1.5rem", display: "flex", gap: "0.75rem" }}>
             <button onClick={() => setStep(4)} className="eg-btn">← Back</button>
-            <button onClick={() => setStep(6)} className="eg-btn eg-btn-primary">Continue to Step 6 →</button>
+            <button onClick={() => setStep(6)} className="eg-btn eg-btn-primary" disabled={validatedHalls.length === 0}>
+              {validatedHalls.length === 0 ? "Configure Halls & Entry Points First" : "Continue to Step 6 →"}
+            </button>
           </div>
         </div>
       )}
@@ -528,7 +536,9 @@ export default function ExamPrepPage() {
 
           <div style={{ marginTop: "1.5rem", display: "flex", gap: "0.75rem" }}>
             <button onClick={() => setStep(5)} className="eg-btn">← Back</button>
-            <button onClick={() => setStep(7)} className="eg-btn eg-btn-primary">Continue to Validation →</button>
+            <button onClick={() => setStep(7)} className="eg-btn eg-btn-primary" disabled={cameras.filter((c) => c.status === "ACTIVE").length === 0}>
+              {cameras.filter((c) => c.status === "ACTIVE").length === 0 ? "Configure Active Cameras First" : "Continue to Validation →"}
+            </button>
           </div>
         </div>
       )}
