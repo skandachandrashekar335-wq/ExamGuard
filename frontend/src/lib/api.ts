@@ -8,6 +8,17 @@
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+// Production safety: warn if API_BASE points to localhost
+if (typeof window !== "undefined" && process.env.NODE_ENV === "production") {
+  if (API_BASE.includes("localhost") || API_BASE.includes("127.0.0.1")) {
+    console.error(
+      "[ExamGuard] CRITICAL: NEXT_PUBLIC_API_URL is not set. " +
+      "The frontend is targeting localhost in production. " +
+      "Set NEXT_PUBLIC_API_URL in your Vercel environment variables."
+    );
+  }
+}
+
 let _tokenGetter: (() => string | null) | null = null;
 
 export function setTokenGetter(getter: () => string | null) {

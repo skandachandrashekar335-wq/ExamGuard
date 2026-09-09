@@ -1,0 +1,51 @@
+# Secrets — NEVER build into image
+.env
+.env.*
+*.pem
+*.key
+credentials/
+
+# Test artifacts
+test_tokens.txt
+test_blank.png
+test_corrupt.png
+test_hall_ticket.png
+tests/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Development / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+docs/
+*.md
+
+# Uploads (ephemeral — should be mounted as volume)
+uploads/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Frontend (not needed for backend image)
+frontend/
+node_modules/
+.vercel/

@@ -12,6 +12,7 @@ import logging
 import sys
 import time
 import json
+import threading
 from datetime import datetime
 from typing import Any, Dict, Optional
 
@@ -38,7 +39,7 @@ def setup_logging() -> logging.Logger:
     - No sensitive data in format strings
     """
     logger = logging.getLogger("examguard")
-    logger.setLevel(getattr(logging, settings.log_level.upper(), logging.INFO))
+    logger.setLevel(getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO))
 
     # Avoid adding handlers if already configured
     if logger.handlers:
@@ -46,7 +47,7 @@ def setup_logging() -> logging.Logger:
 
     # Console handler with structured format
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(getattr(logging, settings.log_level.upper(), logging.INFO))
+    console_handler.setLevel(getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO))
 
     # Simple, safe format — no sensitive data
     formatter = logging.Formatter(
@@ -130,7 +131,7 @@ def check_monitoring() -> dict:
 
     Returns a dict with health status.
     """
-    from app.services.queue import get_queue, init_queue
+    from app.services.queue.queue import get_queue
 
     try:
         queue = get_queue()
@@ -294,11 +295,6 @@ __all__ = [
     "add_metrics_routes",
     "run_production",
     "setup_logging",
-    "sanitize_error",
-    "http_exception_handler",
-    "audit_log",
-    "get_audit_log",
-    "safe_payload",
 ]
 
 

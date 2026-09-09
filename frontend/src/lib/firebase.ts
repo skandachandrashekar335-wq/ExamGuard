@@ -28,6 +28,7 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import { app, analytics } from "./firebase_init";
+import { API_BASE } from "./api";
 
 export {
   signInWithPopup,
@@ -143,7 +144,6 @@ export async function exchangeFirebaseForExamGuard(
   token: string; // ExamGuard JWT
   requires_onboarding: boolean;
 }> {
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const response = await fetch(`${API_BASE}/api/v1/auth/firebase/exchange`, {
     method: "POST",
     headers: {

@@ -89,6 +89,9 @@ class Settings(BaseSettings):
     MONITORING_HEARTBEAT_INTERVAL: int = 30
     MONITORING_STALE_TIMEOUT: int = 60
 
+    # Logging
+    LOG_LEVEL: str = "INFO"
+
     # Firebase Authentication configuration
     # These values are read from environment variables:
     #   FIREBASE_PROJECT_ID

@@ -1,3 +1,6 @@
+import logging
+import sys
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -6,6 +9,7 @@ from app.api.v1.router import router as v1_router
 from app.api.v1.auth import router as auth_router
 from app.core.config import get_settings
 from app.core.database import engine
+from app.monitoring.production import add_health_routes, add_metrics_routes
 from app.security.hardening import rate_limit_handler
 from app.services.monitoring.alert_buffer import AlertBuffer
 from app.services.monitoring.connection_manager import ConnectionManager
@@ -17,7 +21,36 @@ from app.services.security_event_bridge import make_security_event_hook
 settings = get_settings()
 
 
+def _validate_production_config() -> None:
+    """Log warnings for missing production configuration. Non-fatal."""
+    if settings.APP_ENV == "development":
+        return
+
+    logger = logging.getLogger("examguard.startup")
+    warnings = []
+
+    if not settings.FIREBASE_PROJECT_ID:
+        warnings.append("FIREBASE_PROJECT_ID not set — Firebase auth will fail")
+
+    if settings.SECRET_KEY == "change-me-to-a-random-secret-key":
+        warnings.append("SECRET_KEY is placeholder — reject in production")
+
+    if settings.FACE_VERIFICATION_PROVIDER not in ("deterministic", "none", "uniface"):
+        warnings.append(
+            f"FACE_VERIFICATION_PROVIDER={settings.FACE_VERIFICATION_PROVIDER!r} "
+            f"— expected 'deterministic', 'none', or 'uniface'"
+        )
+
+    if not settings.DATABASE_URL or "password" in settings.DATABASE_URL:
+        warnings.append("DATABASE_URL may contain default credentials")
+
+    for w in warnings:
+        logger.warning("STARTUP: %s", w)
+
+
 def create_app() -> FastAPI:
+    _validate_production_config()
+
     application = FastAPI(
         title=settings.APP_NAME,
         debug=settings.DEBUG,
@@ -66,6 +99,10 @@ def create_app() -> FastAPI:
             result["database"] = "disconnected"
             result["status"] = "degraded"
         return result
+
+    # Extended health/metrics endpoints (always registered)
+    add_health_routes(application)
+    add_metrics_routes(application)
 
     return application
 
