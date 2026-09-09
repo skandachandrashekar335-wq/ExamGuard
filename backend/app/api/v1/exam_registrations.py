@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.auth import Role, require_role
+from app.auth import Role, require_role, get_invigilator_scope, check_invigilator_scope
 from app.core.database import get_db
 from app.schemas.exam_registration import (
     ExamRegistrationCreate,
@@ -54,6 +54,9 @@ def list_registrations(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
+    scope = get_invigilator_scope(_user, db)
+    if scope:
+        exam_id = scope.exam_id
     registrations, total = reg_service.list_registrations(
         db,
         page=page,
@@ -80,9 +83,12 @@ def get_registration(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
+    scope = get_invigilator_scope(_user, db)
     reg = reg_service.get_registration(db, registration_id)
     if not reg:
         raise HTTPException(status_code=404, detail="Registration not found")
+    if scope:
+        check_invigilator_scope(scope, resource_exam_id=reg.exam_id)
     return _to_response(reg)
 
 

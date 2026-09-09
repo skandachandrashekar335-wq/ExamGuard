@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.auth import Role, require_role
+from app.auth import Role, require_role, get_invigilator_scope, check_invigilator_scope
 from app.core.database import get_db
 from app.schemas.seat_assignment import (
     SeatAssignmentCreate,
@@ -57,6 +57,9 @@ def list_assignments(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
+    scope = get_invigilator_scope(_user, db)
+    if scope:
+        exam_hall_id = scope.hall_id
     assignments, total = seat_service.list_assignments(
         db,
         page=page,
@@ -85,9 +88,12 @@ def get_assignment(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
+    scope = get_invigilator_scope(_user, db)
     assignment = seat_service.get_assignment(db, assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Seat assignment not found")
+    if scope:
+        check_invigilator_scope(scope, resource_hall_id=assignment.exam_hall_id)
     return _to_response(assignment)
 
 

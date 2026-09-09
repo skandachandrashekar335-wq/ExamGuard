@@ -25,6 +25,7 @@ from app.api.v1.ws_monitoring import (
     parse_filters,
     reset_connection_manager,
 )
+from app.auth import create_access_token, Role
 from app.main import create_app
 from app.services.monitoring.events import (
     EventCategory,
@@ -48,6 +49,20 @@ def client():
     """Create a FastAPI test client."""
     app = create_app()
     return TestClient(app)
+
+
+@pytest.fixture
+def ws_token():
+    """Generate a valid JWT token for WebSocket auth."""
+    return create_access_token({"sub": "1", "role": Role.ADMIN, "email": "test@example.com"})
+
+
+def ws_url(path="/api/v1/ws/monitoring", token=None, **params):
+    """Build a WebSocket URL with token and optional query params."""
+    import urllib.parse
+    params["token"] = token or "invalid"
+    qs = urllib.parse.urlencode(params)
+    return f"{path}?{qs}"
 
 
 def _make_event(**kwargs) -> MonitoringEvent:
@@ -180,53 +195,52 @@ class TestParseClientMessage:
 
 
 class TestWebSocketConnection:
-    def test_successful_connection(self, client):
+    def test_successful_connection(self, client, ws_token):
         """Client connects and receives welcome message."""
-        with client.websocket_connect("/api/v1/ws/monitoring") as ws:
+        with client.websocket_connect(ws_url(token=ws_token)) as ws:
             data = ws.receive_json()
             assert data["type"] == "connected"
             assert "client_id" in data
             assert "filters" in data
 
-    def test_valid_exam_filter(self, client):
+    def test_valid_exam_filter(self, client, ws_token):
         """Client connects with exam_id filter."""
-        with client.websocket_connect("/api/v1/ws/monitoring?exam_id=3") as ws:
+        with client.websocket_connect(ws_url(token=ws_token, exam_id=3)) as ws:
             data = ws.receive_json()
             assert data["type"] == "connected"
             assert data["filters"]["exam_id"] == 3
 
-    def test_valid_hall_filter(self, client):
+    def test_valid_hall_filter(self, client, ws_token):
         """Client connects with hall_id filter."""
-        with client.websocket_connect("/api/v1/ws/monitoring?hall_id=2") as ws:
+        with client.websocket_connect(ws_url(token=ws_token, hall_id=2)) as ws:
             data = ws.receive_json()
             assert data["type"] == "connected"
             assert data["filters"]["hall_id"] == 2
 
-    def test_category_filter(self, client):
+    def test_category_filter(self, client, ws_token):
         """Client connects with category filter."""
-        with client.websocket_connect("/api/v1/ws/monitoring?category=ENTRY") as ws:
+        with client.websocket_connect(ws_url(token=ws_token, category="ENTRY")) as ws:
             data = ws.receive_json()
             assert data["type"] == "connected"
             assert data["filters"]["category"] == "ENTRY"
 
-    def test_event_type_filter(self, client):
+    def test_event_type_filter(self, client, ws_token):
         """Client connects with event_type filter."""
-        with client.websocket_connect("/api/v1/ws/monitoring?event_type=ENTRY_GRANTED") as ws:
+        with client.websocket_connect(ws_url(token=ws_token, event_type="ENTRY_GRANTED")) as ws:
             data = ws.receive_json()
             assert data["type"] == "connected"
             assert data["filters"]["event_type"] == "ENTRY_GRANTED"
 
-    def test_severity_filter(self, client):
+    def test_severity_filter(self, client, ws_token):
         """Client connects with min_severity filter."""
-        with client.websocket_connect("/api/v1/ws/monitoring?min_severity=WARNING") as ws:
+        with client.websocket_connect(ws_url(token=ws_token, min_severity="WARNING")) as ws:
             data = ws.receive_json()
             assert data["type"] == "connected"
             assert data["filters"]["min_severity"] == "WARNING"
 
-    def test_combined_filters(self, client):
+    def test_combined_filters(self, client, ws_token):
         """Client connects with multiple filters."""
-        url = "/api/v1/ws/monitoring?exam_id=1&hall_id=2&category=RISK&min_severity=CRITICAL"
-        with client.websocket_connect(url) as ws:
+        with client.websocket_connect(ws_url(token=ws_token, exam_id=1, hall_id=2, category="RISK", min_severity="CRITICAL")) as ws:
             data = ws.receive_json()
             assert data["type"] == "connected"
             assert data["filters"]["exam_id"] == 1
@@ -234,9 +248,9 @@ class TestWebSocketConnection:
             assert data["filters"]["category"] == "RISK"
             assert data["filters"]["min_severity"] == "CRITICAL"
 
-    def test_invalid_filter_rejects(self, client):
+    def test_invalid_filter_rejects(self, client, ws_token):
         """Invalid filter sends error and closes."""
-        with client.websocket_connect("/api/v1/ws/monitoring?category=BADCAT") as ws:
+        with client.websocket_connect(ws_url(token=ws_token, category="BADCAT")) as ws:
             data = ws.receive_json()
             assert data["type"] == "error"
             assert "Invalid category" in data["message"]
@@ -248,25 +262,25 @@ class TestWebSocketConnection:
 
 
 class TestRegistration:
-    def test_registered_with_manager(self, client):
+    def test_registered_with_manager(self, client, ws_token):
         """Connected client is registered with ConnectionManager."""
         from app.api.v1.ws_monitoring import get_connection_manager
         mgr = get_connection_manager()
         assert mgr.active_count == 0
 
-        with client.websocket_connect("/api/v1/ws/monitoring") as ws:
+        with client.websocket_connect(ws_url(token=ws_token)) as ws:
             ws.receive_json()  # welcome
             assert mgr.active_count == 1
 
         # After disconnect, count goes back to 0
         assert mgr.active_count == 0
 
-    def test_disconnect_unregisters(self, client):
+    def test_disconnect_unregisters(self, client, ws_token):
         """Client disconnect unregisters from ConnectionManager."""
         from app.api.v1.ws_monitoring import get_connection_manager
         mgr = get_connection_manager()
 
-        with client.websocket_connect("/api/v1/ws/monitoring") as ws:
+        with client.websocket_connect(ws_url(token=ws_token)) as ws:
             ws.receive_json()
             assert mgr.active_count == 1
 
@@ -279,18 +293,18 @@ class TestRegistration:
 
 
 class TestClientMessages:
-    def test_ping_pong(self, client):
+    def test_ping_pong(self, client, ws_token):
         """Client sends ping, server responds with pong."""
-        with client.websocket_connect("/api/v1/ws/monitoring") as ws:
+        with client.websocket_connect(ws_url(token=ws_token)) as ws:
             ws.receive_json()  # welcome
             ws.send_json({"type": "ping"})
             data = ws.receive_json()
             assert data["type"] == "pong"
             assert "timestamp" in data
 
-    def test_subscribe_update(self, client):
+    def test_subscribe_update(self, client, ws_token):
         """Client sends subscribe message to update filters."""
-        with client.websocket_connect("/api/v1/ws/monitoring") as ws:
+        with client.websocket_connect(ws_url(token=ws_token)) as ws:
             ws.receive_json()  # welcome
             ws.send_json({
                 "type": "subscribe",
@@ -304,27 +318,27 @@ class TestClientMessages:
             assert data["filters"]["hall_id"] == 3
             assert data["filters"]["category"] == "RISK"
 
-    def test_malformed_json_response(self, client):
+    def test_malformed_json_response(self, client, ws_token):
         """Malformed JSON returns error message."""
-        with client.websocket_connect("/api/v1/ws/monitoring") as ws:
+        with client.websocket_connect(ws_url(token=ws_token)) as ws:
             ws.receive_json()  # welcome
             ws.send_text("not json {{{")
             data = ws.receive_json()
             assert data["type"] == "error"
             assert "Malformed JSON" in data["message"]
 
-    def test_unknown_message_type(self, client):
+    def test_unknown_message_type(self, client, ws_token):
         """Unknown message type returns error."""
-        with client.websocket_connect("/api/v1/ws/monitoring") as ws:
+        with client.websocket_connect(ws_url(token=ws_token)) as ws:
             ws.receive_json()  # welcome
             ws.send_json({"type": "unknown_thing"})
             data = ws.receive_json()
             assert data["type"] == "error"
             assert "Unknown message type" in data["message"]
 
-    def test_invalid_subscribe_data(self, client):
+    def test_invalid_subscribe_data(self, client, ws_token):
         """Invalid subscribe data returns error."""
-        with client.websocket_connect("/api/v1/ws/monitoring") as ws:
+        with client.websocket_connect(ws_url(token=ws_token)) as ws:
             ws.receive_json()  # welcome
             ws.send_json({
                 "type": "subscribe",
@@ -341,9 +355,9 @@ class TestClientMessages:
 
 
 class TestSecurity:
-    def test_no_stack_traces_in_errors(self, client):
+    def test_no_stack_traces_in_errors(self, client, ws_token):
         """Error messages do not contain stack traces."""
-        with client.websocket_connect("/api/v1/ws/monitoring?category=BADCAT") as ws:
+        with client.websocket_connect(ws_url(token=ws_token, category="BADCAT")) as ws:
             data = ws.receive_json()
             assert data["type"] == "error"
             msg = data["message"]
@@ -351,18 +365,18 @@ class TestSecurity:
             assert "File" not in msg
             assert ".py" not in msg
 
-    def test_no_secrets_in_welcome(self, client):
+    def test_no_secrets_in_welcome(self, client, ws_token):
         """Welcome message does not contain secrets."""
-        with client.websocket_connect("/api/v1/ws/monitoring") as ws:
+        with client.websocket_connect(ws_url(token=ws_token)) as ws:
             data = ws.receive_json()
             raw = json.dumps(data)
             assert "SECRET_KEY" not in raw
             assert "password" not in raw
             assert "api_key" not in raw
 
-    def test_no_database_paths_in_error(self, client):
+    def test_no_database_paths_in_error(self, client, ws_token):
         """Error messages do not contain filesystem paths."""
-        with client.websocket_connect("/api/v1/ws/monitoring?category=BADCAT") as ws:
+        with client.websocket_connect(ws_url(token=ws_token, category="BADCAT")) as ws:
             data = ws.receive_json()
             msg = data["message"]
             assert "D:\\" not in msg

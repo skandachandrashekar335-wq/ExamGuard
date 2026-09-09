@@ -13,6 +13,7 @@ from app.models.camera import Camera
 from app.models.camera_entry_point import CameraEntryPointMapping
 from app.models.entry_point import EntryPoint
 from app.models.exam_hall import ExamHall
+from app.models.examination_session import ExaminationSession, GateEvent
 
 
 @pytest.fixture(autouse=True)
@@ -23,6 +24,20 @@ def clean_test_data():
         db.execute(delete(CameraEntryPointMapping))
         db.execute(delete(Camera).where(Camera.device_identifier.like("TEST%")))
         db.execute(delete(EntryPoint).where(EntryPoint.code.like("TEST%")))
+        db.execute(delete(GateEvent).where(
+            GateEvent.session_id.in_(
+                db.query(ExaminationSession.id).filter(
+                    ExaminationSession.exam_hall_id.in_(
+                        db.query(ExamHall.id).filter(ExamHall.building.like("CAM_TEST%"))
+                    )
+                )
+            )
+        ))
+        db.execute(delete(ExaminationSession).where(
+            ExaminationSession.exam_hall_id.in_(
+                db.query(ExamHall.id).filter(ExamHall.building.like("CAM_TEST%"))
+            )
+        ))
         db.execute(delete(ExamHall).where(ExamHall.building.like("CAM_TEST%")))
         db.commit()
     finally:

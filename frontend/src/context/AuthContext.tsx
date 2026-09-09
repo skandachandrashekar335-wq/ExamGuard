@@ -25,7 +25,7 @@
 
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import {
   signInWithPopup,
   signOut as firebaseSignOut,
@@ -84,16 +84,73 @@ export const useAuth = (): AuthState => {
   return context;
 };
 
+function getDevToken(): string | null {
+  if (process.env.NODE_ENV === "development" && typeof window !== "undefined") {
+    // Check URL parameter first
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get("eg_token");
+    if (urlToken) {
+      sessionStorage.setItem("eg_dev_token", urlToken);
+      window.history.replaceState({}, "", window.location.pathname);
+      return urlToken;
+    }
+    // Fall back to sessionStorage
+    return sessionStorage.getItem("eg_dev_token");
+  }
+  return null;
+}
+
+function devTokenToUser(token: string): AuthUser | null {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return {
+      id: parseInt(payload.sub),
+      email: payload.email || null,
+      full_name: payload.full_name || null,
+      role: payload.role as UserRole,
+      is_active: true,
+      firebase_uid: null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  const [authState, setAuthState] = useState<AuthState>(AuthStateDefault);
+  const devToken = getDevToken();
+  const devUser = devToken ? devTokenToUser(devToken) : null;
+  const [authState, setAuthState] = useState<AuthState>(() => {
+    if (devToken && devUser) {
+      // Set token getter immediately so API calls work before first render
+      setTokenGetter(() => devToken);
+      return {
+        user: devUser,
+        loading: false,
+        firebaseIdToken: null,
+        examGuardToken: devToken,
+        requiresOnboarding: false,
+        displayName: devUser.email || "Dev User",
+        isAuthenticated: true,
+        signInWithGoogle: async () => {},
+        signOut: async () => {},
+      };
+    }
+    return AuthStateDefault;
+  });
+  const devTokenUsed = useRef(!!devUser);
 
   // Initialize auth state on component mount
   useEffect(() => {
+    // Skip Firebase listener if dev token already set auth state
+    if (devTokenUsed.current) return;
+
     // Set up Firebase auth state listener
     const unsubscribe = onAuthStateChangedCallback(
       (firebaseUser, idToken) => {
+        // Skip if dev token already set auth state
+        if (devTokenUsed.current) return;
         // idToken can be null during initial state
         if (firebaseUser && idToken) {
           // User is signed in to Firebase - exchange token for ExamGuard session

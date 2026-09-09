@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
-import { apiRequest, qs } from "@/lib/api";
+import { apiRequest, qs, getAuthHeaders } from "@/lib/api";
 
 interface Document {
   id: number;
@@ -179,7 +179,7 @@ export default function DocumentsPage() {
       const { API_BASE } = await import("@/lib/api");
       const res = await fetch(
         `${API_BASE}/api/v1/documents?document_type=${docType}`,
-        { method: "POST", body: formData }
+        { method: "POST", body: formData, headers: getAuthHeaders() }
       );
       if (res.ok) {
         setMessage("Document uploaded successfully");

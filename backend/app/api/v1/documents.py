@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.auth import Role, require_role
 from app.core.config import get_settings
 from app.core.database import get_db
+from app.security.hardening import sanitize_error
 from app.schemas.document import DocumentListResponse, DocumentResponse
 from app.schemas.extraction import ExtractionResultResponse, ExtractedFieldResponse, ProcessDocumentResponse
 from app.schemas.extraction_review import (
@@ -103,7 +104,7 @@ def process_document(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=sanitize_error(e))
 
     fields = processing.get_extracted_fields(db, result.id)
     review_required = any(f.review_status == "REVIEW_REQUIRED" for f in fields)

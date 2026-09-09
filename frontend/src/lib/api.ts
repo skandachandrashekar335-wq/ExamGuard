@@ -24,6 +24,11 @@ export class ApiError extends Error {
   }
 }
 
+export function getAuthHeaders(): Record<string, string> {
+  const token = _tokenGetter?.();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export async function apiRequest<T>(
   path: string,
   init?: RequestInit,
@@ -37,7 +42,7 @@ export async function apiRequest<T>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  if (!headers["Content-Type"] && init?.method && init.method !== "GET") {
+  if (!headers["Content-Type"] && init?.method && init.method !== "GET" && !(init?.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
 

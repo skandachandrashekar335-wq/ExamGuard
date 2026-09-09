@@ -22,6 +22,7 @@ from app.models.entry_verification import EntryVerification
 from app.models.attendance import AttendanceEvent, AttendanceRecord
 from app.models.security_event import SecurityAlert, SecurityEvent
 from app.models.proxy_risk import ProxyRiskAssessment, SecuritySignal
+from app.models.examination_session import ExaminationSession, GateEvent
 from app.services import dashboard
 
 
@@ -59,6 +60,8 @@ def cleanup():
         db.execute(delete(CameraEntryPointMapping))
         db.execute(delete(Camera))
         db.execute(delete(EntryPoint))
+        db.execute(delete(GateEvent))
+        db.execute(delete(ExaminationSession))
         db.execute(delete(ExamHall))
         db.execute(delete(Exam))
         db.execute(delete(Subject))

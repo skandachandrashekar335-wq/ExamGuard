@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   listEntryVerifications,
@@ -27,6 +28,7 @@ const CHECK_BADGE: Record<string, string> = {
 };
 
 export default function EntryVerificationsPage() {
+  const router = useRouter();
   const [items, setItems] = useState<EntryVerification[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -86,7 +88,7 @@ export default function EntryVerificationsPage() {
         camera_id: form.camera_id || undefined,
         hall_ticket_id: form.hall_ticket_id || undefined,
       });
-      window.location.href = `/entry-verifications/${created.id}`;
+      router.push(`/entry-verifications/${created.id}`);
     } catch (err) {
       if (err instanceof ApiError) {
         setFormError(err.message);

@@ -8,8 +8,7 @@ Provides:
 - Clean disconnect handling
 - Integration with Phase 13.2 ConnectionManager
 
-Authentication is NOT implemented (Phase 19).
-The endpoint accepts unauthenticated connections for now.
+Authentication via JWT token in query parameter `token`.
 """
 
 from __future__ import annotations
@@ -23,7 +22,9 @@ from typing import Any
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
+from app.auth import decode_token, Role, get_invigilator_scope
 from app.core.config import get_settings
+from app.core.database import get_db
 from app.services.monitoring.connection_manager import ConnectionManager
 from app.services.monitoring.events import (
     EventCategory,
@@ -215,6 +216,7 @@ async def _heartbeat_loop(
 @router.websocket("/ws/monitoring")
 async def websocket_monitoring(
     websocket: WebSocket,
+    token: str | None = Query(default=None, description="JWT authentication token"),
     exam_id: int | None = Query(default=None, description="Filter by exam ID"),
     hall_id: int | None = Query(default=None, description="Filter by hall ID"),
     category: str | None = Query(default=None, description="Filter by event category"),
@@ -224,16 +226,39 @@ async def websocket_monitoring(
     """WebSocket endpoint for real-time monitoring events.
 
     Connection lifecycle:
-    1. Accept connection
-    2. Parse/validate subscription filters
-    3. Register with ConnectionManager
-    4. Run heartbeat loop
-    5. Handle client messages
-    6. Unregister on disconnect
-    7. Clean up on errors
-
-    Authentication is NOT implemented (Phase 19).
+    1. Authenticate via JWT token
+    2. Accept connection
+    3. Parse/validate subscription filters
+    4. Register with ConnectionManager
+    5. Run heartbeat loop
+    6. Handle client messages
+    7. Unregister on disconnect
+    8. Clean up on errors
     """
+    # --- Authentication ---
+    if token is None:
+        await websocket.close(code=1008, reason="Authentication token required")
+        return
+
+    claims = decode_token(token)
+    if claims is None:
+        await websocket.close(code=1008, reason="Invalid or expired token")
+        return
+
+    # Resolve invigilator scope for context filtering
+    invigilator_scope = None
+    if claims.get("role") == Role.INVIGILATOR:
+        # Resolve scope from DB
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            invigilator_scope = get_invigilator_scope(claims, db)
+        finally:
+            try:
+                next(db_gen)
+            except StopIteration:
+                pass
+
     client_id = str(uuid.uuid4())
     manager = get_connection_manager()
     heartbeat_task: asyncio.Task | None = None
@@ -248,6 +273,12 @@ async def websocket_monitoring(
             await websocket.send_json({"type": "error", "message": str(exc)})
             await websocket.close(code=1008, reason="Invalid subscription")
             return
+
+        # Enforce invigilator scope on subscription filters
+        if invigilator_scope is not None:
+            exam_id = invigilator_scope.exam_id
+            hall_id = invigilator_scope.hall_id
+            filters = parse_filters(exam_id, hall_id, category, event_type, min_severity)
 
         # Register connection
         try:
@@ -321,6 +352,15 @@ async def websocket_monitoring(
                 except ValueError as exc:
                     await websocket.send_json({"type": "error", "message": str(exc)})
                     continue
+                # Enforce invigilator scope on dynamic updates
+                if invigilator_scope is not None:
+                    new_filters = parse_filters(
+                        invigilator_scope.exam_id,
+                        invigilator_scope.hall_id,
+                        data.get("category"),
+                        data.get("event_type"),
+                        data.get("min_severity"),
+                    )
                 # Update the connection's filters in the manager
                 conn = manager.get_connection(client_id)
                 if conn is not None:

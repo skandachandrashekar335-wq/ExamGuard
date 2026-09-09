@@ -58,6 +58,13 @@ models/weights/
 *.pem
 *.key
 credentials/
+test_tokens.txt
+
+# Test artifacts
+test_blank.png
+test_corrupt.png
+test_hall_ticket.png
+frontend/test-results/
 
 .vercel
 .env*

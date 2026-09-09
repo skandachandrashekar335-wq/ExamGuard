@@ -129,7 +129,7 @@ def _record_rate_limit(client_id: str) -> None:
     _rate_limits[client_id].append(now)
 
 
-def rate_limit_handler(request: Request, call_next) -> Response:
+async def rate_limit_handler(request: Request, call_next) -> Response:
     """FastAPI middleware for rate limiting.
 
     Returns HTTP 429 if the client has exceeded the rate limit.
@@ -145,16 +145,12 @@ def rate_limit_handler(request: Request, call_next) -> Response:
         )
 
     _record_rate_limit(client_id)
-    response = await call_next(request)
-    return response
+    return await call_next(request)
 
 
-def rate_limit_middleware(func):
-    """Decorator to apply rate limiting to a route handler."""
-    @wraps(func)
-    async def wrapper(request: Request, *args, **kwargs):
-        return await rate_limit_handler(request, lambda: func(request, *args, **kwargs))
-    return wrapper
+async def rate_limit_middleware(request: Request, call_next) -> Response:
+    """FastAPI middleware function for rate limiting (as middleware, not decorator)."""
+    return await rate_limit_handler(request, call_next)
 
 
 # -------------------------------------------------------------------------

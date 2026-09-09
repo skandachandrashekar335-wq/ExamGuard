@@ -262,6 +262,7 @@ def list_entry_verifications(
     student_id: int | None = None,
     entry_point_id: int | None = None,
     status: str | None = None,
+    session_id: int | None = None,
 ) -> dict:
     query = db.query(EntryVerification)
 
@@ -271,6 +272,8 @@ def list_entry_verifications(
         query = query.filter(EntryVerification.entry_point_id == entry_point_id)
     if status is not None:
         query = query.filter(EntryVerification.status == status)
+    if session_id is not None:
+        query = query.filter(EntryVerification.session_id == session_id)
 
     total = query.count()
     items = (

@@ -19,6 +19,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+from app.auth import create_access_token, Role
 from app.services.monitoring.alert_buffer import AlertBuffer
 from app.services.monitoring.connection_manager import ConnectionManager
 from app.services.monitoring.event_buffer import EventBuffer
@@ -54,6 +55,15 @@ def client():
     return TestClient(app)
 
 
+@pytest.fixture
+def auth_headers():
+    """Auth headers with valid ADMIN token."""
+    token = create_access_token(
+        {"sub": "5", "role": Role.ADMIN, "email": "admin@test.com"}
+    )
+    return {"Authorization": f"Bearer {token}"}
+
+
 def _make_event(**kwargs) -> MonitoringEvent:
     defaults = {
         "event_type": EventType.ENTRY_GRANTED,
@@ -71,20 +81,20 @@ def _make_event(**kwargs) -> MonitoringEvent:
 
 
 class TestRouteRegistration:
-    def test_status_route_exists(self, client):
-        resp = client.get("/api/v1/monitoring/status")
+    def test_status_route_exists(self, client, auth_headers):
+        resp = client.get("/api/v1/monitoring/status", headers=auth_headers)
         assert resp.status_code == 200
 
-    def test_events_route_exists(self, client):
-        resp = client.get("/api/v1/monitoring/events")
+    def test_events_route_exists(self, client, auth_headers):
+        resp = client.get("/api/v1/monitoring/events", headers=auth_headers)
         assert resp.status_code == 200
 
-    def test_alerts_route_exists(self, client):
-        resp = client.get("/api/v1/monitoring/alerts")
+    def test_alerts_route_exists(self, client, auth_headers):
+        resp = client.get("/api/v1/monitoring/alerts", headers=auth_headers)
         assert resp.status_code == 200
 
-    def test_connections_route_exists(self, client):
-        resp = client.get("/api/v1/monitoring/connections")
+    def test_connections_route_exists(self, client, auth_headers):
+        resp = client.get("/api/v1/monitoring/connections", headers=auth_headers)
         assert resp.status_code == 200
 
     def test_wrong_method_post_status(self, client):
@@ -110,8 +120,8 @@ class TestRouteRegistration:
 
 
 class TestMonitoringStatus:
-    def test_status_response_fields(self, client):
-        resp = client.get("/api/v1/monitoring/status")
+    def test_status_response_fields(self, client, auth_headers):
+        resp = client.get("/api/v1/monitoring/status", headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()
         assert "active_connections" in data
@@ -122,34 +132,34 @@ class TestMonitoringStatus:
         assert "alert_buffer_capacity" in data
         assert "max_connections" in data
 
-    def test_status_empty_buffers(self, client):
-        resp = client.get("/api/v1/monitoring/status")
+    def test_status_empty_buffers(self, client, auth_headers):
+        resp = client.get("/api/v1/monitoring/status", headers=auth_headers)
         data = resp.json()
         assert data["buffered_events"] == 0
         assert data["buffered_alerts"] == 0
         assert data["total_published"] == 0
         assert data["active_connections"] == 0
 
-    def test_status_real_counts(self, client):
+    def test_status_real_counts(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         event = _make_event()
         publisher.publish(event)
-        resp = client.get("/api/v1/monitoring/status")
+        resp = client.get("/api/v1/monitoring/status", headers=auth_headers)
         data = resp.json()
         assert data["buffered_events"] == 1
         assert data["total_published"] == 1
 
-    def test_status_real_capacities(self, client):
+    def test_status_real_capacities(self, client, auth_headers):
         publisher = get_monitoring_publisher()
-        resp = client.get("/api/v1/monitoring/status")
+        resp = client.get("/api/v1/monitoring/status", headers=auth_headers)
         data = resp.json()
         assert data["event_buffer_capacity"] == publisher._event_buffer.capacity
         assert data["alert_buffer_capacity"] == publisher._alert_buffer.capacity
         assert data["max_connections"] == publisher._connection_manager.max_connections
 
-    def test_status_503_unavailable(self, client):
+    def test_status_503_unavailable(self, client, auth_headers):
         init_monitoring_publisher(None)
-        resp = client.get("/api/v1/monitoring/status")
+        resp = client.get("/api/v1/monitoring/status", headers=auth_headers)
         assert resp.status_code == 503
 
 
@@ -159,22 +169,22 @@ class TestMonitoringStatus:
 
 
 class TestMonitoringEvents:
-    def test_empty_buffer(self, client):
-        resp = client.get("/api/v1/monitoring/events")
+    def test_empty_buffer(self, client, auth_headers):
+        resp = client.get("/api/v1/monitoring/events", headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()
         assert data["items"] == []
         assert data["count"] == 0
 
-    def test_published_events_returned(self, client):
+    def test_published_events_returned(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(_make_event(event_type=EventType.ENTRY_GRANTED))
         publisher.publish(_make_event(event_type=EventType.ENTRY_DENIED))
-        resp = client.get("/api/v1/monitoring/events")
+        resp = client.get("/api/v1/monitoring/events", headers=auth_headers)
         data = resp.json()
         assert data["count"] == 2
 
-    def test_newest_first_ordering(self, client):
+    def test_newest_first_ordering(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         e1 = _make_event(
             event_type=EventType.ENTRY_GRANTED,
@@ -188,72 +198,77 @@ class TestMonitoringEvents:
         )
         publisher.publish(e1)
         publisher.publish(e2)
-        resp = client.get("/api/v1/monitoring/events")
+        resp = client.get("/api/v1/monitoring/events", headers=auth_headers)
         data = resp.json()
         assert data["items"][0]["entity_id"] == 2
         assert data["items"][1]["entity_id"] == 1
 
-    def test_category_filter(self, client):
+    def test_category_filter(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(_make_event(event_type=EventType.ENTRY_GRANTED))
         publisher.publish(_make_event(event_type=EventType.RISK_HIGH))
         resp = client.get(
             "/api/v1/monitoring/events",
             params={"category": "ENTRY"},
+            headers=auth_headers,
         )
         data = resp.json()
         assert data["count"] == 1
         assert data["items"][0]["category"] == "ENTRY"
 
-    def test_event_type_filter(self, client):
+    def test_event_type_filter(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(_make_event(event_type=EventType.ENTRY_GRANTED))
         publisher.publish(_make_event(event_type=EventType.ENTRY_DENIED))
         resp = client.get(
             "/api/v1/monitoring/events",
             params={"event_type": "ENTRY_GRANTED"},
+            headers=auth_headers,
         )
         data = resp.json()
         assert data["count"] == 1
         assert data["items"][0]["event_type"] == "ENTRY_GRANTED"
 
-    def test_min_severity_filter(self, client):
+    def test_min_severity_filter(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(_make_event(event_type=EventType.ENTRY_GRANTED))
         publisher.publish(_make_event(event_type=EventType.RISK_CRITICAL))
         resp = client.get(
             "/api/v1/monitoring/events",
             params={"min_severity": "CRITICAL"},
+            headers=auth_headers,
         )
         data = resp.json()
         assert data["count"] == 1
         assert data["items"][0]["severity"] == "CRITICAL"
 
-    def test_exam_id_filter(self, client):
+    def test_exam_id_filter(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(_make_event(event_type=EventType.ENTRY_GRANTED, exam_id=1))
         publisher.publish(_make_event(event_type=EventType.ENTRY_DENIED, exam_id=2))
         resp = client.get(
             "/api/v1/monitoring/events",
             params={"exam_id": 1},
+            headers=auth_headers,
         )
         data = resp.json()
         assert data["count"] == 1
         assert data["items"][0]["exam_id"] == 1
 
-    def test_hall_id_filter(self, client):
+    def test_hall_id_filter(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(_make_event(event_type=EventType.ENTRY_GRANTED, hall_id=10))
         publisher.publish(_make_event(event_type=EventType.ENTRY_DENIED, hall_id=20))
         resp = client.get(
             "/api/v1/monitoring/events",
             params={"hall_id": 10},
+            headers=auth_headers,
         )
         data = resp.json()
         assert data["count"] == 1
         assert data["items"][0]["hall_id"] == 10
 
-    def test_combined_filters(self, client):
+    def test_combined_filters(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(
             _make_event(event_type=EventType.ENTRY_GRANTED, exam_id=1, hall_id=10)
@@ -267,13 +282,14 @@ class TestMonitoringEvents:
         resp = client.get(
             "/api/v1/monitoring/events",
             params={"exam_id": 1, "event_type": "ENTRY_GRANTED"},
+            headers=auth_headers,
         )
         data = resp.json()
         assert data["count"] == 1
         assert data["items"][0]["exam_id"] == 1
         assert data["items"][0]["event_type"] == "ENTRY_GRANTED"
 
-    def test_default_limit_50(self, client):
+    def test_default_limit_50(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         for i in range(60):
             publisher.publish(
@@ -283,11 +299,11 @@ class TestMonitoringEvents:
                     timestamp=datetime(2026, 1, 1, 0, i, tzinfo=timezone.utc),
                 )
             )
-        resp = client.get("/api/v1/monitoring/events")
+        resp = client.get("/api/v1/monitoring/events", headers=auth_headers)
         data = resp.json()
         assert data["count"] == 50
 
-    def test_custom_limit(self, client):
+    def test_custom_limit(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         for i in range(10):
             publisher.publish(
@@ -297,29 +313,29 @@ class TestMonitoringEvents:
                     timestamp=datetime(2026, 1, 1, 0, i, tzinfo=timezone.utc),
                 )
             )
-        resp = client.get("/api/v1/monitoring/events", params={"limit": 5})
+        resp = client.get("/api/v1/monitoring/events", params={"limit": 5}, headers=auth_headers)
         data = resp.json()
         assert data["count"] == 5
 
-    def test_limit_200_accepted(self, client):
-        resp = client.get("/api/v1/monitoring/events", params={"limit": 200})
+    def test_limit_200_accepted(self, client, auth_headers):
+        resp = client.get("/api/v1/monitoring/events", params={"limit": 200}, headers=auth_headers)
         assert resp.status_code == 200
 
-    def test_limit_201_rejected(self, client):
-        resp = client.get("/api/v1/monitoring/events", params={"limit": 201})
+    def test_limit_201_rejected(self, client, auth_headers):
+        resp = client.get("/api/v1/monitoring/events", params={"limit": 201}, headers=auth_headers)
         assert resp.status_code == 422
 
-    def test_limit_0_rejected(self, client):
-        resp = client.get("/api/v1/monitoring/events", params={"limit": 0})
+    def test_limit_0_rejected(self, client, auth_headers):
+        resp = client.get("/api/v1/monitoring/events", params={"limit": 0}, headers=auth_headers)
         assert resp.status_code == 422
 
-    def test_negative_limit_rejected(self, client):
-        resp = client.get("/api/v1/monitoring/events", params={"limit": -1})
+    def test_negative_limit_rejected(self, client, auth_headers):
+        resp = client.get("/api/v1/monitoring/events", params={"limit": -1}, headers=auth_headers)
         assert resp.status_code == 422
 
-    def test_503_unavailable(self, client):
+    def test_503_unavailable(self, client, auth_headers):
         init_monitoring_publisher(None)
-        resp = client.get("/api/v1/monitoring/events")
+        resp = client.get("/api/v1/monitoring/events", headers=auth_headers)
         assert resp.status_code == 503
 
 
@@ -329,53 +345,55 @@ class TestMonitoringEvents:
 
 
 class TestMonitoringAlerts:
-    def test_empty_buffer(self, client):
-        resp = client.get("/api/v1/monitoring/alerts")
+    def test_empty_buffer(self, client, auth_headers):
+        resp = client.get("/api/v1/monitoring/alerts", headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()
         assert data["items"] == []
         assert data["count"] == 0
 
-    def test_alert_producing_event_returned(self, client):
+    def test_alert_producing_event_returned(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(_make_event(event_type=EventType.ENTRY_ESCALATED))
-        resp = client.get("/api/v1/monitoring/alerts")
+        resp = client.get("/api/v1/monitoring/alerts", headers=auth_headers)
         data = resp.json()
         assert data["count"] == 1
         assert data["items"][0]["event_type"] == "ENTRY_ESCALATED"
 
-    def test_no_alert_for_info_event(self, client):
+    def test_no_alert_for_info_event(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(_make_event(event_type=EventType.ENTRY_GRANTED))
-        resp = client.get("/api/v1/monitoring/alerts")
+        resp = client.get("/api/v1/monitoring/alerts", headers=auth_headers)
         data = resp.json()
         assert data["count"] == 0
 
-    def test_severity_filter(self, client):
+    def test_severity_filter(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(_make_event(event_type=EventType.ENTRY_ESCALATED))
         publisher.publish(_make_event(event_type=EventType.RISK_CRITICAL))
         resp = client.get(
             "/api/v1/monitoring/alerts",
             params={"severity": "CRITICAL"},
+            headers=auth_headers,
         )
         data = resp.json()
         assert data["count"] == 1
         assert data["items"][0]["severity"] == "CRITICAL"
 
-    def test_event_type_filter(self, client):
+    def test_event_type_filter(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(_make_event(event_type=EventType.ENTRY_ESCALATED))
         publisher.publish(_make_event(event_type=EventType.RISK_HIGH))
         resp = client.get(
             "/api/v1/monitoring/alerts",
             params={"event_type": "ENTRY_ESCALATED"},
+            headers=auth_headers,
         )
         data = resp.json()
         assert data["count"] == 1
         assert data["items"][0]["event_type"] == "ENTRY_ESCALATED"
 
-    def test_exam_id_filter(self, client):
+    def test_exam_id_filter(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(
             _make_event(event_type=EventType.ENTRY_ESCALATED, exam_id=1)
@@ -386,12 +404,13 @@ class TestMonitoringAlerts:
         resp = client.get(
             "/api/v1/monitoring/alerts",
             params={"exam_id": 1},
+            headers=auth_headers,
         )
         data = resp.json()
         assert data["count"] == 1
         assert data["items"][0]["exam_id"] == 1
 
-    def test_hall_id_filter(self, client):
+    def test_hall_id_filter(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(
             _make_event(event_type=EventType.RISK_HIGH, hall_id=10)
@@ -402,12 +421,13 @@ class TestMonitoringAlerts:
         resp = client.get(
             "/api/v1/monitoring/alerts",
             params={"hall_id": 10},
+            headers=auth_headers,
         )
         data = resp.json()
         assert data["count"] == 1
         assert data["items"][0]["hall_id"] == 10
 
-    def test_combined_filters(self, client):
+    def test_combined_filters(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(
             _make_event(event_type=EventType.ENTRY_ESCALATED, exam_id=1)
@@ -421,12 +441,13 @@ class TestMonitoringAlerts:
         resp = client.get(
             "/api/v1/monitoring/alerts",
             params={"exam_id": 1, "event_type": "ENTRY_ESCALATED"},
+            headers=auth_headers,
         )
         data = resp.json()
         assert data["count"] == 1
         assert data["items"][0]["event_type"] == "ENTRY_ESCALATED"
 
-    def test_default_limit(self, client):
+    def test_default_limit(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         for i in range(60):
             publisher.publish(
@@ -436,11 +457,11 @@ class TestMonitoringAlerts:
                     timestamp=datetime(2026, 1, 1, 0, i, tzinfo=timezone.utc),
                 )
             )
-        resp = client.get("/api/v1/monitoring/alerts")
+        resp = client.get("/api/v1/monitoring/alerts", headers=auth_headers)
         data = resp.json()
         assert data["count"] == 50
 
-    def test_custom_limit(self, client):
+    def test_custom_limit(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         for i in range(10):
             publisher.publish(
@@ -450,29 +471,29 @@ class TestMonitoringAlerts:
                     timestamp=datetime(2026, 1, 1, 0, i, tzinfo=timezone.utc),
                 )
             )
-        resp = client.get("/api/v1/monitoring/alerts", params={"limit": 5})
+        resp = client.get("/api/v1/monitoring/alerts", params={"limit": 5}, headers=auth_headers)
         data = resp.json()
         assert data["count"] == 5
 
-    def test_limit_200_accepted(self, client):
-        resp = client.get("/api/v1/monitoring/alerts", params={"limit": 200})
+    def test_limit_200_accepted(self, client, auth_headers):
+        resp = client.get("/api/v1/monitoring/alerts", params={"limit": 200}, headers=auth_headers)
         assert resp.status_code == 200
 
-    def test_limit_201_rejected(self, client):
-        resp = client.get("/api/v1/monitoring/alerts", params={"limit": 201})
+    def test_limit_201_rejected(self, client, auth_headers):
+        resp = client.get("/api/v1/monitoring/alerts", params={"limit": 201}, headers=auth_headers)
         assert resp.status_code == 422
 
-    def test_limit_0_rejected(self, client):
-        resp = client.get("/api/v1/monitoring/alerts", params={"limit": 0})
+    def test_limit_0_rejected(self, client, auth_headers):
+        resp = client.get("/api/v1/monitoring/alerts", params={"limit": 0}, headers=auth_headers)
         assert resp.status_code == 422
 
-    def test_negative_limit_rejected(self, client):
-        resp = client.get("/api/v1/monitoring/alerts", params={"limit": -1})
+    def test_negative_limit_rejected(self, client, auth_headers):
+        resp = client.get("/api/v1/monitoring/alerts", params={"limit": -1}, headers=auth_headers)
         assert resp.status_code == 422
 
-    def test_503_unavailable(self, client):
+    def test_503_unavailable(self, client, auth_headers):
         init_monitoring_publisher(None)
-        resp = client.get("/api/v1/monitoring/alerts")
+        resp = client.get("/api/v1/monitoring/alerts", headers=auth_headers)
         assert resp.status_code == 503
 
 
@@ -482,23 +503,23 @@ class TestMonitoringAlerts:
 
 
 class TestMonitoringConnections:
-    def test_connections_response_fields(self, client):
-        resp = client.get("/api/v1/monitoring/connections")
+    def test_connections_response_fields(self, client, auth_headers):
+        resp = client.get("/api/v1/monitoring/connections", headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()
         assert "active_connections" in data
         assert "max_connections" in data
 
-    def test_connections_real_counts(self, client):
+    def test_connections_real_counts(self, client, auth_headers):
         publisher = get_monitoring_publisher()
-        resp = client.get("/api/v1/monitoring/connections")
+        resp = client.get("/api/v1/monitoring/connections", headers=auth_headers)
         data = resp.json()
         assert data["active_connections"] == 0
         assert data["max_connections"] == publisher._connection_manager.max_connections
 
-    def test_503_unavailable(self, client):
+    def test_503_unavailable(self, client, auth_headers):
         init_monitoring_publisher(None)
-        resp = client.get("/api/v1/monitoring/connections")
+        resp = client.get("/api/v1/monitoring/connections", headers=auth_headers)
         assert resp.status_code == 503
 
 
@@ -508,7 +529,7 @@ class TestMonitoringConnections:
 
 
 class TestSchemaContract:
-    def test_event_fields(self, client):
+    def test_event_fields(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(
             _make_event(
@@ -519,7 +540,7 @@ class TestSchemaContract:
                 entry_point_id=5,
             )
         )
-        resp = client.get("/api/v1/monitoring/events")
+        resp = client.get("/api/v1/monitoring/events", headers=auth_headers)
         item = resp.json()["items"][0]
         expected_keys = {
             "event_id",
@@ -537,7 +558,7 @@ class TestSchemaContract:
         }
         assert expected_keys == set(item.keys())
 
-    def test_alert_fields(self, client):
+    def test_alert_fields(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(
             _make_event(
@@ -547,7 +568,7 @@ class TestSchemaContract:
                 student_id=100,
             )
         )
-        resp = client.get("/api/v1/monitoring/alerts")
+        resp = client.get("/api/v1/monitoring/alerts", headers=auth_headers)
         item = resp.json()["items"][0]
         expected_keys = {
             "alert_id",
@@ -564,8 +585,8 @@ class TestSchemaContract:
         }
         assert expected_keys == set(item.keys())
 
-    def test_status_fields(self, client):
-        resp = client.get("/api/v1/monitoring/status")
+    def test_status_fields(self, client, auth_headers):
+        resp = client.get("/api/v1/monitoring/status", headers=auth_headers)
         data = resp.json()
         expected_keys = {
             "active_connections",
@@ -578,16 +599,16 @@ class TestSchemaContract:
         }
         assert expected_keys == set(data.keys())
 
-    def test_connection_fields(self, client):
-        resp = client.get("/api/v1/monitoring/connections")
+    def test_connection_fields(self, client, auth_headers):
+        resp = client.get("/api/v1/monitoring/connections", headers=auth_headers)
         data = resp.json()
         expected_keys = {"active_connections", "max_connections"}
         assert expected_keys == set(data.keys())
 
-    def test_nullable_optional_ids(self, client):
+    def test_nullable_optional_ids(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(_make_event(event_type=EventType.ENTRY_GRANTED))
-        resp = client.get("/api/v1/monitoring/events")
+        resp = client.get("/api/v1/monitoring/events", headers=auth_headers)
         item = resp.json()["items"][0]
         assert item["exam_id"] is None
         assert item["hall_id"] is None
@@ -601,61 +622,61 @@ class TestSchemaContract:
 
 
 class TestSecurityPrivacy:
-    def test_no_biometric_data_in_events(self, client):
+    def test_no_biometric_data_in_events(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(_make_event(event_type=EventType.ENTRY_GRANTED))
-        resp = client.get("/api/v1/monitoring/events")
+        resp = client.get("/api/v1/monitoring/events", headers=auth_headers)
         text = resp.text
         assert "biometric" not in text.lower()
         assert "face_image" not in text.lower()
         assert "embedding" not in text.lower()
 
-    def test_no_credentials_in_events(self, client):
+    def test_no_credentials_in_events(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(_make_event(event_type=EventType.ENTRY_GRANTED))
-        resp = client.get("/api/v1/monitoring/events")
+        resp = client.get("/api/v1/monitoring/events", headers=auth_headers)
         text = resp.text
         assert "api_key" not in text.lower()
         assert "password" not in text.lower()
         assert "token" not in text.lower()
 
-    def test_no_database_urls_in_events(self, client):
+    def test_no_database_urls_in_events(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(_make_event(event_type=EventType.ENTRY_GRANTED))
-        resp = client.get("/api/v1/monitoring/events")
+        resp = client.get("/api/v1/monitoring/events", headers=auth_headers)
         text = resp.text
         assert "postgresql://" not in text
         assert "sqlite://" not in text
 
-    def test_no_filesystem_paths_in_events(self, client):
+    def test_no_filesystem_paths_in_events(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(_make_event(event_type=EventType.ENTRY_GRANTED))
-        resp = client.get("/api/v1/monitoring/events")
+        resp = client.get("/api/v1/monitoring/events", headers=auth_headers)
         text = resp.text
         assert "D:\\" not in text
         assert "/home/" not in text
         assert "/var/" not in text
 
-    def test_no_stack_traces_in_events(self, client):
+    def test_no_stack_traces_in_events(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(_make_event(event_type=EventType.ENTRY_GRANTED))
-        resp = client.get("/api/v1/monitoring/events")
+        resp = client.get("/api/v1/monitoring/events", headers=auth_headers)
         text = resp.text
         assert "stack_trace" not in text.lower()
         assert "traceback" not in text.lower()
 
-    def test_no_biometric_data_in_alerts(self, client):
+    def test_no_biometric_data_in_alerts(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(_make_event(event_type=EventType.ENTRY_ESCALATED))
-        resp = client.get("/api/v1/monitoring/alerts")
+        resp = client.get("/api/v1/monitoring/alerts", headers=auth_headers)
         text = resp.text
         assert "biometric" not in text.lower()
         assert "face_image" not in text.lower()
 
-    def test_no_filesystem_paths_in_alert_messages(self, client):
+    def test_no_filesystem_paths_in_alert_messages(self, client, auth_headers):
         publisher = get_monitoring_publisher()
         publisher.publish(_make_event(event_type=EventType.ENTRY_ESCALATED))
-        resp = client.get("/api/v1/monitoring/alerts")
+        resp = client.get("/api/v1/monitoring/alerts", headers=auth_headers)
         data = resp.json()
         for alert in data["items"]:
             msg = alert["message"]

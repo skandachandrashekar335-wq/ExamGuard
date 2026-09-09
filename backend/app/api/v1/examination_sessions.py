@@ -9,7 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.auth import Role, require_role
+from app.auth import Role, require_role, get_invigilator_scope, check_invigilator_scope
 from app.core.database import get_db
 from app.schemas.examination_session import (
     EndSessionRequest,
@@ -28,6 +28,19 @@ router = APIRouter(
     prefix="/examination-sessions",
     tags=["Examination Sessions"],
 )
+
+
+def _require_session_in_scope(
+    db: Session, scope, session_id: int
+) -> None:
+    """Verify an examination session belongs to the invigilator's scope."""
+    if scope is None:
+        return
+    try:
+        s = svc.get_examination_session(db, session_id)
+        check_invigilator_scope(scope, s.exam_id, s.exam_hall_id)
+    except LookupError:
+        pass
 
 
 @router.get(
@@ -77,6 +90,7 @@ def get_session(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ) -> ExaminationSessionResponse:
+    _require_session_in_scope(db, get_invigilator_scope(_user, db), session_id)
     try:
         return svc.get_examination_session(db, session_id)
     except LookupError as e:
@@ -115,6 +129,7 @@ def start_session(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ) -> ExaminationSessionResponse:
+    _require_session_in_scope(db, get_invigilator_scope(_user, db), session_id)
     try:
         return svc.start_session(db, session_id, performed_by=body.performed_by)
     except LookupError as e:
@@ -134,6 +149,7 @@ def end_session(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ) -> ExaminationSessionResponse:
+    _require_session_in_scope(db, get_invigilator_scope(_user, db), session_id)
     try:
         return svc.end_session(db, session_id, performed_by=body.performed_by)
     except LookupError as e:
@@ -176,6 +192,7 @@ def close_gates(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ) -> ExaminationSessionResponse:
+    _require_session_in_scope(db, get_invigilator_scope(_user, db), session_id)
     try:
         return svc.close_gates(
             db, session_id,
@@ -199,6 +216,7 @@ def open_gates(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ) -> ExaminationSessionResponse:
+    _require_session_in_scope(db, get_invigilator_scope(_user, db), session_id)
     try:
         return svc.open_gates(
             db, session_id,
@@ -221,6 +239,7 @@ def list_gate_events(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ) -> GateEventListResponse:
+    _require_session_in_scope(db, get_invigilator_scope(_user, db), session_id)
     try:
         return GateEventListResponse(**svc.list_gate_events(db, session_id))
     except LookupError as e:

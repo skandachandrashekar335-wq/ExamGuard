@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.auth import Role, require_role
+from app.auth import Role, require_role, get_invigilator_scope, check_invigilator_scope
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -65,6 +65,7 @@ def list_hall_tickets(
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
     db: Session = Depends(get_db),
 ):
+    scope = get_invigilator_scope(_user, db)
     result = ht_service.list_hall_tickets(
         db,
         page=page,

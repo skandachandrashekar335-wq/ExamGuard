@@ -6,6 +6,7 @@ from app.api.v1.router import router as v1_router
 from app.api.v1.auth import router as auth_router
 from app.core.config import get_settings
 from app.core.database import engine
+from app.security.hardening import rate_limit_handler
 from app.services.monitoring.alert_buffer import AlertBuffer
 from app.services.monitoring.connection_manager import ConnectionManager
 from app.services.monitoring.event_buffer import EventBuffer
@@ -26,11 +27,19 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "Accept"],
     )
 
-    application.include_router(auth_router, prefix=f"{settings.API_V1_PREFIX}/auth")
+    # Rate limiting middleware (disabled under pytest to avoid shared-state conflicts)
+    import sys
+    is_test = "pytest" in sys.modules or settings.APP_ENV == "test"
+    if not is_test:
+        @application.middleware("http")
+        async def _rate_limit(request, call_next):
+            return await rate_limit_handler(request, call_next)
+
+    application.include_router(auth_router, prefix=settings.API_V1_PREFIX)
     application.include_router(v1_router, prefix=settings.API_V1_PREFIX)
 
     # Initialize monitoring publisher

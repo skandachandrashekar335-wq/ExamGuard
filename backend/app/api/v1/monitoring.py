@@ -6,15 +6,18 @@ READ-ONLY endpoints exposing in-memory monitoring state:
 - Connection status (active WebSocket connections)
 - Publisher status (aggregated counts)
 
-No database dependency. No authentication. No authorization.
-Monitoring data is ephemeral — restart clears all buffers.
+Auth enforced: OPERATOR+ for all endpoints. INVIGILATOR gets filtered view.
 """
 
 from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+
+from app.auth import Role, require_role, get_invigilator_scope
+from app.core.database import get_db
 
 from app.schemas.monitoring import (
     MonitoringAlertListResponse,
@@ -62,7 +65,9 @@ def _require_publisher():
     response_model=MonitoringStatusResponse,
     summary="Monitoring system status",
 )
-def get_monitoring_status() -> MonitoringStatusResponse:
+def get_monitoring_status(
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
+) -> MonitoringStatusResponse:
     """Return aggregated status from in-memory monitoring components.
 
     Values come from the actual EventPublisher and its buffers.
@@ -99,6 +104,8 @@ def get_monitoring_events(
     ),
     exam_id: int | None = Query(None, description="Filter by exam ID"),
     hall_id: int | None = Query(None, description="Filter by hall ID"),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
+    db: Session = Depends(get_db),
 ) -> MonitoringEventListResponse:
     """Return recent events from the in-memory ring buffer.
 
@@ -106,6 +113,11 @@ def get_monitoring_events(
     exam_id, and hall_id. No page/page_size — ring buffer only has limit.
     """
     publisher = _require_publisher()
+
+    scope = get_invigilator_scope(_user, db)
+    if scope:
+        exam_id = scope.exam_id
+        hall_id = scope.hall_id
 
     filter_obj = MonitoringFilter(
         exam_id=exam_id,
@@ -140,6 +152,8 @@ def get_monitoring_alerts(
     ),
     exam_id: int | None = Query(None, description="Filter by exam ID"),
     hall_id: int | None = Query(None, description="Filter by hall ID"),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
+    db: Session = Depends(get_db),
 ) -> MonitoringAlertListResponse:
     """Return recent alerts from the in-memory ring buffer.
 
@@ -147,6 +161,11 @@ def get_monitoring_alerts(
     No page/page_size — ring buffer only has limit.
     """
     publisher = _require_publisher()
+
+    scope = get_invigilator_scope(_user, db)
+    if scope:
+        exam_id = scope.exam_id
+        hall_id = scope.hall_id
 
     alert_filter = AlertFilter(
         severity=severity,
@@ -172,7 +191,9 @@ def get_monitoring_alerts(
     response_model=MonitoringConnectionStatusResponse,
     summary="WebSocket connection status",
 )
-def get_monitoring_connections() -> MonitoringConnectionStatusResponse:
+def get_monitoring_connections(
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
+) -> MonitoringConnectionStatusResponse:
     """Return active WebSocket connection count and maximum capacity.
 
     Does not expose client IPs, credentials, or internal connection details.

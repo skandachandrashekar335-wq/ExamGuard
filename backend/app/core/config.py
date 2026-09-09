@@ -106,6 +106,16 @@ class Settings(BaseSettings):
     INITIAL_ADMIN_EMAILS: list[str] = []
 
     @model_validator(mode="after")
+    def validate_secret_key(self) -> "Settings":
+        """Reject placeholder SECRET_KEY in non-development environments."""
+        if self.APP_ENV != "development" and self.SECRET_KEY == "change-me-to-a-random-secret-key":
+            raise ValueError(
+                "SECRET_KEY must be set to a real secret in non-development environments. "
+                "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+            )
+        return self
+
+    @model_validator(mode="after")
     def validate_decision_policy(self) -> "Settings":
         """Validate decision policy configuration values."""
         if not (0.0 < self.IDENTITY_VERIFICATION_MATCH_THRESHOLD <= 1.0):

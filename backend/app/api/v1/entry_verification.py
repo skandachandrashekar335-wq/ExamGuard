@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.auth import Role, require_role
+from app.auth import Role, require_role, InvigilatorScope, check_invigilator_scope, get_invigilator_scope
 from app.core.database import get_db
 from app.schemas.entry_verification import (
     EntryVerificationCreate,
@@ -24,6 +24,20 @@ from app.services.monitoring.publisher import (
 router = APIRouter(prefix="/entry-verifications", tags=["Entry Verifications"])
 
 
+def _require_ev_in_scope(
+    db: Session, scope: InvigilatorScope | None, ev_id: int
+) -> None:
+    """Verify an entry verification belongs to the invigilator's scope."""
+    if scope is None:
+        return
+    ev = ev_service.get_entry_verification(db, ev_id)
+    if ev and ev.exam_hall_id != scope.hall_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: entry verification outside your assigned hall",
+        )
+
+
 class IdentityCheckRequest(BaseModel):
     identity_attempt_id: int | None = Field(
         default=None,
@@ -42,6 +56,13 @@ def create_entry_verification(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ):
+    scope = get_invigilator_scope(_user, db)
+    if scope:
+        if data.entry_point_id and data.entry_point_id != scope.entry_point_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: entry point outside your assignment",
+            )
     try:
         ev = ev_service.create_entry_verification(
             db,
@@ -76,9 +97,13 @@ def list_entry_verifications(
     status: str | None = Query(None, description="Filter by status"),
     entry_point_id: int | None = Query(None, description="Filter by entry point ID"),
     student_id: int | None = Query(None, description="Filter by student ID"),
+    session_id: int | None = Query(None, description="Filter by examination session ID"),
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
+    scope = get_invigilator_scope(_user, db)
+    if scope:
+        entry_point_id = scope.entry_point_id
     result = ev_service.list_entry_verifications(
         db,
         page=page,
@@ -86,6 +111,7 @@ def list_entry_verifications(
         student_id=student_id,
         entry_point_id=entry_point_id,
         status=status,
+        session_id=session_id,
     )
     return EntryVerificationListResponse(
         items=[
@@ -125,6 +151,7 @@ def begin_processing(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ):
+    _require_ev_in_scope(db, get_invigilator_scope(_user, db), entry_verification_id)
     try:
         ev = ev_service.begin_processing(db, entry_verification_id)
         publish_entry_began(entry_verification_id=ev.id)
@@ -145,6 +172,7 @@ def process_hall_ticket_check(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ):
+    _require_ev_in_scope(db, get_invigilator_scope(_user, db), entry_verification_id)
     try:
         return ev_service.process_hall_ticket_check(db, entry_verification_id)
     except LookupError as e:
@@ -163,6 +191,7 @@ def process_seat_check(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ):
+    _require_ev_in_scope(db, get_invigilator_scope(_user, db), entry_verification_id)
     try:
         return ev_service.process_seat_check(db, entry_verification_id)
     except LookupError as e:
@@ -182,6 +211,7 @@ def process_identity_check(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ):
+    _require_ev_in_scope(db, get_invigilator_scope(_user, db), entry_verification_id)
     try:
         return ev_service.process_identity_check(
             db,
@@ -204,6 +234,7 @@ def evaluate_entry(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ):
+    _require_ev_in_scope(db, get_invigilator_scope(_user, db), entry_verification_id)
     try:
         ev = ev_service.evaluate_entry(db, entry_verification_id)
         if ev.status == "GRANTED":
@@ -249,6 +280,7 @@ def escalate_for_review(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ):
+    _require_ev_in_scope(db, get_invigilator_scope(_user, db), entry_verification_id)
     try:
         ev = ev_service.escalate_for_review(
             db, entry_verification_id, reason=body.reason,

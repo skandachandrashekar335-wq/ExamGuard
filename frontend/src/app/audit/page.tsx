@@ -55,7 +55,7 @@ export default function AuditPage() {
   const loadImportLogs = useCallback(async () => {
     try {
       const data = await apiRequest<{ items: ImportLog[] }>(
-        "/api/v1/import/audit-logs?page_size=100"
+        "/api/v1/import/audit?page_size=100"
       );
       setImportLogs(data.items || []);
     } catch (err: any) {

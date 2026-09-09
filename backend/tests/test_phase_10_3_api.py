@@ -22,6 +22,7 @@ from app.models.hall_ticket import HallTicket
 from app.models.identity_verification import IdentityVerificationAttempt
 from app.models.security_event import SecurityAlert, SecurityEvent
 from app.models.proxy_risk import ProxyRiskAssessment, SecuritySignal
+from app.models.examination_session import ExaminationSession, GateEvent
 from app.models.seat_assignment import SeatAssignment
 from app.models.student import Student
 from app.models.subject import Subject
@@ -107,6 +108,20 @@ def clean_test_data():
         ))
         db.execute(delete(Camera).where(Camera.device_identifier.ilike("EVCAM%")))
         db.execute(delete(EntryPoint).where(EntryPoint.code.ilike("EVEP%")))
+        db.execute(delete(GateEvent).where(
+            GateEvent.session_id.in_(
+                db.query(ExaminationSession.id).filter(
+                    ExaminationSession.exam_id.in_(
+                        db.query(Exam.id).filter(Exam.exam_name.ilike("EVEXAM%"))
+                    )
+                )
+            )
+        ))
+        db.execute(delete(ExaminationSession).where(
+            ExaminationSession.exam_id.in_(
+                db.query(Exam.id).filter(Exam.exam_name.ilike("EVEXAM%"))
+            )
+        ))
         db.execute(delete(Exam).where(Exam.exam_name.ilike("EVEXAM%")))
         db.execute(delete(ExamHall).where(ExamHall.building.ilike("EVHALL%")))
         db.execute(delete(Subject).where(Subject.code.ilike("EVSUB%")))

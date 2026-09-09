@@ -71,6 +71,105 @@ class Role:
 ALL_ROLES = [Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER]
 
 
+class InvigilatorScope:
+    """Resolved scope for an INVIGILATOR's assignment.
+
+    Contains the exam_id, hall_id, entry_point_id, and camera_id that the
+    invigilator is assigned to. Used to enforce IDOR protection: endpoints
+    check that requested resources belong to this scope.
+
+    Returns None for non-INVIGILATOR roles (ADMIN/OPERATOR/REVIEWER get
+    unrestricted access).
+    """
+
+    def __init__(
+        self,
+        exam_id: int,
+        hall_id: int,
+        entry_point_id: int | None = None,
+        camera_id: int | None = None,
+        assignment_id: int | None = None,
+    ):
+        self.exam_id = exam_id
+        self.hall_id = hall_id
+        self.entry_point_id = entry_point_id
+        self.camera_id = camera_id
+        self.assignment_id = assignment_id
+
+
+def _get_invigilator_scope_inner(
+    current_user: Dict[str, Any],
+    db: Any,
+) -> InvigilatorScope | None:
+    """Inner function: resolve invigilator scope."""
+    from app.models.invigilator_assignment import InvigilatorAssignment as _IA
+
+    if current_user.get("role") != Role.INVIGILATOR:
+        return None
+
+    user_id = int(current_user["sub"])
+    assignment = (
+        db.query(_IA)
+        .filter(_IA.user_id == user_id, _IA.is_active == True)
+        .order_by(_IA.created_at.desc())
+        .first()
+    )
+    if not assignment:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No active invigilator assignment found",
+        )
+    return InvigilatorScope(
+        exam_id=assignment.exam_id,
+        hall_id=assignment.exam_hall_id,
+        entry_point_id=assignment.entry_point_id,
+        camera_id=assignment.camera_id,
+        assignment_id=assignment.id,
+    )
+
+
+def get_invigilator_scope(
+    current_user: Dict[str, Any],
+    db: Any,
+) -> InvigilatorScope | None:
+    """Resolve invigilator scope from JWT claims and database.
+
+    Returns InvigilatorScope for INVIGILATOR role.
+    Returns None for ADMIN/OPERATOR/REVIEWER (unrestricted access).
+    Raises 403 if INVIGILATOR has no active assignment.
+
+    Usage in endpoints:
+        scope = get_invigilator_scope(_user, db)
+    """
+    if current_user.get("role") != Role.INVIGILATOR:
+        return None
+    return _get_invigilator_scope_inner(current_user, db)
+
+
+def check_invigilator_scope(
+    scope: InvigilatorScope | None,
+    resource_exam_id: int | None = None,
+    resource_hall_id: int | None = None,
+) -> None:
+    """Check that a resource belongs to the invigilator's scope.
+
+    Raises 403 if the resource is outside the invigilator's assignment.
+    No-op if scope is None (non-INVIGILATOR = unrestricted).
+    """
+    if scope is None:
+        return
+    if resource_exam_id is not None and resource_exam_id != scope.exam_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: resource outside your assigned exam",
+        )
+    if resource_hall_id is not None and resource_hall_id != scope.hall_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: resource outside your assigned hall",
+        )
+
+
 def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
 ) -> Dict[str, Any]:

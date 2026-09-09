@@ -13,7 +13,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.auth import Role, require_role
+from app.auth import Role, require_role, get_invigilator_scope, check_invigilator_scope
 from app.core.database import get_db
 from app.schemas.attendance import (
     AttendanceCorrectionRequest,
@@ -97,6 +97,10 @@ def list_exam_attendance(
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """List attendance records for an exam with optional filters."""
+    scope = get_invigilator_scope(_user, db)
+    if scope:
+        check_invigilator_scope(scope, exam_id)
+        hall_id = scope.hall_id
     result = att_service.list_attendance(
         db,
         exam_id,
@@ -132,6 +136,9 @@ def get_exam_summary(
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ):
     """Get attendance summary with by-hall breakdown."""
+    scope = get_invigilator_scope(_user, db)
+    if scope:
+        check_invigilator_scope(scope, exam_id)
     try:
         result = att_service.get_exam_summary(db, exam_id)
     except LookupError as e:
@@ -277,6 +284,12 @@ def list_entry_events(
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """List attendance events for an entry verification with pagination."""
+    scope = get_invigilator_scope(_user, db)
+    if scope:
+        from app.services import entry_verification as ev_svc
+        ev = ev_svc.get_entry_verification(db, entry_verification_id)
+        if ev:
+            check_invigilator_scope(scope, ev.exam_id, ev.exam_hall_id)
     result = att_service.get_entry_events(
         db,
         entry_verification_id,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { apiRequest, qs } from "@/lib/api";
 
 interface ExaminationSession {
@@ -44,6 +45,7 @@ interface Student {
 }
 
 export default function VerifyPage() {
+  const router = useRouter();
   const [activeSession, setActiveSession] = useState<ExaminationSession | null>(null);
   const [sessionExam, setSessionExam] = useState<Exam | null>(null);
   const [sessionHall, setSessionHall] = useState<ExamHall | null>(null);
@@ -209,7 +211,7 @@ export default function VerifyPage() {
                   const student = students.get(v.student_id);
                   const statusColor = v.status === "PASSED" ? "success" : v.status === "REJECTED" ? "danger" : v.status === "REVIEW" ? "warning" : "neutral";
                   return (
-                    <tr key={v.id} style={{ cursor: "pointer" }} onClick={() => window.location.href = `/entry-verifications/${v.id}`}>
+                    <tr key={v.id} style={{ cursor: "pointer" }} onClick={() => router.push(`/entry-verifications/${v.id}`)}>
                       <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.6875rem", whiteSpace: "nowrap" }}>
                         {new Date(v.created_at).toLocaleTimeString()}
                       </td>

@@ -6,6 +6,7 @@ from app.core.database import SessionLocal
 from app.main import app
 from app.models.exam import Exam
 from app.models.exam_registration import ExamRegistration
+from app.models.examination_session import ExaminationSession, GateEvent
 from app.models.student import Student
 from app.models.subject import Subject
 
@@ -17,6 +18,20 @@ def cleanup():
         db.execute(delete(ExamRegistration).where(
             ExamRegistration.student_id.in_(
                 db.query(Student.id).filter(Student.usn.ilike("BREGSTU%"))
+            )
+        ))
+        db.execute(delete(GateEvent).where(
+            GateEvent.session_id.in_(
+                db.query(ExaminationSession.id).filter(
+                    ExaminationSession.exam_id.in_(
+                        db.query(Exam.id).filter(Exam.exam_name.ilike("BREGEXAM%"))
+                    )
+                )
+            )
+        ))
+        db.execute(delete(ExaminationSession).where(
+            ExaminationSession.exam_id.in_(
+                db.query(Exam.id).filter(Exam.exam_name.ilike("BREGEXAM%"))
             )
         ))
         db.execute(delete(Exam).where(Exam.exam_name.ilike("BREGEXAM%")))

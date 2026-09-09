@@ -14,6 +14,7 @@ from app.models.seat_assignment import SeatAssignment
 from app.models.student import Student
 from app.models.subject import Subject
 from app.models.verification import VerificationOutcome
+from app.models.examination_session import ExaminationSession, GateEvent
 
 
 @pytest.fixture(autouse=True)
@@ -57,6 +58,20 @@ def clean_test_data():
         db.execute(delete(ExamRegistration).where(
             ExamRegistration.student_id.in_(
                 db.query(Student.id).filter(Student.usn.ilike("MATCHSTU%"))
+            )
+        ))
+        db.execute(delete(GateEvent).where(
+            GateEvent.session_id.in_(
+                db.query(ExaminationSession.id).filter(
+                    ExaminationSession.exam_hall_id.in_(
+                        db.query(ExamHall.id).filter(ExamHall.building.ilike("MATCHHALL%"))
+                    )
+                )
+            )
+        ))
+        db.execute(delete(ExaminationSession).where(
+            ExaminationSession.exam_hall_id.in_(
+                db.query(ExamHall.id).filter(ExamHall.building.ilike("MATCHHALL%"))
             )
         ))
         db.execute(delete(ExamHall).where(ExamHall.building.ilike("MATCHHALL%")))
