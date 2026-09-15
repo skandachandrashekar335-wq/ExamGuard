@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "ExamGuard"
     APP_ENV: str = "development"
     DEBUG: bool = True
-    SECRET_KEY: str = "change-me-to-a-random-secret-key"
+    SECRET_KEY: str = "abA3ssrP61jvzSP33Rkd1klI7FbebfpIczx95uIsULzPUl0dvbMj9tb-GqAXmytWdizlUOytHSox6fW6YxI1bw"
 
     DATABASE_URL: str = "postgresql://user:password@localhost:5432/examguard"
 
@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     FACE_VERIFICATION_MAX_CALLS_PER_ATTEMPT: int = 5
     # Rate limiting: max verify-face calls per minute globally (0 = unlimited)
     FACE_VERIFICATION_MAX_CALLS_PER_MINUTE: int = 60
+
+    # Cloudinary document storage settings
+    # Environment variables: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+    CLOUDINARY_CLOUD_NAME: str | None = None
+    CLOUDINARY_API_KEY: str | None = None
+    CLOUDINARY_API_SECRET: str | None = None
 
     # Proxy risk scoring settings
     PROXY_RISK_WEIGHTS: str = (

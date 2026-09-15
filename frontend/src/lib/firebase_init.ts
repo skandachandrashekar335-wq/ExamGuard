@@ -21,13 +21,13 @@
 
 const firebaseConfig = {
   // Firebase project configuration - public web app settings
-  apiKey: "AIzaSyBotQRBro543rZAvblrLbP1BkvniHZ4-Qk",
-  authDomain: "ggvoting-8ac37.firebaseapp.com",
-  projectId: "ggvoting-8ac37",
-  storageBucket: "ggvoting-8ac37.firebasestorage.app",
-  messagingSenderId: "832618179222",
-  appId: "1:832618179222:web:59847d8441b6a7636ab0b7",
-  measurementId: "G-7XMZ3X0YHH",
+  apiKey: "AIzaSyCRoOlMP-VO6dgg_TeXhwAkRsE94rZG7GQ",
+  authDomain: "exam-guard-75675.firebaseapp.com",
+  projectId: "exam-guard-75675",
+  storageBucket: "exam-guard-75675.firebasestorage.app",
+  messagingSenderId: "391945763373",
+  appId: "1:391945763373:web:57d1c6193de6abe30956a4",
+  measurementId: "G-L38NDKWP89",
 };
 
 // Initialize Firebase app (safe for both server and client)
