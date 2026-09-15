@@ -1,10 +1,9 @@
 # ---------------------------------------------------------------------------
-# ExamGuard Backend — Production Dockerfile
+# ExamGuard Backend �?" Production Dockerfile
 # ---------------------------------------------------------------------------
 # Build:  docker build -t examguard-backend -f Dockerfile .
 # Run:    docker run -p 8000:8000 --env-file .env examguard-backend
 # ---------------------------------------------------------------------------
-
 FROM python:3.11-slim AS base
 
 # Prevent Python from writing .pyc files and enable unbuffered output
@@ -40,14 +39,14 @@ RUN groupadd -r examguard && useradd -r -g examguard -d /app -s /sbin/nologin ex
 WORKDIR /app
 
 # Copy dependency definition first (for Docker layer caching)
-COPY backend/pyproject.toml ./
+COPY pyproject.toml ./
 
 # Install Python dependencies
 RUN pip install --no-cache-dir "." && \
     pip install --no-cache-dir "uniface[cpu]>=4.0.0" || true
 
 # Copy application code
-COPY backend/ ./
+COPY . ./
 
 # Create upload directory and set ownership
 RUN mkdir -p /app/uploads && chown -R examguard:examguard /app
@@ -60,7 +59,7 @@ USER examguard
 # ---------------------------------------------------------------------------
 EXPOSE 8000
 
-# Health check — hits the /health endpoint
+# Health check �?" hits the /health endpoint
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
