@@ -275,7 +275,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         loading: false,
         requiresOnboarding: true,
       }));
-      throw error;
+    } finally {
+      // GUARANTEE loading is set to false regardless of success/failure
+      setAuthState(prev => ({ ...prev, loading: false }));
     }
   };
 

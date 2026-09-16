@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
+import { useAuth } from "@/context/AuthContext";
 
 interface ExamListItem {
   id: number;
@@ -100,6 +101,7 @@ export default function DashboardPage() {
   const [batchVerifying, setBatchVerifying] = useState(false);
   const [batchResult, setBatchResult] = useState<BatchResult | null>(null);
   const [selectedDocs, setSelectedDocs] = useState<Set<number>>(new Set());
+  const { user, isAuthenticated, examGuardToken } = useAuth();
 
   const fetchDashboard = useCallback(() => {
     if (!selectedExamId) { setDashboard(null); return; }
@@ -111,12 +113,20 @@ export default function DashboardPage() {
   }, [selectedExamId]);
 
   useEffect(() => {
-    apiRequest<{ items: ExamListItem[] }>("/api/v1/exams?page=1&page_size=100")
-      .then((data) => setExams(data.items || []))
+    apiRequest<{ items: ExamListItem[] }>("/api/v1/exams?page=1&page_size=100", {
+      headers: examGuardToken ? { Authorization: `Bearer ${examGuardToken}` } : {},
+    })
+      .then((data) => {
+        setExams(data.items || []);
+        // Auto-select the first exam after fetching the list
+        if (data.items && data.items.length > 0 && !selectedExamId) {
+          setSelectedExamId(data.items[0].id);
+        }
+      })
       .catch(() => setError("Failed to load exams"));
-  }, []);
+  }, [examGuardToken]);
 
-  useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
+  useEffect(() => { fetchDashboard(); }, [fetchDashboard, isAuthenticated]);
 
   const filteredStudents =
     dashboard?.students.filter(
