@@ -101,9 +101,11 @@ class Settings(BaseSettings):
     # Firebase Authentication configuration
     # These values are read from environment variables:
     #   FIREBASE_PROJECT_ID
+    #   FIREBASE_WEB_API_KEY (Web API Key from Firebase Console > Project Settings)
     #   FIREBASE_CLIENT_EMAIL (optional, for service account)
     #   FIREBASE_CLIENT_ID (frontend web app client ID)
     FIREBASE_PROJECT_ID: str | None = None
+    FIREBASE_WEB_API_KEY: str | None = None
     FIREBASE_CLIENT_EMAIL: str | None = None
     FIREBASE_CLIENT_ID: str | None = None
     FIREBASE_AUTH_DOMAIN: str | None = None

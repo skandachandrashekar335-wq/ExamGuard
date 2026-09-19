@@ -33,11 +33,14 @@ def _verify_firebase_token_http(token: str) -> Optional[Dict[str, Any]]:
         return None
 
     project_id = settings.FIREBASE_PROJECT_ID
+    web_api_key = settings.FIREBASE_WEB_API_KEY
     if not project_id:
         # Cannot verify without project ID
         return None
 
-    url = f"https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyIdToken?key={project_id}"
+    # Use Web API Key if available, fall back to project ID for backward compatibility
+    api_key = web_api_key or project_id
+    url = f"https://identitytoolkit.googleapis.com/v1/accounts:lookup?key={api_key}"
 
     try:
         response = httpx.post(url, json={"idToken": token}, timeout=10)
