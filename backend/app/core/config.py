@@ -22,7 +22,14 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://user:password@localhost:5432/examguard"
 
     API_V1_PREFIX: str = "/api/v1"
-    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "https://exam-guardian-management.vercel.app",
+        "https://exam-guard-liard.vercel.app",
+        "https://exam-guard-59g16u2rx-skc5.vercel.app",
+        "https://dscasc-crvoting.vercel.app",
+        "https://frontend-skc5.vercel.app",
+    ]
 
     NEXT_PUBLIC_API_URL: str = "http://localhost:8000"
 
