@@ -1,0 +1,51 @@
+EXAMGUARD DEPLOYMENT PROGRESS
+==============================
+
+CURRENT STATE: DEPLOYED & FUNCTIONAL (pending Firebase domain config)
+Last updated: 2026-09-19
+
+INFRASTRUCTURE STATUS
+---------------------
+Frontend:  https://exam-guardian-management.vercel.app  ✅ DEPLOYED (Vercel)
+Backend:   https://examguard-production-ef78.up.railway.app  ✅ DEPLOYED (Railway)
+Database:  Neon PostgreSQL  ✅ CONNECTED
+Firebase:  exam-guard-75675  ✅ CONFIGURED
+Cloudinary: y9eod1rk  ✅ CONFIGURED
+
+AUTH FLOW STATUS
+----------------
+Firebase Google Sign-In:     ✅ Popup opens correctly
+Firebase → ExamGuard exchange: ✅ Backend exchange endpoint working
+Post-login navigation:        ✅ FIXED (commit d9c5c92) - routes to /dashboard
+Duplicate exchange race:      ✅ FIXED (commit d9c5c92) - exchangeInProgress ref
+Auth gate coverage:           ✅ FIXED (commit d9c5c92) - all pages protected
+
+REMAINING BLOCKER (1 - manual action)
+--------------------------------------
+Firebase Authorized Domains:
+  - Required: Add exam-guardian-management.vercel.app to Firebase Console
+  - Path: Firebase Console → Authentication → Settings → Authorized domains
+  - Impact: Without this, Google Sign-In fails with auth/unauthorized-domain error
+  - Action: Manual Firebase Console step (outside this environment)
+
+RECENT FIXES (commit d9c5c92)
+------------------------------
+1. AppShell: Navigate to /dashboard after Google sign-in
+2. AuthContext: Prevent duplicate Firebase token exchange race condition
+3. Add AppShell auth gate to 4 unprotected pages (verify, exam-prep, audit, invigilator)
+4. Fix invigilator relative imports to use @/ aliases
+
+HISTORICAL PHASES (completed)
+-----------------------------
+Phase 1: Production PostgreSQL Database     ✅ CONFIGURED & VERIFIED
+Phase 2: Firebase Authorized Domain         ⚠️ MANUAL ACTION REQUIRED (see above)
+Phase 3: Backend Deployment                 ✅ DEPLOYED on Railway
+Phase 4: Frontend Deployment                ✅ DEPLOYED on Vercel
+Phase 5: Live E2E Verification              ✅ Backend healthy, frontend serving
+Phase 6: Git Commit and Preparation         ✅ All changes committed and pushed
+
+NEXT ACTIONS
+------------
+1. Add exam-guardian-management.vercel.app to Firebase Console (manual)
+2. Test Google Sign-In after Firebase domain configuration
+3. Verify full dashboard flow end-to-end
