@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import AppShell from "@/components/AppShell";
 import { apiRequest, qs } from "@/lib/api";
 
 interface ExaminationSession {
@@ -125,28 +126,31 @@ export default function VerifyPage() {
 
   useEffect(() => { setLoading(false); }, []);
 
-  if (loading) return <div className="eg-page"><p style={{ color: "var(--text-muted)" }}>Loading...</p></div>;
+  if (loading) return <AppShell><div className="eg-page"><p style={{ color: "var(--text-muted)" }}>Loading...</p></div></AppShell>;
 
   if (!activeSession) {
     return (
-      <div className="eg-page">
-        <div className="eg-page-header">
-          <h1 className="eg-page-title">Verify Entry</h1>
-          <p className="eg-page-desc">No active examination session found.</p>
+      <AppShell>
+        <div className="eg-page">
+          <div className="eg-page-header">
+            <h1 className="eg-page-title">Verify Entry</h1>
+            <p className="eg-page-desc">No active examination session found.</p>
+          </div>
+          <div className="glass" style={{ padding: "3rem", borderRadius: "var(--radius-lg)", textAlign: "center" }}>
+            <p style={{ fontSize: "2rem", marginBottom: "1rem" }}>📋</p>
+            <h3 style={{ fontFamily: "var(--font-display)", marginBottom: "0.5rem" }}>No Active Session</h3>
+            <p style={{ color: "var(--text-muted)", marginBottom: "1.5rem" }}>
+              Start an examination session to begin verification.
+            </p>
+            <a href="/examination-sessions" className="eg-btn eg-btn-primary">Go to Sessions</a>
+          </div>
         </div>
-        <div className="glass" style={{ padding: "3rem", borderRadius: "var(--radius-lg)", textAlign: "center" }}>
-          <p style={{ fontSize: "2rem", marginBottom: "1rem" }}>📋</p>
-          <h3 style={{ fontFamily: "var(--font-display)", marginBottom: "0.5rem" }}>No Active Session</h3>
-          <p style={{ color: "var(--text-muted)", marginBottom: "1.5rem" }}>
-            Start an examination session to begin verification.
-          </p>
-          <a href="/examination-sessions" className="eg-btn eg-btn-primary">Go to Sessions</a>
-        </div>
-      </div>
+      </AppShell>
     );
   }
 
   return (
+    <AppShell>
     <div className="eg-page">
       {/* Session Header */}
       <div className="glass" style={{ padding: "1.25rem 1.5rem", borderRadius: "var(--radius-lg)", marginBottom: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
@@ -258,5 +262,6 @@ export default function VerifyPage() {
         <a href="/security-alerts" className="eg-btn">Alerts</a>
       </div>
     </div>
+    </AppShell>
   );
 }

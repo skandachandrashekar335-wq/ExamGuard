@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import AppShell from "@/components/AppShell";
 import { apiRequest, qs } from "@/lib/api";
 
 interface AuditEntry {
@@ -79,6 +80,7 @@ export default function AuditPage() {
   };
 
   return (
+    <AppShell>
     <div className="eg-page">
       <div className="eg-page-header">
         <Link href="/dashboard" className="eg-breadcrumb">← Dashboard</Link>
@@ -237,5 +239,6 @@ export default function AuditPage() {
         </>
       )}
     </div>
+    </AppShell>
   );
 }

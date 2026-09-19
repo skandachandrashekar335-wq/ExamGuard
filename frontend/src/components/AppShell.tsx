@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 
 interface NavLink {
@@ -75,8 +75,17 @@ function isActive(pathname: string, href: string) {
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, signOut, isAuthenticated: authed, loading, signInWithGoogle } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [justSignedIn, setJustSignedIn] = useState(false);
+
+  useEffect(() => {
+    if (justSignedIn && authed && !loading) {
+      setJustSignedIn(false);
+      router.push("/dashboard");
+    }
+  }, [justSignedIn, authed, loading, router]);
 
   // Filter nav groups by user role
   const visibleGroups = NAV_GROUPS.filter(group => {
@@ -95,7 +104,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             You must sign in to access ExamGuard.
           </p>
           <button
-            onClick={() => signInWithGoogle()}
+            onClick={() => { setJustSignedIn(true); signInWithGoogle(); }}
             className="eg-btn eg-btn-primary"
           >
             Continue with Google

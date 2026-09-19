@@ -140,6 +140,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     return AuthStateDefault;
   });
   const devTokenUsed = useRef(!!devUser);
+  const exchangeInProgress = useRef(false);
 
   // Initialize auth state on component mount
   useEffect(() => {
@@ -154,6 +155,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         // idToken can be null during initial state
         if (firebaseUser && idToken) {
           // User is signed in to Firebase - exchange token for ExamGuard session
+          // Skip if signInWithGoogle() is already handling this exchange
+          if (exchangeInProgress.current) return;
+          exchangeInProgress.current = true;
           exchangeFirebaseForExamGuard(idToken)
             .then((result) => {
               const user: AuthUser = {
@@ -193,6 +197,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
                 signInWithGoogle: async () => {},
                 signOut: async () => {},
               });
+            })
+            .finally(() => {
+              exchangeInProgress.current = false;
             });
         } else {
           // User signed out from Firebase or initial state
@@ -239,6 +246,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   }, []);
 
   const signInWithGoogle = async () => {
+    exchangeInProgress.current = true;
     setAuthState((prev) => ({ ...prev, loading: true }));
     try {
       // Use signInWithPopup directly with the exported googleProvider
@@ -277,6 +285,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       }));
     } finally {
       // GUARANTEE loading is set to false regardless of success/failure
+      exchangeInProgress.current = false;
       setAuthState(prev => ({ ...prev, loading: false }));
     }
   };

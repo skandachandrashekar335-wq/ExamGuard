@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import AppShell from "@/components/AppShell";
 import { apiRequest, qs } from "@/lib/api";
 
 interface Exam {
@@ -165,6 +166,7 @@ export default function ExamPrepPage() {
   const allReady = Object.values(readiness).every(Boolean);
 
   return (
+    <AppShell>
     <div className="eg-page">
       <div className="eg-page-header">
         <Link href="/exams" className="eg-breadcrumb">← Back to Examinations</Link>
@@ -615,5 +617,6 @@ export default function ExamPrepPage() {
         </div>
       )}
     </div>
+    </AppShell>
   );
 }

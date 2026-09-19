@@ -6,8 +6,9 @@ import {
   startExam,
   endExam,
   type InvigilatorDashboard,
-} from "../../lib/invigilator-api";
-import { ApiError } from "../../lib/api";
+} from "@/lib/invigilator-api";
+import { ApiError } from "@/lib/api";
+import AppShell from "@/components/AppShell";
 
 export default function InvigilatorPage() {
   const [data, setData] = useState<InvigilatorDashboard | null>(null);
@@ -62,13 +63,14 @@ export default function InvigilatorPage() {
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-lg">Loading invigilator dashboard...</div>;
-  if (error) return <div className="p-8 text-center text-red-600">Error: {error}</div>;
-  if (!data) return <div className="p-8 text-center">No data</div>;
+  if (loading) return <AppShell><div className="p-8 text-center text-lg">Loading invigilator dashboard...</div></AppShell>;
+  if (error) return <AppShell><div className="p-8 text-center text-red-600">Error: {error}</div></AppShell>;
+  if (!data) return <AppShell><div className="p-8 text-center">No data</div></AppShell>;
 
   const { profile: p } = data;
 
   return (
+    <AppShell>
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       <h1 className="text-2xl font-bold">Invigilator Control Center</h1>
 
@@ -183,5 +185,6 @@ export default function InvigilatorPage() {
         </div>
       )}
     </div>
+    </AppShell>
   );
 }
