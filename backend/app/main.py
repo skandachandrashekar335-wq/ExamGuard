@@ -56,9 +56,19 @@ def create_app() -> FastAPI:
         debug=settings.DEBUG,
     )
 
+    # Always include known production origins alongside any env-configured ones
+    _production_origins = {
+        "https://exam-guardian-management.vercel.app",
+        "https://exam-guard-liard.vercel.app",
+        "https://exam-guard-59g16u2rx-skc5.vercel.app",
+        "https://dscasc-crvoting.vercel.app",
+        "https://frontend-skc5.vercel.app",
+    }
+    _all_origins = list(set(settings.CORS_ORIGINS) | _production_origins)
+
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.CORS_ORIGINS,
+        allow_origins=_all_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "Accept"],
