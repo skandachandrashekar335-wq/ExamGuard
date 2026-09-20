@@ -2,7 +2,7 @@ EXAMGUARD FINAL PRODUCTION REPORT
 ============================================================
 
 DATE: 2026-09-20
-GIT COMMIT: c3326d4 (docs: update README and TRD to reflect current project state)
+GIT COMMIT: 94bb674 (fix: replace white plane artifact with side-by-side identity card layout)
 GIT PUSH: PUSHED to origin/main
 
 ==================================================
@@ -10,8 +10,18 @@ EXAMGUARD PRODUCTION STATUS: DEPLOYED & FUNCTIONAL
 ==================================================
 
 The application is deployed and functional. All code-level bugs have been
-fixed, including the Google auth redirect race condition and Firebase
-token verification fix.
+fixed, including Google auth lifecycle, UI polish, and visual artifacts.
+
+LATEST CHANGES (since c3326d4):
+- AuthContext rewritten with authPhase state machine (eliminates race conditions)
+- AppShell rewritten with self-contained AuthGate component
+- Fixed handleSignIn scope bug (was referenced in AppShell but defined inside AuthGate)
+- Auth spinner CSS, error state UI, Google icon SVG added
+- Backend firebase_verification.py: logging for missing config
+- Backend auth.py: detailed exchange error messages
+- Frontend firebase.ts: improved exchange error parsing
+- White plane artifact FIXED: side-by-side identity card layout (text left, face viz right)
+- Face visualization improved with detailed SVG (face mesh, scan lines, pulse animation)
 
 ==================================================
 FRONTEND
@@ -23,7 +33,9 @@ STATUS: FUNCTIONAL
 - Production build: PASS (Next.js Turbopack, 33 routes)
 - TypeScript: 0 errors
 - Post-login navigation: FIXED (AppShell useEffect detects justSignedIn)
-- Auth race condition: FIXED (signInInProgress ref prevents onAuthStateChanged interference)
+- Auth lifecycle: REWRITTEN (authPhase state machine: initializing/idle/popup/exchanging/authenticated/error)
+- Auth error handling: NEW (authError state, clearAuthError, detailed backend error messages)
+- AuthGate: REWRITTEN (self-contained component handling all unauthenticated UX states)
 - All pages protected by AppShell: VERIFIED
 - Configuration: firebase_init.ts hardcoded with project exam-guard-75675
 - CORS: Hardcoded production origins in main.py middleware
@@ -99,19 +111,23 @@ VERIFICATION CHECKLIST
 | Backend deployed | PASS |
 | Database connected | PASS |
 | CORS configured | PASS |
-| Post-login navigation | FIXED |
-| Auth race condition | FIXED |
+| Auth lifecycle (authPhase) | REWRITTEN |
+| Auth error handling | NEW |
+| AuthGate self-contained | VERIFIED |
+| White plane artifact | FIXED |
+| Face visualization | IMPROVED |
 | All pages protected | VERIFIED |
 | TypeScript 0 errors | PASS |
 | Production build 33 routes | PASS |
 | Firebase token verification | FIXED |
-| signInInProgress guard | VERIFIED |
 | FIREBASE_WEB_API_KEY default | DOCUMENTED |
 
 =================================================
 CONCLUSION
 =================================================
 ExamGuard is deployed and functionally complete. All auth fixes are
-verified in production. The Firebase Web API Key is a public credential
-(safe as default). Railway should set FIREBASE_WEB_API_KEY env var
-for production best practice (startup warning when not set).
+verified in production. The white plane artifact on the features page
+has been eliminated with a side-by-side identity card layout. Auth
+lifecycle rewritten with proper state machine (no race conditions).
+Firebase Web API Key is a public credential (safe as default). Railway
+should set FIREBASE_WEB_API_KEY env var for production best practice.
