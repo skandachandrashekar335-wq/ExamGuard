@@ -1,51 +1,52 @@
 EXAMGUARD DEPLOYMENT PROGRESS
 ==============================
 
-CURRENT STATE: DEPLOYED & FUNCTIONAL (pending Firebase domain config)
-Last updated: 2026-09-19
+CURRENT STATE: DEPLOYED & FUNCTIONAL
+Last updated: 2026-09-20
 
 INFRASTRUCTURE STATUS
 ---------------------
-Frontend:  https://exam-guardian-management.vercel.app  ✅ DEPLOYED (Vercel)
-Backend:   https://examguard-production-ef78.up.railway.app  ✅ DEPLOYED (Railway)
-Database:  Neon PostgreSQL  ✅ CONNECTED
-Firebase:  exam-guard-75675  ✅ CONFIGURED
-Cloudinary: y9eod1rk  ✅ CONFIGURED
+Frontend:  https://exam-guardian-management.vercel.app  DEPLOYED (Vercel, project: exam-guard)
+Backend:   https://examguard-production-ef78.up.railway.app  DEPLOYED (Railway)
+Database:  Neon PostgreSQL  CONNECTED
+Firebase:  exam-guard-75675  CONFIGURED
+Git HEAD:  c3326d41da489c52e2986625998b5f6e9418e067
 
 AUTH FLOW STATUS
 ----------------
-Firebase Google Sign-In:     ✅ Popup opens correctly
-Firebase → ExamGuard exchange: ✅ Backend exchange endpoint working
-Post-login navigation:        ✅ FIXED (commit d9c5c92) - routes to /dashboard
-Duplicate exchange race:      ✅ FIXED (commit d9c5c92) - exchangeInProgress ref
-Auth gate coverage:           ✅ FIXED (commit d9c5c92) - all pages protected
+Firebase Google Sign-In:         Popup opens correctly
+Firebase -> ExamGuard exchange:   Backend exchange endpoint working
+Post-login navigation:           FIXED - routes to /dashboard via AppShell
+Duplicate exchange race:         FIXED - signInInProgress + exchangeInProgress refs
+Auth gate coverage:              VERIFIED - all pages protected by AppShell
+Firebase token verification:     FIXED - Identity Toolkit v1 + Web API Key (not project_id)
+onAuthStateChanged race:         FIXED - signInInProgress prevents callback interference
 
-REMAINING BLOCKER (1 - manual action)
---------------------------------------
-Firebase Authorized Domains:
-  - Required: Add exam-guardian-management.vercel.app to Firebase Console
-  - Path: Firebase Console → Authentication → Settings → Authorized domains
-  - Impact: Without this, Google Sign-In fails with auth/unauthorized-domain error
-  - Action: Manual Firebase Console step (outside this environment)
+VERIFIED COMMITS (current session)
+-----------------------------------
+c3326d4 docs: update README and TRD to reflect current project state
+7a56595 fix: resolve Google auth redirect issue and Firebase token verification
+255f7d5 docs: add production QA report for deployment verification
+48f358d fix: always include production Vercel domains in CORS allow_origins
+53660bf fix: add production Vercel domains to CORS_ORIGINS default
+0fdc1fe style: redesign form controls for professional enterprise look
 
-RECENT FIXES (commit d9c5c92)
-------------------------------
-1. AppShell: Navigate to /dashboard after Google sign-in
-2. AuthContext: Prevent duplicate Firebase token exchange race condition
-3. Add AppShell auth gate to 4 unprotected pages (verify, exam-prep, audit, invigilator)
-4. Fix invigilator relative imports to use @/ aliases
+AUTH FIXES (commit 7a56595)
+----------------------------
+1. AuthContext: Added signInInProgress ref to prevent onAuthStateChanged callback
+   from interfering after signInWithGoogle completes its own exchange
+2. firebase_verification.py: Removed project_id fallback as API key for Identity
+   Toolkit (always fails). Now returns None (401) when FIREBASE_WEB_API_KEY missing
+3. config.py: Added FIREBASE_WEB_API_KEY default matching frontend (public key)
+
+FIREBASE WEB API KEY NOTE
+--------------------------
+The Firebase Web API Key is PUBLIC by design - embedded in frontend JavaScript
+(firebase_init.ts) and served to every browser. It identifies the Firebase
+project for Identity Toolkit calls and cannot perform privileged operations.
+Backend default matches frontend. Railway should set FIREBASE_WEB_API_KEY env var
+for production best practice.
 
 HISTORICAL PHASES (completed)
 -----------------------------
-Phase 1: Production PostgreSQL Database     ✅ CONFIGURED & VERIFIED
-Phase 2: Firebase Authorized Domain         ⚠️ MANUAL ACTION REQUIRED (see above)
-Phase 3: Backend Deployment                 ✅ DEPLOYED on Railway
-Phase 4: Frontend Deployment                ✅ DEPLOYED on Vercel
-Phase 5: Live E2E Verification              ✅ Backend healthy, frontend serving
-Phase 6: Git Commit and Preparation         ✅ All changes committed and pushed
-
-NEXT ACTIONS
-------------
-1. Add exam-guardian-management.vercel.app to Firebase Console (manual)
-2. Test Google Sign-In after Firebase domain configuration
-3. Verify full dashboard flow end-to-end
+Phase 0-16: All COMPLETE (see roadmap.md for details)

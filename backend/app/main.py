@@ -32,6 +32,13 @@ def _validate_production_config() -> None:
     if not settings.FIREBASE_PROJECT_ID:
         warnings.append("FIREBASE_PROJECT_ID not set — Firebase auth will fail")
 
+    import os
+    if not os.environ.get("FIREBASE_WEB_API_KEY"):
+        warnings.append(
+            "FIREBASE_WEB_API_KEY not in environment — using default value. "
+            "Set FIREBASE_WEB_API_KEY env var for production deployments."
+        )
+
     if settings.SECRET_KEY == "change-me-to-a-random-secret-key":
         warnings.append("SECRET_KEY is placeholder — reject in production")
 

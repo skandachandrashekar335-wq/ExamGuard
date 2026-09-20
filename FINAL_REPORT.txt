@@ -1,104 +1,117 @@
 EXAMGUARD FINAL PRODUCTION REPORT
 ============================================================
 
-DATE: 2026-09-19
-GIT COMMIT: d9c5c92 (fix: add post-login navigation and secure auth flow)
-GIT PUSH: ✅ PUSHED to origin/main
+DATE: 2026-09-20
+GIT COMMIT: c3326d4 (docs: update README and TRD to reflect current project state)
+GIT PUSH: PUSHED to origin/main
 
 ==================================================
-EXAMGUARD PRODUCTION STATUS: DEPLOYED (pending Firebase domain config)
+EXAMGUARD PRODUCTION STATUS: DEPLOYED & FUNCTIONAL
 ==================================================
 
 The application is deployed and functional. All code-level bugs have been
-fixed. The only remaining blocker is a manual Firebase Console configuration
-step to add the production domain to authorized domains.
+fixed, including the Google auth redirect race condition and Firebase
+token verification fix.
 
 ==================================================
 FRONTEND
-==================================================
+=================================================
 URL: https://exam-guardian-management.vercel.app
-DEPLOYED: ✅ YES (Vercel)
+DEPLOYED: YES (Vercel, project: exam-guard)
 STATUS: FUNCTIONAL
 
-- Production build: PASS (Next.js Turbopack)
+- Production build: PASS (Next.js Turbopack, 33 routes)
 - TypeScript: 0 errors
-- Post-login navigation: ✅ FIXED (commit d9c5c92)
-- Auth race condition: ✅ FIXED (commit d9c5c92)
-- All pages protected by AppShell: ✅ FIXED (commit d9c5c92)
-- Configuration: firebase_init.ts updated to project exam-guard-75675
-- CORS: Configured with production domain
+- Post-login navigation: FIXED (AppShell useEffect detects justSignedIn)
+- Auth race condition: FIXED (signInInProgress ref prevents onAuthStateChanged interference)
+- All pages protected by AppShell: VERIFIED
+- Configuration: firebase_init.ts hardcoded with project exam-guard-75675
+- CORS: Hardcoded production origins in main.py middleware
+- Form UI: Redesigned glassmorphism controls (eg-input, eg-select, etc.)
+- devIndicators: disabled in next.config.ts
 
-==================================================
+=================================================
 BACKEND
-==================================================
+=================================================
 URL: https://examguard-production-ef78.up.railway.app
-DEPLOYED: ✅ YES (Railway)
+DEPLOYED: YES (Railway)
 STATUS: HEALTHY
 
-- Health check: ✅ {"status":"healthy","database":"connected"}
+- Health check: {"status":"healthy","database":"connected"}
 - Database: Neon PostgreSQL connected
 - Firebase exchange endpoint: POST /api/v1/auth/firebase/exchange
 - Type: FastAPI
-- Alembic head: 027
+- Alembic head: 027_create_invigilator_assignments_table.py
+- CORS: Production Vercel domains hardcoded in main.py + env-configurable
+- FIREBASE_WEB_API_KEY: Default in config.py (public key, same as frontend)
 
-==================================================
+=================================================
 DATABASE
-==================================================
+=================================================
 TYPE: PostgreSQL (Neon)
-STATUS: ✅ CONNECTED
-TABLES: 32
+STATUS: CONNECTED
+MIGRATIONS: 27 (head 027)
 
-==================================================
-AUTH FLOW (FIXED)
-==================================================
+=================================================
+AUTH FLOW (VERIFIED)
+=================================================
 1. User navigates to protected route
 2. AppShell shows "Sign In Required" with Google button
 3. User clicks "Continue with Google"
-4. Firebase popup opens → user signs in
-5. ExchangeInProgress flag prevents duplicate token exchange
-6. Auth state updates with ExamGuard JWT
-7. AppShell useEffect detects justSignedIn && authed → navigates to /dashboard
-8. DashboardPage mounts → fetches exams with token → auto-selects first exam
-9. Dashboard data renders
+4. Firebase popup opens -> user signs in
+5. signInInProgress ref prevents onAuthStateChanged from interfering
+6. exchangeInProgress ref prevents duplicate token exchange
+7. Backend verifies token via Identity Toolkit v1 REST API
+8. FIREBASE_WEB_API_KEY used for API call (not project_id)
+9. Auth state updates with ExamGuard JWT
+10. AppShell useEffect detects justSignedIn && authed -> navigates to /dashboard
+11. DashboardPage mounts -> fetches exams with token -> auto-selects first exam
+12. Dashboard data renders
 
-==================================================
-REMAINING BLOCKER (1 - manual action)
-==================================================
-Firebase Authorized Domains:
-  - Required: Add exam-guardian-management.vercel.app to Firebase Console
-  - Path: Firebase Console → Authentication → Settings → Authorized domains
-  - Impact: Without this, Google Sign-In fails with auth/unauthorized-domain error
-  - Action: Manual Firebase Console step
+=================================================
+FIREBASE WEB API KEY SECURITY NOTE
+=================================================
+The Firebase Web API Key (AIzaSyCRoOlMP-VO6dgg_TeXhwAkRsE94rZG7GQ) is
+PUBLIC by design. It is embedded in frontend JavaScript (firebase_init.ts)
+and served to every browser. It identifies the Firebase project for
+Identity Toolkit calls and CANNOT be used for privileged operations.
 
-==================================================
+The backend config.py default matches the frontend. For production,
+set FIREBASE_WEB_API_KEY via environment variable (startup warning if not).
+
+=================================================
 SECURITY AUDIT
-==================================================
+=================================================
 - SECRET_KEY: Hardcoded default in config.py (overridden by .env in production)
 - .env: Contains production credentials (Neon DB, Cloudinary, Firebase) - gitignored
 - No secrets committed to git
-- Firebase verification uses REST API (not Admin SDK) - may need Web API Key
+- Firebase verification uses Identity Toolkit v1 REST API (not Admin SDK)
 - RBAC: ADMIN, OPERATOR, REVIEWER roles
 - Token expiry: 30 minutes (HS256 JWT)
+- CORS: Production origins hardcoded + env-configurable
 
-==================================================
+=================================================
 VERIFICATION CHECKLIST
-==================================================
+=================================================
 | Item | Status |
 |------|--------|
-| Frontend deployed | ✅ PASS |
-| Backend deployed | ✅ PASS |
-| Database connected | ✅ PASS |
-| CORS configured | ✅ PASS |
-| Post-login navigation | ✅ FIXED |
-| Auth race condition | ✅ FIXED |
-| All pages protected | ✅ FIXED |
-| TypeScript 0 errors | ✅ PASS |
-| Firebase domain config | ⚠️ MANUAL ACTION |
+| Frontend deployed | PASS |
+| Backend deployed | PASS |
+| Database connected | PASS |
+| CORS configured | PASS |
+| Post-login navigation | FIXED |
+| Auth race condition | FIXED |
+| All pages protected | VERIFIED |
+| TypeScript 0 errors | PASS |
+| Production build 33 routes | PASS |
+| Firebase token verification | FIXED |
+| signInInProgress guard | VERIFIED |
+| FIREBASE_WEB_API_KEY default | DOCUMENTED |
 
-==================================================
+=================================================
 CONCLUSION
-==================================================
-ExamGuard is deployed and functionally complete. The only remaining
-blocker is adding exam-guardian-management.vercel.app to Firebase
-Console authorized domains (manual step). Once done, the full
-Google Sign-In → Dashboard flow will work end-to-end.
+=================================================
+ExamGuard is deployed and functionally complete. All auth fixes are
+verified in production. The Firebase Web API Key is a public credential
+(safe as default). Railway should set FIREBASE_WEB_API_KEY env var
+for production best practice (startup warning when not set).

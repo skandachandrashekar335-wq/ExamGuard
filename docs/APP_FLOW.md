@@ -10,7 +10,7 @@
   - "ACCESS SYSTEM" — navigates to `/examination-sessions` (or login if not authenticated)
   - READY, DETECT, VERIFY, DECIDE buttons (visual pipeline stages)
 - **API calls**: None on load
-- **Success behavior**: Page renders with monochrome editorial design, verification pipeline visualization
+- **Success behavior**: Page renders with glassmorphism design, verification pipeline visualization
 - **Error behavior**: TypeScript compilation error for `--progress` CSS variable (pre-existing, known issue)
 - **Role restrictions**: Public; no authentication state required
 
@@ -432,13 +432,11 @@
 - Web app registration in Firebase Console
 - `INITIAL_ADMIN_EMAILS` in `.env` (optional, for first-time admin setup)
 
-## Frontend TypeScript Issues (Known)
+## Frontend TypeScript Issues (Resolved)
 
-- **page.tsx(168,60)**: `Object literal may only specify known properties, and '"--progress"' does not exist in type 'Properties<string | number, string & {}>'`
-- This is a pre-existing TypeScript error related to CSS custom property `--progress` in the inline style object
-- Fix: Use proper TypeScript-safe approach for CSS custom properties (currently unfixed due to constraints)
-- Impact: Production build (`next build`) fails typecheck until resolved
-- Note: All other AuthContext TypeScript errors were fixed during earlier verification
+- **`--progress` CSS variable**: Previously caused a TypeScript error with inline styles using CSS custom properties
+- **Status: RESOLVED** — Production build passes cleanly (33 routes, 0 errors)
+- TypeScript: 0 errors (`npx tsc --noEmit` passes)
 
 ## E2E Test Coverage
 

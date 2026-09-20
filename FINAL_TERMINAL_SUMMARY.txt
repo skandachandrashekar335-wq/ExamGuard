@@ -1,48 +1,49 @@
 EXAMGUARD PRODUCTION STATUS
 ============================
 
-STATUS: DEPLOYED (pending Firebase domain config)
+STATUS: DEPLOYED & FUNCTIONAL
 
 FRONTEND:
 - URL: https://exam-guardian-management.vercel.app
-- Deployed: ✅ YES (Vercel)
-- Build: PASS (Next.js Turbopack)
+- Deployed: YES (Vercel, project: exam-guard)
+- Build: PASS (Next.js Turbopack, 33 routes)
 - TypeScript: 0 errors
-- Post-login navigation: ✅ FIXED (commit d9c5c92)
-- Auth race condition: ✅ FIXED (commit d9c5c92)
-- All pages protected: ✅ FIXED (commit d9c5c92)
+- Post-login navigation: FIXED (AppShell justSignedIn effect)
+- Auth race condition: FIXED (signInInProgress ref in AuthContext)
+- All pages protected: VERIFIED (AppShell auth gate)
 
 BACKEND:
 - URL: https://examguard-production-ef78.up.railway.app
-- Deployed: ✅ YES (Railway)
-- Health: ✅ {"status":"healthy","database":"connected"}
+- Deployed: YES (Railway)
+- Health: {"status":"healthy","database":"connected"}
 - Database: Neon PostgreSQL connected
+- Alembic head: 027
 
 DATABASE:
 - Type: PostgreSQL (Neon)
-- Status: ✅ CONNECTED
-- Tables: 32 (Alembic head 027)
-
-CLOUDINARY:
-- SDK: Integrated (official Python SDK)
-- Cloud: y9eod1rk
+- Status: CONNECTED
+- Migrations: 27 (head 027_create_invigilator_assignments_table.py)
 
 FIREBASE:
 - Project: exam-guard-75675
-- Authorized domain: ⚠️ exam-guardian-management.vercel.app NOT yet in Firebase Console
-- Action required: Add domain in Firebase Console → Authentication → Settings → Authorized domains
+- Web API Key: Default in config.py (public key, same as frontend firebase_init.ts)
+- Verification: Identity Toolkit v1 REST API (not Admin SDK)
+- Auth fix: signInInProgress prevents onAuthStateChanged race condition
 
 GIT:
 - Branch: main
-- Latest commit: d9c5c92 (fix: add post-login navigation and secure auth flow)
-- Pushed: ✅ YES
+- Latest commit: c3326d4 (docs: update README and TRD to reflect current project state)
+- HEAD: c3326d41da489c52e2986625998b5f6e9418e067
+- origin/main: c3326d41da489c52e2986625998b5f6e9418e067
+- Pushed: YES
 - Working tree: clean
 
-REMAINING BLOCKERS (1):
-1. Firebase authorized domain (manual Firebase Console action required)
-   - Add exam-guardian-management.vercel.app to Firebase project exam-guard-75675
+VERIFIED:
+- TypeScript: 0 errors
+- Production build: 33 routes, 0 errors
+- Backend tests: 10/10 pass (firebase_noninteractive + config)
+- CORS: access-control-allow-origin matches production domain
+- Firebase exchange: responds 401 for invalid tokens (correct)
 
 FINAL REPORT: D:\ExamGuard\FINAL_REPORT.txt
 QA REPORT: D:\ExamGuard\PRODUCTION_QA_REPORT.md
-
-NO SECRETS OR CREDENTIALS PRINTED IN THIS SUMMARY.

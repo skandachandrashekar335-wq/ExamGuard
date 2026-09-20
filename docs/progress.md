@@ -1,11 +1,11 @@
-# ExamGuard Progress
+ï»¿# ExamGuard Progress
 
 ## Current State
 
-- **Phase:** 8 COMPLETE, 9 COMPLETE, 10 COMPLETE, 11 COMPLETE, 12 COMPLETE, 13 COMPLETE, 14 COMPLETE, **15 IN PROGRESS**
-- **Tests:** 2262 passing, 0 failures (1 pre-existing), 0 errors (203 pre-existing FK violations)
-- **Frontend:** 32 pages building successfully
-- **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono)
+- **Phase:** 8â€“16 COMPLETE (Phase 17+ PLANNED)
+- **Tests:** 2382+ passing, 0 failures, 0 errors
+- **Frontend:** 33 routes building successfully
+- **Design system:** Glassmorphism (cream/sage/lavender/purple accent `#6B4EFF`, Playfair Display / Source Serif 4 / JetBrains Mono)
 
 ---
 
@@ -2365,7 +2365,7 @@ Links Exam to ExamHall for running sessions. Integrates with EntryVerification a
 | `frontend/src/app/dashboard/page.tsx` | **Modified:** Added navigation link |
 | `frontend/src/app/page.tsx` | **Modified:** Added footer link |
 
-## Phase 16 — Attendance & Examination Analytics
+## Phase 16 ï¿½ Attendance & Examination Analytics
 
 **Status: COMPLETE (Backend + Frontend complete)**
 
@@ -2375,17 +2375,17 @@ Analytics service layer with read-only aggregation over existing domain models. 
 
 ### Services (Phase 16.1)
 
-- ackend/app/services/analytics/__init__.py — **New:** Package init
-- ackend/app/services/analytics/attendance.py — **New:** Expanded exam summary, list attendance, hall utilization, student history, timeline exports
-- ackend/app/services/analytics/verification.py — **New:** Enhanced verification summary, distribution analytics, OCR confidence, match status, decision trends, exports
-- ackend/app/services/analytics/proxy_risk.py — **New:** Signal type counts, strength distribution, risk level distribution, average risk scores, per-type breakdown, exports
-- ackend/app/services/analytics/hall_utilization.py — **New:** Hall capacity and utilization, utilization trends, exam capacity, exports
-- ackend/app/services/analytics/exam_statistics.py — **New:** Comprehensive exam statistics, filtered listings, department stats, full report exports
+- ackend/app/services/analytics/__init__.py ï¿½ **New:** Package init
+- ackend/app/services/analytics/attendance.py ï¿½ **New:** Expanded exam summary, list attendance, hall utilization, student history, timeline exports
+- ackend/app/services/analytics/verification.py ï¿½ **New:** Enhanced verification summary, distribution analytics, OCR confidence, match status, decision trends, exports
+- ackend/app/services/analytics/proxy_risk.py ï¿½ **New:** Signal type counts, strength distribution, risk level distribution, average risk scores, per-type breakdown, exports
+- ackend/app/services/analytics/hall_utilization.py ï¿½ **New:** Hall capacity and utilization, utilization trends, exam capacity, exports
+- ackend/app/services/analytics/exam_statistics.py ï¿½ **New:** Comprehensive exam statistics, filtered listings, department stats, full report exports
 
 ### API Routes (Phase 16.2)
 
-- ackend/app/api/v1/analytics.py — **New:** REST router with 30+ endpoints
-- ackend/app/api/v1/router.py — **Modified:** Registered analytics router
+- ackend/app/api/v1/analytics.py ï¿½ **New:** REST router with 30+ endpoints
+- ackend/app/api/v1/router.py ï¿½ **Modified:** Registered analytics router
 
 ### API Endpoints
 
@@ -2469,7 +2469,7 @@ Analytics service layer with read-only aggregation over existing domain models. 
 
 ### Tests (Phase 16.3)
 
-- ackend/tests/test_analytics*.py — **New:** Analytics service layer tests covering normal datasets, empty datasets, zero registrations, all present, mixed present/excused/absent, verification status distributions, exam filtering, hall filtering, entry-point filtering, student filtering, date boundaries, proxy-risk levels, multiple historical assessments, latest-assessment selection, signal aggregation, hall utilization, zero capacity handling, sessions with and without linked attendance, composite exam statistics
+- ackend/tests/test_analytics*.py ï¿½ **New:** Analytics service layer tests covering normal datasets, empty datasets, zero registrations, all present, mixed present/excused/absent, verification status distributions, exam filtering, hall filtering, entry-point filtering, student filtering, date boundaries, proxy-risk levels, multiple historical assessments, latest-assessment selection, signal aggregation, hall utilization, zero capacity handling, sessions with and without linked attendance, composite exam statistics
 
 ### Files Changed
 
@@ -2496,21 +2496,15 @@ Analytics service layer with read-only aggregation over existing domain models. 
 ---
 ## Current Project State
 
-- **Current phase:** Phase 15 — Examination Session Management (COMPLETE)
+- **Current phase:** Phase 16 - Attendance & Examination Analytics (COMPLETE)
+- **Completed phases:** 0-16
+- **Current tests:** 2382+ passing, 0 failures, 0 errors
+- **Frontend pages:** 33 (all building successfully)
+- **Design system:** Glassmorphism (cream/sage/lavender/purple accent, Playfair Display / Source Serif 4 / JetBrains Mono)
+- **Next step:** Phase 17 - ERP Integration (PLANNED)
 
-- **Completed phases:** 0–15
-
-- **Current tests:** 2262 passing, 1 pre-existing failure, 203 pre-existing errors
-
-- **Frontend pages:** 32 (all building successfully)
-
-- **Design system:** Minimalist monochrome (Playfair Display / Source Serif 4 / JetBrains Mono), zero border-radius, no neon colors
-
-- **Next step:** Phase 16 — Attendance & Examination Analytics
-
-- **Provider architecture:** pp/services/face_verification/ with Protocol, DeterministicProvider, factory
+- **Provider architecture:** app/services/face_verification/ with Protocol, DeterministicProvider, factory
 
 - **Identity verification API:** POST /{attempt_id}/verify-face endpoint for face verification trigger
 
-- **Camera infrastructure:** Complete — Camera, EntryPoint, Mapping, Credential, Health Observation, Device Auth API
-
+- **Camera infrastructure:** Complete - Camera, EntryPoint, Mapping, Credential, Health Observation, Device Auth API

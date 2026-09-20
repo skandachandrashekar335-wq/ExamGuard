@@ -112,6 +112,11 @@ class Settings(BaseSettings):
     #   FIREBASE_CLIENT_EMAIL (optional, for service account)
     #   FIREBASE_CLIENT_ID (frontend web app client ID)
     FIREBASE_PROJECT_ID: str | None = None
+    # Firebase Web API Key — PUBLIC by design (embedded in every Firebase web app's
+    # client-side JavaScript in firebase_init.ts). This is NOT a secret; it identifies
+    # the Firebase project for Identity Toolkit token exchange. The default matches
+    # the frontend config so auth works without env var configuration. For production
+    # deployments, prefer setting this via the FIREBASE_WEB_API_KEY environment variable.
     FIREBASE_WEB_API_KEY: str | None = "AIzaSyCRoOlMP-VO6dgg_TeXhwAkRsE94rZG7GQ"
     FIREBASE_CLIENT_EMAIL: str | None = None
     FIREBASE_CLIENT_ID: str | None = None
