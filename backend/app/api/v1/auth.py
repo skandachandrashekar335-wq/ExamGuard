@@ -91,9 +91,12 @@ async def firebase_token_exchange(
     # Verify the Firebase ID token server-side
     claims = verify_firebase_id_token(firebase_token)
     if claims is None:
+        import logging
+        logger = logging.getLogger("examguard.auth")
+        logger.warning("Firebase token verification failed — check FIREBASE_PROJECT_ID and FIREBASE_WEB_API_KEY")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired Firebase ID token",
+            detail="Firebase token verification failed. Ensure FIREBASE_PROJECT_ID and FIREBASE_WEB_API_KEY are configured.",
         )
 
     # Extract verified identity

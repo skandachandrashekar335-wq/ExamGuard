@@ -4,15 +4,6 @@
  * Manages the authentication state bridging Firebase Authentication and
  * ExamGuard's RBAC system.
  *
- * The AuthContext provides:
- * - current user state (ExamGuard user, not Firebase user)
- * - loading state during authentication flow
- * - signInWithGoogle() - initiates Firebase Google sign-in
- * - signOut() - clears both Firebase and ExamGuard sessions
- * - firebaseIdToken - the current Firebase ID token for API exchange
- * - requiresOnboarding - whether the user needs to complete onboarding
- * - role-based UI visibility
- *
  * Authentication flow:
  *   1. User clicks "Continue with Google"
  *   2. Firebase sign-in popup opens
@@ -25,7 +16,7 @@
 
 "use client";
 
-import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from "react";
 import {
   signInWithPopup,
   signOut as firebaseSignOut,
@@ -36,7 +27,6 @@ import {
 } from "../lib/firebase";
 import { setTokenGetter } from "../lib/api";
 
-// Types for the auth context state
 export type UserRole = "ADMIN" | "OPERATOR" | "REVIEWER";
 
 export interface AuthUser {
@@ -48,7 +38,8 @@ export interface AuthUser {
   firebase_uid: string | null;
 }
 
-// The public auth state visible to components
+export type AuthPhase = "initializing" | "idle" | "popup" | "exchanging" | "authenticated" | "error";
+
 export interface AuthState {
   user: AuthUser | null;
   loading: boolean;
@@ -59,9 +50,11 @@ export interface AuthState {
   isAuthenticated: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  authPhase: AuthPhase;
+  authError: string | null;
+  clearAuthError: () => void;
 }
 
-// Default state for the context
 const AuthStateDefault: AuthState = {
   user: null,
   loading: true,
@@ -72,6 +65,9 @@ const AuthStateDefault: AuthState = {
   isAuthenticated: false,
   signInWithGoogle: async () => {},
   signOut: async () => {},
+  authPhase: "initializing",
+  authError: null,
+  clearAuthError: () => {},
 };
 
 const AuthContext = createContext<AuthState>(AuthStateDefault);
@@ -86,7 +82,6 @@ export const useAuth = (): AuthState => {
 
 function getDevToken(): string | null {
   if (process.env.NODE_ENV === "development" && typeof window !== "undefined") {
-    // Check URL parameter first
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get("eg_token");
     if (urlToken) {
@@ -94,7 +89,6 @@ function getDevToken(): string | null {
       window.history.replaceState({}, "", window.location.pathname);
       return urlToken;
     }
-    // Fall back to sessionStorage
     return sessionStorage.getItem("eg_dev_token");
   }
   return null;
@@ -116,218 +110,180 @@ function devTokenToUser(token: string): AuthUser | null {
   }
 }
 
+function makeAuthStateUpdate(overrides: Partial<AuthState>): AuthState {
+  return {
+    ...AuthStateDefault,
+    loading: false,
+    authPhase: "idle",
+    authError: null,
+    clearAuthError: () => {},
+    signInWithGoogle: async () => {},
+    signOut: async () => {},
+    ...overrides,
+  };
+}
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   const devToken = getDevToken();
   const devUser = devToken ? devTokenToUser(devToken) : null;
+
   const [authState, setAuthState] = useState<AuthState>(() => {
     if (devToken && devUser) {
-      // Set token getter immediately so API calls work before first render
       setTokenGetter(() => devToken);
       return {
+        ...AuthStateDefault,
         user: devUser,
         loading: false,
-        firebaseIdToken: null,
         examGuardToken: devToken,
         requiresOnboarding: false,
         displayName: devUser.email || "Dev User",
         isAuthenticated: true,
-        signInWithGoogle: async () => {},
-        signOut: async () => {},
+        authPhase: "authenticated",
       };
     }
     return AuthStateDefault;
   });
+
   const devTokenUsed = useRef(!!devUser);
   const exchangeInProgress = useRef(false);
-  const signInInProgress = useRef(false);
+  const signInWithGoogleRef = useRef<() => Promise<void>>(async () => {});
+  const signOutRef = useRef<() => Promise<void>>(async () => {});
 
-  // Initialize auth state on component mount
+  const doExchange = useCallback(async (idToken: string) => {
+    exchangeInProgress.current = true;
+    setAuthState(prev => ({ ...prev, authPhase: "exchanging", loading: true }));
+    try {
+      const result = await exchangeFirebaseForExamGuard(idToken);
+      const authUser: AuthUser = {
+        id: result.user.id,
+        email: result.user.email,
+        full_name: result.user.full_name,
+        role: result.user.role as UserRole,
+        is_active: result.user.is_active,
+        firebase_uid: result.user.firebase_uid,
+      };
+      setAuthState({
+        ...AuthStateDefault,
+        user: authUser,
+        loading: false,
+        firebaseIdToken: idToken,
+        examGuardToken: result.token,
+        requiresOnboarding: result.requires_onboarding,
+        displayName: result.user.email
+          ? `${result.user.full_name || ""} (${result.user.email})`
+          : "User",
+        isAuthenticated: true,
+        authPhase: "authenticated",
+        signInWithGoogle: signInWithGoogleRef.current,
+        signOut: signOutRef.current,
+        clearAuthError: () => setAuthState(prev => ({ ...prev, authError: null })),
+      });
+    } catch (error: any) {
+      console.error("[ExamGuard] Auth exchange failed:", error);
+      const msg = error?.message || "Authentication failed. Please try again.";
+      setAuthState(prev => ({
+        ...prev,
+        user: null,
+        loading: false,
+        firebaseIdToken: idToken,
+        examGuardToken: null,
+        requiresOnboarding: true,
+        displayName: "Guest",
+        isAuthenticated: false,
+        authPhase: "error",
+        authError: msg,
+        signInWithGoogle: signInWithGoogleRef.current,
+        signOut: signOutRef.current,
+        clearAuthError: () => setAuthState(prev => ({ ...prev, authError: null })),
+      }));
+    } finally {
+      exchangeInProgress.current = false;
+    }
+  }, []);
+
   useEffect(() => {
-    // Skip Firebase listener if dev token already set auth state
     if (devTokenUsed.current) return;
 
-    // Set up Firebase auth state listener
     const unsubscribe = onAuthStateChangedCallback(
       (firebaseUser, idToken) => {
-        // Skip if dev token already set auth state
         if (devTokenUsed.current) return;
-        // Skip if signInWithGoogle() is handling the full flow
-        if (signInInProgress.current) return;
-        // idToken can be null during initial state
-        if (firebaseUser && idToken) {
-          // User is signed in to Firebase - exchange token for ExamGuard session
-          // Skip if signInWithGoogle() is already handling this exchange
-          if (exchangeInProgress.current) return;
-          exchangeInProgress.current = true;
-          exchangeFirebaseForExamGuard(idToken)
-            .then((result) => {
-              const user: AuthUser = {
-                id: result.user.id,
-                email: result.user.email,
-                full_name: result.user.full_name,
-                role: result.user.role as UserRole,
-                is_active: result.user.is_active,
-                firebase_uid: result.user.firebase_uid,
-              };
+        if (exchangeInProgress.current) return;
 
-              setAuthState({
-                user,
-                loading: false,
-                firebaseIdToken: idToken,
-                examGuardToken: result.token,
-                requiresOnboarding: result.requires_onboarding,
-                displayName: result.user.email
-                  ? `${result.user.full_name || ""} (${result.user.email})`
-                  : "User",
-                isAuthenticated: true,
-                signInWithGoogle: async () => {},
-                signOut: async () => {},
-              });
-            })
-            .catch((error) => {
-              console.error("Auth exchange failed:", error);
-              // Fallback: create a minimal user and mark as needing onboarding
-              setAuthState({
-                user: null,
-                loading: false,
-                firebaseIdToken: idToken ?? null,
-                examGuardToken: null,
-                requiresOnboarding: true,
-                displayName: "User",
-                isAuthenticated: false,
-                signInWithGoogle: async () => {},
-                signOut: async () => {},
-              });
-            })
-            .finally(() => {
-              exchangeInProgress.current = false;
-            });
+        if (firebaseUser && idToken) {
+          doExchange(idToken);
         } else {
-          // User signed out from Firebase or initial state
-          firebaseSignOut()
-            .then(() => {
-              setAuthState({
-                user: null,
-                loading: false,
-                firebaseIdToken: null,
-                examGuardToken: null,
-                requiresOnboarding: true,
-                displayName: "Guest",
-                isAuthenticated: false,
-                signInWithGoogle: async () => {},
-                signOut: async () => {},
-              });
-            })
-            .catch((err) => {
-              console.error("Sign out error:", err);
-              setAuthState({
-                user: null,
-                loading: false,
-                firebaseIdToken: null,
-                examGuardToken: null,
-                requiresOnboarding: true,
-                displayName: "Guest",
-                isAuthenticated: false,
-                signInWithGoogle: async () => {},
-                signOut: async () => {},
-              });
-            });
+          setAuthState(prev => ({
+            ...prev,
+            user: null,
+            loading: false,
+            firebaseIdToken: null,
+            examGuardToken: null,
+            requiresOnboarding: true,
+            displayName: "Guest",
+            isAuthenticated: false,
+            authPhase: "idle",
+            authError: null,
+            signInWithGoogle: signInWithGoogleRef.current,
+            signOut: signOutRef.current,
+            clearAuthError: () => setAuthState(p => ({ ...p, authError: null })),
+          }));
         }
       }
     );
 
-    // Cleanup on unmount
     return () => unsubscribe();
-  }, []);
+  }, [doExchange]);
 
-  // Initial loading check - the onAuthStateChangedCallback will handle
-  // determining if there's already a session. This effect runs after
-  // the callback is set up.
-  useEffect(() => {
-  }, []);
-
-  const signInWithGoogle = async () => {
-    signInInProgress.current = true;
-    exchangeInProgress.current = true;
-    setAuthState((prev) => ({ ...prev, loading: true }));
+  const signInWithGoogle = useCallback(async () => {
+    setAuthState(prev => ({ ...prev, authPhase: "popup", loading: true, authError: null }));
     try {
-      // Use signInWithPopup directly with the exported googleProvider
       const result = await signInWithPopup(auth, googleProvider);
       const idToken = await result.user.getIdToken();
-      const exchangeResult = await exchangeFirebaseForExamGuard(idToken);
-
-      const authUser: AuthUser = {
-        id: exchangeResult.user.id,
-        email: exchangeResult.user.email,
-        full_name: exchangeResult.user.full_name,
-        role: exchangeResult.user.role as UserRole,
-        is_active: exchangeResult.user.is_active,
-        firebase_uid: exchangeResult.user.firebase_uid,
-      };
-
-      setAuthState({
-        user: authUser,
-        loading: false,
-        firebaseIdToken: idToken,
-        examGuardToken: exchangeResult.token,
-        requiresOnboarding: exchangeResult.requires_onboarding,
-        displayName: authUser.email
-          ? `${authUser.full_name || ""} (${authUser.email})`
-          : "User",
-        isAuthenticated: true,
-        signInWithGoogle: async () => {},
-        signOut: async () => {},
-      });
+      setAuthState(prev => ({ ...prev, authPhase: "exchanging" }));
+      await doExchange(idToken);
     } catch (error: any) {
-      console.error("Google sign-in failed:", error);
-      setAuthState((prev) => ({
+      console.error("[ExamGuard] Google sign-in failed:", error);
+      let msg = "Sign-in was cancelled or failed. Please try again.";
+      if (error?.code === "auth/popup-closed-by-user") {
+        msg = "Sign-in popup was closed. Please try again.";
+      } else if (error?.code === "auth/network-request-failed") {
+        msg = "Network error. Please check your connection and try again.";
+      } else if (error?.message && !error.message.includes("popup")) {
+        msg = error.message;
+      }
+      setAuthState(prev => ({
         ...prev,
         loading: false,
-        requiresOnboarding: true,
+        authPhase: "error",
+        authError: msg,
+        signInWithGoogle: signInWithGoogleRef.current,
+        signOut: signOutRef.current,
+        clearAuthError: () => setAuthState(p => ({ ...p, authError: null })),
       }));
-    } finally {
-      exchangeInProgress.current = false;
-      signInInProgress.current = false;
-      setAuthState(prev => ({ ...prev, loading: false }));
     }
-  };
+  }, [doExchange]);
 
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
     try {
-      // Sign out from Firebase first
       await firebaseSignOut();
-      // Clear ExamGuard state
-      setAuthState({
-        user: null,
-        loading: false,
-        firebaseIdToken: null,
-        examGuardToken: null,
-        requiresOnboarding: true,
-        displayName: "Guest",
-        isAuthenticated: false,
-        signInWithGoogle: async () => {},
-        signOut: async () => {},
-      });
     } catch (error) {
-      console.error("Sign out error:", error);
-      // Still try to clear local state
-      setAuthState({
-        user: null,
-        loading: false,
-        firebaseIdToken: null,
-        examGuardToken: null,
-        requiresOnboarding: true,
-        displayName: "Guest",
-        isAuthenticated: false,
-        signInWithGoogle: async () => {},
-        signOut: async () => {},
-      });
+      console.error("[ExamGuard] Sign out error:", error);
     }
-  };
+    setAuthState({
+      ...AuthStateDefault,
+      loading: false,
+      authPhase: "idle",
+      signInWithGoogle: signInWithGoogleRef.current,
+      signOut: signOutRef.current,
+      clearAuthError: () => setAuthState(p => ({ ...p, authError: null })),
+    });
+  }, []);
 
-  // Initialize API client with token getter
+  signInWithGoogleRef.current = signInWithGoogle;
+  signOutRef.current = handleSignOut;
+
   useEffect(() => {
     setTokenGetter(() => authState.examGuardToken);
   }, [authState.examGuardToken]);
@@ -344,6 +300,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         isAuthenticated: authState.isAuthenticated,
         signInWithGoogle,
         signOut: handleSignOut,
+        authPhase: authState.authPhase,
+        authError: authState.authError,
+        clearAuthError: () => setAuthState(p => ({ ...p, authError: null })),
       }}
     >
       {children}

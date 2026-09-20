@@ -248,17 +248,38 @@ export default function Home() {
             {/* Large — Identity */}
             <div className="eg-bento__item eg-bento__item--wide">
               <div className="glass eg-bento__card eg-bento__card--tall">
+                <div className="eg-bento__card-bg" aria-hidden="true">
+                  <svg viewBox="0 0 400 300" fill="none" className="eg-bento__card-bg-svg">
+                    <circle cx="320" cy="80" r="120" stroke="var(--accent)" strokeWidth="0.5" opacity="0.08" />
+                    <circle cx="320" cy="80" r="80" stroke="var(--accent)" strokeWidth="0.5" opacity="0.06" />
+                    <circle cx="320" cy="80" r="40" stroke="var(--accent)" strokeWidth="0.5" opacity="0.04" />
+                    <line x1="200" y1="0" x2="200" y2="300" stroke="var(--border)" strokeWidth="0.5" strokeDasharray="4 8" opacity="0.3" />
+                  </svg>
+                </div>
                 <p className="eg-eyebrow">Identity Verification</p>
                 <h3 className="eg-bento__title">Face geometry meets biometric confidence.</h3>
                 <p className="eg-bento__desc">1:N face matching, liveness detection, anti-spoofing. Evidence packages are provider-agnostic and auditable.</p>
-                {/* Mini face visualization */}
                 <div className="eg-bento__viz eg-bento__viz--face">
-                  <svg viewBox="0 0 120 120" width="120" height="120">
-                    <circle cx="60" cy="50" r="28" fill="none" stroke="var(--accent)" strokeWidth="1.5" opacity="0.6" />
-                    <circle cx="50" cy="44" r="2.5" fill="var(--accent)" opacity="0.5" />
-                    <circle cx="70" cy="44" r="2.5" fill="var(--accent)" opacity="0.5" />
-                    <path d="M52 56 Q60 64 68 56" fill="none" stroke="var(--accent)" strokeWidth="1" opacity="0.5" />
-                    <rect x="24" y="18" width="72" height="84" rx="6" fill="none" stroke="var(--border)" strokeWidth="1" strokeDasharray="4 3" />
+                  <svg viewBox="0 0 140 160" width="140" height="160">
+                    <defs>
+                      <linearGradient id="faceGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.15" />
+                        <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.03" />
+                      </linearGradient>
+                    </defs>
+                    <rect x="20" y="10" width="100" height="140" rx="12" fill="url(#faceGrad)" stroke="var(--border)" strokeWidth="1" />
+                    <ellipse cx="70" cy="65" rx="26" ry="32" fill="none" stroke="var(--accent)" strokeWidth="1.5" opacity="0.6" />
+                    <circle cx="60" cy="58" r="2" fill="var(--accent)" opacity="0.7" />
+                    <circle cx="80" cy="58" r="2" fill="var(--accent)" opacity="0.7" />
+                    <path d="M62 72 Q70 80 78 72" fill="none" stroke="var(--accent)" strokeWidth="1" opacity="0.5" />
+                    <line x1="30" y1="115" x2="110" y2="115" stroke="var(--accent)" strokeWidth="0.75" opacity="0.2" />
+                    <line x1="40" y1="122" x2="100" y2="122" stroke="var(--accent)" strokeWidth="0.75" opacity="0.15" />
+                    <line x1="45" y1="129" x2="95" y2="129" stroke="var(--accent)" strokeWidth="0.75" opacity="0.1" />
+                    <rect x="28" y="18" width="84" height="124" rx="8" fill="none" stroke="var(--accent)" strokeWidth="0.75" strokeDasharray="3 3" opacity="0.3" />
+                    <circle cx="70" cy="65" r="36" fill="none" stroke="var(--accent)" strokeWidth="0.5" strokeDasharray="2 4" opacity="0.2">
+                      <animate attributeName="r" values="36;42;36" dur="4s" repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="0.2;0.1;0.2" dur="4s" repeatCount="indefinite" />
+                    </circle>
                   </svg>
                 </div>
                 <div className="eg-bento__badges">

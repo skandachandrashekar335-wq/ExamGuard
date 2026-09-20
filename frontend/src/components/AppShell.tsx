@@ -8,13 +8,12 @@ import { useAuth } from "@/context/AuthContext";
 interface NavLink {
   href: string;
   label: string;
-  icon?: string;
 }
 
 interface NavGroup {
   label: string;
   links: NavLink[];
-  roles?: string[]; // If set, only these roles see this group
+  roles?: string[];
 }
 
 const NAV_GROUPS: NavGroup[] = [
@@ -46,9 +45,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "ATTENDANCE",
-    links: [
-      { href: "/attendance", label: "Attendance" },
-    ],
+    links: [{ href: "/attendance", label: "Attendance" }],
   },
   {
     label: "SECURITY",
@@ -73,10 +70,101 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
+function AuthGate() {
+  const { signInWithGoogle, authPhase, authError, clearAuthError } = useAuth();
+  const isBusy = authPhase === "popup" || authPhase === "exchanging" || authPhase === "initializing";
+
+  const handleSignIn = async () => {
+    clearAuthError();
+    await signInWithGoogle();
+  };
+
+  if (authPhase === "error" || authError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-base)]">
+        <div className="glass p-8 max-w-sm w-full mx-4 text-center">
+          <div className="eg-auth-icon-wrap eg-auth-icon-wrap--error mx-auto mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--danger, #dc3545)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="15" y1="9" x2="9" y2="15" />
+              <line x1="9" y1="9" x2="15" y2="15" />
+            </svg>
+          </div>
+          <h2 className="eg-section__title text-lg mb-2">Authentication Failed</h2>
+          <p className="text-sm text-[var(--text-secondary)] mb-6 leading-relaxed">
+            {authError || "Unable to complete sign-in. Please try again."}
+          </p>
+          <button onClick={handleSignIn} disabled={isBusy} className="eg-btn eg-btn-primary w-full">
+            Try Again
+          </button>
+          <p className="mt-4">
+            <Link href="/" className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors">
+              &larr; Back to Home
+            </Link>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (authPhase === "popup" || authPhase === "exchanging") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-base)]">
+        <div className="glass p-10 max-w-sm w-full mx-4 text-center">
+          <div className="eg-auth-spinner mx-auto mb-5" />
+          <p className="text-sm text-[var(--text-primary)] font-medium mb-1">
+            {authPhase === "popup" ? "Waiting for Google sign-in..." : "Connecting to ExamGuard..."}
+          </p>
+          <p className="text-xs text-[var(--text-muted)]">
+            Complete authentication in the popup window.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-base)]">
+      <div className="glass p-10 max-w-md w-full mx-4 text-center">
+        <div className="eg-auth-icon-wrap mx-auto mb-5">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <rect x="4" y="4" width="24" height="24" rx="6" stroke="var(--accent)" strokeWidth="1.5" opacity="0.4" />
+            <circle cx="16" cy="13" r="4" stroke="var(--accent)" strokeWidth="1.5" />
+            <path d="M9 25c0-3.87 3.13-7 7-7s7 3.13 7 7" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </div>
+        <h2 className="eg-section__title text-xl mb-2">ExamGuard</h2>
+        <p className="eg-eyebrow mb-4">Authentication Required</p>
+        <p className="text-sm text-[var(--text-secondary)] mb-8 leading-relaxed">
+          Sign in with your Google account to access the examination management system.
+        </p>
+        <button
+          onClick={handleSignIn}
+          disabled={isBusy}
+          className="eg-btn eg-btn-primary w-full flex items-center justify-center gap-3"
+        >
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+            <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
+            <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.997 8.997 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+            <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+          </svg>
+          Continue with Google
+        </button>
+        <p className="mt-6">
+          <Link href="/" className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors">
+            &larr; Back to Home
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, signOut, isAuthenticated: authed, loading, signInWithGoogle } = useAuth();
+  const { user, signOut, isAuthenticated: authed, loading } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [justSignedIn, setJustSignedIn] = useState(false);
 
@@ -87,41 +175,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [justSignedIn, authed, loading, router]);
 
-  // Filter nav groups by user role
   const visibleGroups = NAV_GROUPS.filter(group => {
     if (!group.roles) return true;
     if (!user) return false;
     return group.roles.includes(user.role);
   });
 
-  // Auth guard: show login prompt if not authenticated
   if (!loading && !authed) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="glass p-8 max-w-md w-full text-center">
-          <h2 className="eg-section__title text-xl mb-4">Sign In Required</h2>
-          <p className="text-[var(--text-secondary)] mb-6">
-            You must sign in to access ExamGuard.
-          </p>
-          <button
-            onClick={() => { setJustSignedIn(true); signInWithGoogle(); }}
-            className="eg-btn eg-btn-primary"
-          >
-            Continue with Google
-          </button>
-          <p className="mt-4">
-            <Link href="/" className="text-sm text-[var(--accent)]">← Back to Home</Link>
-          </p>
-        </div>
-      </div>
-    );
+    return <AuthGate />;
   }
 
-  // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-[var(--text-muted)]">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-base)]">
+        <div className="text-center">
+          <div className="eg-auth-spinner mx-auto mb-4" />
+          <p className="text-sm text-[var(--text-muted)]">Loading ExamGuard...</p>
+        </div>
       </div>
     );
   }

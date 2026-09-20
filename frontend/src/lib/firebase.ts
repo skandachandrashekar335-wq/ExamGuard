@@ -155,10 +155,14 @@ export async function exchangeFirebaseForExamGuard(
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(
-      errorData.detail || "Authentication exchange failed",
-    );
+    let errorMsg = "Authentication exchange failed";
+    try {
+      const errorData = await response.json();
+      errorMsg = errorData.detail || errorMsg;
+    } catch {
+      errorMsg = `Server returned ${response.status}`;
+    }
+    throw new Error(errorMsg);
   }
 
   return response.json();

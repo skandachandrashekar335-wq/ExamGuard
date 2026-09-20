@@ -29,18 +29,20 @@ def _verify_firebase_token_http(token: str) -> Optional[Dict[str, Any]]:
     Returns:
         Dict of decoded claims if verification successful, None otherwise.
     """
+    import logging
+    logger = logging.getLogger("examguard.firebase")
+
     if not token or not token.strip():
         return None
 
     project_id = settings.FIREBASE_PROJECT_ID
     web_api_key = settings.FIREBASE_WEB_API_KEY
     if not project_id:
-        # Cannot verify without project ID
+        logger.warning("FIREBASE_PROJECT_ID not configured — cannot verify token")
         return None
 
     if not web_api_key:
-        # FIREBASE_WEB_API_KEY is required for Identity Toolkit API.
-        # project_id is NOT a valid API key and will always fail.
+        logger.warning("FIREBASE_WEB_API_KEY not configured — cannot verify token")
         return None
 
     api_key = web_api_key
@@ -50,10 +52,8 @@ def _verify_firebase_token_http(token: str) -> Optional[Dict[str, Any]]:
         response = httpx.post(url, json={"idToken": token}, timeout=10)
         if response.status_code == 200:
             data = response.json()
-            # Firebase returns the verified claims
             if "users" in data and len(data["users"]) > 0:
                 user = data["users"][0]
-                # Extract the standard claims
                 return {
                     "uid": user.get("localId"),
                     "email": user.get("email"),
@@ -64,17 +64,13 @@ def _verify_firebase_token_http(token: str) -> Optional[Dict[str, Any]]:
                     "exp": user.get("expirationTime"),
                 }
             return None
-        elif response.status_code == 401 or response.status_code == 403:
-            # Invalid token / unauthorized
-            return None
         else:
-            # Other error - don't leak details
+            logger.warning("Firebase token verification failed: HTTP %s", response.status_code)
             return None
-    except httpx.RequestError:
-        # Network error - don't crash, just fail open (return None)
+    except httpx.RequestError as e:
+        logger.error("Firebase token verification network error: %s", e)
         return None
     except (json.JSONDecodeError, KeyError, TypeError):
-        # Malformed response
         return None
 
 

@@ -310,6 +310,37 @@ body {
 }
 
 /* ========================================
+   AUTH STATES
+   ======================================== */
+
+@keyframes eg-spin {
+  to { transform: rotate(360deg); }
+}
+
+.eg-auth-spinner {
+  width: 32px;
+  height: 32px;
+  border: 2.5px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: eg-spin 0.8s linear infinite;
+}
+
+.eg-auth-icon-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: var(--accent-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.eg-auth-icon-wrap--error {
+  background: rgba(220, 53, 69, 0.1);
+}
+
+/* ========================================
    TABLES
    ======================================== */
 
@@ -1725,7 +1756,7 @@ body {
 }
 
 .eg-bento__card--tall {
-  min-height: 360px;
+  min-height: 320px;
 }
 
 .eg-bento__title {
@@ -1758,8 +1789,20 @@ body {
   justify-content: center;
 }
 
+.eg-bento__card-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.eg-bento__card-bg-svg {
+  width: 100%;
+  height: 100%;
+}
+
 .eg-bento__viz--face svg {
-  opacity: 0.8;
+  opacity: 0.9;
 }
 
 /* Document Mock */
