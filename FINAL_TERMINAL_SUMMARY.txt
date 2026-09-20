@@ -39,9 +39,9 @@ FIREBASE:
 
 GIT:
 - Branch: main
-- Latest commit: 2001c94 (fix: add FIREBASE_PROJECT_ID default, improve error logging)
-- HEAD: 2001c94
-- origin/main: 2001c94
+- Latest commit: 379d8ec (docs: update all reports with root cause fix (2001c94))
+- HEAD: 379d8ec
+- origin/main: 379d8ec
 - Pushed: YES
 - Working tree: clean
 
