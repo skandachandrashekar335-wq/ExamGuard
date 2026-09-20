@@ -38,8 +38,12 @@ def _verify_firebase_token_http(token: str) -> Optional[Dict[str, Any]]:
         # Cannot verify without project ID
         return None
 
-    # Use Web API Key if available, fall back to project ID for backward compatibility
-    api_key = web_api_key or project_id
+    if not web_api_key:
+        # FIREBASE_WEB_API_KEY is required for Identity Toolkit API.
+        # project_id is NOT a valid API key and will always fail.
+        return None
+
+    api_key = web_api_key
     url = f"https://identitytoolkit.googleapis.com/v1/accounts:lookup?key={api_key}"
 
     try:

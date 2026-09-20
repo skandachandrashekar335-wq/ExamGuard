@@ -141,6 +141,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   });
   const devTokenUsed = useRef(!!devUser);
   const exchangeInProgress = useRef(false);
+  const signInInProgress = useRef(false);
 
   // Initialize auth state on component mount
   useEffect(() => {
@@ -152,6 +153,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       (firebaseUser, idToken) => {
         // Skip if dev token already set auth state
         if (devTokenUsed.current) return;
+        // Skip if signInWithGoogle() is handling the full flow
+        if (signInInProgress.current) return;
         // idToken can be null during initial state
         if (firebaseUser && idToken) {
           // User is signed in to Firebase - exchange token for ExamGuard session
@@ -246,6 +249,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   }, []);
 
   const signInWithGoogle = async () => {
+    signInInProgress.current = true;
     exchangeInProgress.current = true;
     setAuthState((prev) => ({ ...prev, loading: true }));
     try {
@@ -284,8 +288,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         requiresOnboarding: true,
       }));
     } finally {
-      // GUARANTEE loading is set to false regardless of success/failure
       exchangeInProgress.current = false;
+      signInInProgress.current = false;
       setAuthState(prev => ({ ...prev, loading: false }));
     }
   };

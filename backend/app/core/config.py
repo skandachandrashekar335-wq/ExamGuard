@@ -112,7 +112,7 @@ class Settings(BaseSettings):
     #   FIREBASE_CLIENT_EMAIL (optional, for service account)
     #   FIREBASE_CLIENT_ID (frontend web app client ID)
     FIREBASE_PROJECT_ID: str | None = None
-    FIREBASE_WEB_API_KEY: str | None = None
+    FIREBASE_WEB_API_KEY: str | None = "AIzaSyCRoOlMP-VO6dgg_TeXhwAkRsE94rZG7GQ"
     FIREBASE_CLIENT_EMAIL: str | None = None
     FIREBASE_CLIENT_ID: str | None = None
     FIREBASE_AUTH_DOMAIN: str | None = None
