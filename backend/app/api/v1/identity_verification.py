@@ -61,9 +61,10 @@ class OverrideRequest(BaseModel):
 
 class VerifyFaceRequest(BaseModel):
     """Request to run face verification on an attempt."""
-    reference_image: str = Field(
-        ..., min_length=1,
-        description="Base64-encoded reference/enrollment image",
+    reference_image: str | None = Field(
+        default=None,
+        description="Base64-encoded reference/enrollment image. "
+                    "If omitted, uses the stored reference_face_url from the attempt.",
     )
     probe_image: str = Field(
         ..., min_length=1,
@@ -83,18 +84,22 @@ class VerifyFaceRequest(BaseModel):
         """Validate base64 encoding and format at the schema level."""
         import base64 as b64mod
 
-        for field_name in ("reference_image", "probe_image"):
-            value = getattr(self, field_name)
+        # Probe image is always required
+        try:
+            decoded = b64mod.b64decode(self.probe_image, validate=True)
+        except Exception:
+            raise ValueError("Invalid base64 encoding in probe_image")
+        if len(decoded) == 0:
+            raise ValueError("probe_image decodes to empty bytes")
+
+        # Reference image is optional (uses stored reference if omitted)
+        if self.reference_image is not None:
             try:
-                decoded = b64mod.b64decode(value, validate=True)
+                decoded = b64mod.b64decode(self.reference_image, validate=True)
             except Exception:
-                raise ValueError(
-                    f"Invalid base64 encoding in {field_name}"
-                )
+                raise ValueError("Invalid base64 encoding in reference_image")
             if len(decoded) == 0:
-                raise ValueError(
-                    f"{field_name} decodes to empty bytes"
-                )
+                raise ValueError("reference_image decodes to empty bytes")
 
         format_fields = {
             "reference_image_format": self.reference_image_format,
@@ -109,6 +114,125 @@ class VerifyFaceRequest(BaseModel):
                 )
 
         return self
+
+
+class SaveReferenceFaceRequest(BaseModel):
+    """Request to save a reference face image for an attempt."""
+    reference_image: str = Field(
+        ..., min_length=1,
+        description="Base64-encoded reference face image",
+    )
+    image_format: str = Field(
+        default="image/jpeg",
+        description="MIME type of the image",
+    )
+
+
+@router.post(
+    "/{attempt_id}/reference-face",
+    response_model=IdentityVerificationResponse,
+    summary="Save a reference face image for later verification",
+)
+def save_reference_face(
+    attempt_id: int,
+    body: SaveReferenceFaceRequest,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
+    """Save a reference face image to Cloudinary and persist the URL on the attempt.
+
+    This allows the invigilator page to later retrieve the stored reference
+    without requiring the client to re-supply it on every verify call.
+    """
+    import base64
+
+    from app.core.config import get_settings
+    from app.services.face_verification.validation import (
+        ImageValidationError,
+        validate_image_bytes,
+    )
+
+    settings = get_settings()
+    max_size_bytes = settings.FACE_VERIFICATION_MAX_IMAGE_SIZE_MB * 1024 * 1024
+
+    try:
+        ref_bytes = base64.b64decode(body.reference_image, validate=True)
+    except Exception:
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid base64 encoding in reference_image",
+        )
+
+    try:
+        validate_image_bytes(
+            ref_bytes,
+            field_name="reference_image",
+            max_size_bytes=max_size_bytes,
+        )
+    except ImageValidationError as e:
+        raise HTTPException(status_code=422, detail=e.message)
+
+    # Validate attempt exists and is eligible
+    attempt = iv_service.get_attempt(db, attempt_id)
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+
+    if attempt.status not in (
+        iv_service.IdentityVerificationStatus.CREATED.value,
+        iv_service.IdentityVerificationStatus.IN_PROGRESS.value,
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Cannot save reference face for attempt in status '{attempt.status}'",
+        )
+
+    # Save to storage (Cloudinary or local fallback)
+    from app.storage.cloudinary import CloudinaryStorage
+
+    storage = CloudinaryStorage()
+    ext = ".jpg" if body.image_format == "image/jpeg" else ".png"
+    key = f"face-references/attempt-{attempt_id}{ext}"
+    try:
+        url = storage.save(key, ref_bytes)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to save reference face: {e}",
+        )
+
+    # Persist URL on the attempt
+    attempt.reference_face_url = url
+    db.commit()
+    db.refresh(attempt)
+
+    return IdentityVerificationResponse.model_validate(attempt)
+
+
+@router.get(
+    "/{attempt_id}/reference-face",
+    summary="Get the stored reference face URL for an attempt",
+)
+def get_reference_face(
+    attempt_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
+):
+    """Retrieve the stored reference face URL for an attempt.
+
+    Returns 404 if no reference face has been saved yet.
+    """
+    attempt = iv_service.get_attempt(db, attempt_id)
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+    if not attempt.reference_face_url:
+        raise HTTPException(
+            status_code=404,
+            detail="No reference face saved for this attempt",
+        )
+    return {
+        "attempt_id": attempt_id,
+        "reference_face_url": attempt.reference_face_url,
+    }
 
 
 @router.post(
@@ -279,15 +403,12 @@ def verify_face(
     The provider produces evidence. Authorization decisions are made
     separately via the evaluate endpoint.
 
-    Input validation:
-    - Base64 decoding with strict error handling
-    - Image format verification via magic bytes
-    - Image size limits (configurable via FACE_VERIFICATION_MAX_IMAGE_SIZE_MB)
-    - Image dimension limits (min 16px, max 16384px)
-    - Corrupted image detection
-    - Decompression bomb protection
+    If reference_image is provided, it is used directly.
+    If omitted, the stored reference_face_url on the attempt is fetched
+    and downloaded for comparison.
     """
     import base64
+    import urllib.request
 
     from app.core.config import get_settings
     from app.services.face_verification.validation import (
@@ -298,13 +419,34 @@ def verify_face(
     settings = get_settings()
     max_size_bytes = settings.FACE_VERIFICATION_MAX_IMAGE_SIZE_MB * 1024 * 1024
 
-    try:
-        ref_bytes = base64.b64decode(body.reference_image, validate=True)
-    except Exception:
-        raise HTTPException(
-            status_code=422,
-            detail="Invalid base64 encoding in reference_image",
-        )
+    # Resolve reference image bytes
+    if body.reference_image is not None:
+        try:
+            ref_bytes = base64.b64decode(body.reference_image, validate=True)
+        except Exception:
+            raise HTTPException(
+                status_code=422,
+                detail="Invalid base64 encoding in reference_image",
+            )
+    else:
+        # Fetch stored reference from attempt
+        attempt = iv_service.get_attempt(db, attempt_id)
+        if not attempt:
+            raise HTTPException(status_code=404, detail="Attempt not found")
+        if not attempt.reference_face_url:
+            raise HTTPException(
+                status_code=422,
+                detail="No reference_image provided and no stored reference face for this attempt. "
+                       "Upload a reference face first via /reference-face endpoint.",
+            )
+        try:
+            with urllib.request.urlopen(attempt.reference_face_url, timeout=30) as resp:
+                ref_bytes = resp.read()
+        except Exception as e:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to download stored reference face: {e}",
+            )
 
     try:
         probe_bytes = base64.b64decode(body.probe_image, validate=True)

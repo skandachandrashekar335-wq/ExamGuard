@@ -35,7 +35,7 @@ export async function startAttempt(id: number): Promise<IdentityVerificationAtte
 export async function verifyFace(
   id: number,
   payload: {
-    reference_image: string;
+    reference_image?: string | null;
     probe_image: string;
     reference_image_format?: string;
     probe_image_format?: string;
@@ -45,6 +45,25 @@ export async function verifyFace(
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function saveReferenceFace(
+  id: number,
+  payload: {
+    reference_image: string;
+    image_format?: string;
+  },
+): Promise<IdentityVerificationAttempt> {
+  return apiRequest(`/api/v1/identity-verifications/${id}/reference-face`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getReferenceFace(
+  id: number,
+): Promise<{ attempt_id: number; reference_face_url: string }> {
+  return apiRequest(`/api/v1/identity-verifications/${id}/reference-face`);
 }
 
 export async function evaluateEvidence(id: number): Promise<IdentityVerificationAttempt> {

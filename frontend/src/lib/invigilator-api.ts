@@ -74,3 +74,18 @@ export async function createInvigilatorAssignment(data: {
     method: "POST", body: JSON.stringify(data),
   });
 }
+
+export interface RegisteredStudent {
+  registration_id: number;
+  student_id: number;
+  student_usn: string;
+  student_name: string;
+  attempt_id: number | null;
+  attempt_status: string | null;
+  attempt_decision: string | null;
+  reference_face_url: string | null;
+}
+
+export async function getRegisteredStudents(examId: number): Promise<{ items: RegisteredStudent[]; total: number }> {
+  return apiRequest(`/api/v1/exam-registrations?exam_id=${examId}&page_size=100`);
+}

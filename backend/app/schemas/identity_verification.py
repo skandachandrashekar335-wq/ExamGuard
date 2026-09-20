@@ -73,6 +73,7 @@ class IdentityVerificationResponse(BaseModel):
     verification_method: str
     decision: str
     failure_reason: str | None
+    reference_face_url: str | None = None
     created_at: datetime
     started_at: datetime | None
     completed_at: datetime | None

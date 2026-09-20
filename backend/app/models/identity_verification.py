@@ -87,6 +87,11 @@ class IdentityVerificationAttempt(Base):
         index=True,
     )
     failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reference_face_url: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+        comment="Cloudinary/public URL of the student's reference face image for comparison",
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

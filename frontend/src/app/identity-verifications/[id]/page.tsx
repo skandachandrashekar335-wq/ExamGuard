@@ -11,6 +11,7 @@ import {
   reviewAttempt,
   overrideDecision,
   cancelAttempt,
+  saveReferenceFace,
   ApiError,
 } from "@/lib/iv-api";
 import type {
@@ -92,19 +93,19 @@ export default function IdentityVerificationDetailPage() {
     : false;
 
   const handleVerify = async () => {
-    if (!referenceImage || !probeImage) return;
+    if (!probeImage) return;
+    if (!referenceImage && !attempt?.reference_face_url) return;
     setVerifyError("");
     setActionMsg("");
     setUiState("SUBMITTING");
     try {
-      const refBase64 = await fileToBase64(referenceImage);
       const probeBase64 = await fileToBase64(probeImage);
 
       setUiState("VERIFYING");
       await verifyFace(id, {
-        reference_image: refBase64,
+        reference_image: referenceImage ? await fileToBase64(referenceImage) : undefined,
         probe_image: probeBase64,
-        reference_image_format: referenceImage.type || "image/jpeg",
+        reference_image_format: referenceImage?.type || "image/jpeg",
         probe_image_format: probeImage.type || "image/jpeg",
       });
 
@@ -164,6 +165,22 @@ export default function IdentityVerificationDetailPage() {
       setActionMsg(e instanceof Error ? e.message : "Failed to load demo reference");
     } finally {
       setDemoLoading(false);
+    }
+  };
+
+  const handleSaveReference = async () => {
+    if (!referenceImage) return;
+    setActionMsg("");
+    try {
+      const refBase64 = await fileToBase64(referenceImage);
+      await saveReferenceFace(id, {
+        reference_image: refBase64,
+        image_format: referenceImage.type || "image/jpeg",
+      });
+      setActionMsg("Reference face saved successfully");
+      await fetchContext();
+    } catch (e: unknown) {
+      setActionMsg(e instanceof ApiError ? e.message : "Failed to save reference face");
     }
   };
 
@@ -250,19 +267,45 @@ export default function IdentityVerificationDetailPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <span className="eg-mono-sm text-[var(--text-muted)] block">REFERENCE FACE</span>
+                    {attempt?.reference_face_url && !referenceImage && (
+                      <div className="glass-surface p-2">
+                        <img
+                          src={attempt.reference_face_url}
+                          alt="Stored reference face"
+                          className="w-full h-40 object-cover rounded"
+                        />
+                        <p className="text-[10px] text-[var(--accent)] mt-1">Stored reference face loaded</p>
+                      </div>
+                    )}
                     <ImageUpload
                       label="Reference Face (your face photo)"
                       onImage={(blob) => setReferenceImage(blob)}
                       onClear={() => setReferenceImage(null)}
                       disabled={uiState !== "READY"}
                     />
-                    <button
-                      onClick={handleLoadDemoReference}
-                      disabled={demoLoading || uiState !== "READY"}
-                      className="eg-btn eg-btn-ghost w-full text-xs py-1.5"
-                    >
-                      {demoLoading ? "Loading..." : "Use Demo Reference (synthetic)"}
-                    </button>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={handleLoadDemoReference}
+                        disabled={demoLoading || uiState !== "READY"}
+                        className="eg-btn eg-btn-ghost flex-1 text-xs py-1.5"
+                      >
+                        {demoLoading ? "Loading..." : "Demo Reference"}
+                      </button>
+                      {referenceImage && (
+                        <button
+                          onClick={handleSaveReference}
+                          disabled={uiState !== "READY"}
+                          className="eg-btn eg-btn-primary flex-1 text-xs py-1.5"
+                        >
+                          Save Reference
+                        </button>
+                      )}
+                    </div>
+                    {attempt?.reference_face_url && (
+                      <p className="text-[10px] text-[var(--accent)]">
+                        Reference saved — verify will use stored reference if none uploaded
+                      </p>
+                    )}
                   </div>
 
                   {/* Probe Image — Camera or Upload toggle */}
@@ -327,14 +370,19 @@ export default function IdentityVerificationDetailPage() {
               <div className="flex items-center gap-4">
                 <button
                   onClick={handleVerify}
-                  disabled={!referenceImage || !probeImage || uiState !== "READY"}
+                  disabled={!probeImage || (!referenceImage && !attempt?.reference_face_url) || uiState !== "READY"}
                   className="eg-btn eg-btn-primary px-6 py-2 disabled:opacity-30"
                 >
                   {uiState === "READY" ? "Verify Identity" : "Processing..."}
                 </button>
-                {!referenceImage && (
+                {attempt?.reference_face_url && !referenceImage && (
+                  <span className="text-xs text-[var(--accent)]">
+                    Using stored reference face
+                  </span>
+                )}
+                {!referenceImage && !attempt?.reference_face_url && (
                   <span className="text-xs text-[var(--text-muted)]">
-                    Upload a reference face photo first
+                    Upload or save a reference face first
                   </span>
                 )}
                 {referenceImage && !probeImage && (

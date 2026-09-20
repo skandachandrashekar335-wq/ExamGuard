@@ -7,6 +7,7 @@ export interface IdentityVerificationAttempt {
   verification_method: string;
   decision: string;
   failure_reason: string | null;
+  reference_face_url: string | null;
   created_at: string;
   started_at: string | null;
   completed_at: string | null;

@@ -7,8 +7,28 @@ import {
   endExam,
   type InvigilatorDashboard,
 } from "@/lib/invigilator-api";
+import { apiRequest } from "@/lib/api";
 import { ApiError } from "@/lib/api";
+import { listAttempts, getAttemptContext, verifyFace, evaluateEvidence, ApiError as IvApiError } from "@/lib/iv-api";
+import type { VerificationContext } from "@/lib/types";
+import CameraCapture from "@/components/CameraCapture";
+import EvidenceDisplay from "@/components/EvidenceDisplay";
+import DecisionDisplay from "@/components/DecisionDisplay";
 import AppShell from "@/components/AppShell";
+
+function fileToBase64(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(",")[1];
+      if (base64) resolve(base64);
+      else reject(new Error("Failed to encode image"));
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function InvigilatorPage() {
   const [data, setData] = useState<InvigilatorDashboard | null>(null);
@@ -17,12 +37,43 @@ export default function InvigilatorPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
 
+  // Registered students state
+  interface RegisteredStudent {
+    registration_id: number;
+    student_id: number;
+    student_usn: string;
+    student_name: string;
+    attempt_id: number | null;
+    attempt_status: string | null;
+    attempt_decision: string | null;
+    reference_face_url: string | null;
+  }
+  const [students, setStudents] = useState<RegisteredStudent[]>([]);
+
+  // Face verification state
+  const [verifyStudentId, setVerifyStudentId] = useState<number | null>(null);
+  const [verifyAttemptId, setVerifyAttemptId] = useState<number | null>(null);
+  const [verifyCtx, setVerifyCtx] = useState<VerificationContext | null>(null);
+  const [probeImage, setProbeImage] = useState<Blob | null>(null);
+  const [verifyState, setVerifyState] = useState<"idle" | "capturing" | "verifying" | "done" | "error">("idle");
+  const [verifyResult, setVerifyResult] = useState<{ decision: string; evidence: unknown[] } | null>(null);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const dash = await getInvigilatorDashboard();
       setData(dash);
+      // Fetch registered students for this invigilator's exam
+      try {
+        const studentsRes = await apiRequest<{ items: RegisteredStudent[]; total: number }>(
+          `/api/v1/invigilator/registered-students`
+        );
+        setStudents(studentsRes.items || []);
+      } catch {
+        setStudents([]);
+      }
     } catch (e: unknown) {
       const msg = e instanceof ApiError ? e.message : "Failed to load dashboard";
       setError(msg);
@@ -61,6 +112,63 @@ export default function InvigilatorPage() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  // Face verification flow
+  const handleStartVerify = async (studentId: number, attemptId: number) => {
+    setVerifyStudentId(studentId);
+    setVerifyAttemptId(attemptId);
+    setVerifyState("capturing");
+    setVerifyResult(null);
+    setVerifyError(null);
+    setProbeImage(null);
+    try {
+      const ctx = await getAttemptContext(attemptId);
+      setVerifyCtx(ctx);
+    } catch {
+      setVerifyError("Failed to load attempt context");
+      setVerifyState("error");
+    }
+  };
+
+  const handleCapture = (blob: Blob) => {
+    setProbeImage(blob);
+  };
+
+  const handleVerifyNow = async () => {
+    if (!probeImage || !verifyAttemptId) return;
+    setVerifyState("verifying");
+    setVerifyError(null);
+    try {
+      const probeBase64 = await fileToBase64(probeImage);
+      await verifyFace(verifyAttemptId, {
+        probe_image: probeBase64,
+        probe_image_format: probeImage.type || "image/jpeg",
+      });
+      await evaluateEvidence(verifyAttemptId);
+      const updated = await getAttemptContext(verifyAttemptId);
+      setVerifyCtx(updated);
+      setVerifyResult({
+        decision: updated.attempt.decision,
+        evidence: updated.evidence,
+      });
+      setVerifyState("done");
+      await load();
+    } catch (e: unknown) {
+      const msg = e instanceof IvApiError ? e.message : "Verification failed";
+      setVerifyError(msg);
+      setVerifyState("error");
+    }
+  };
+
+  const handleCloseVerify = () => {
+    setVerifyStudentId(null);
+    setVerifyAttemptId(null);
+    setVerifyCtx(null);
+    setProbeImage(null);
+    setVerifyState("idle");
+    setVerifyResult(null);
+    setVerifyError(null);
   };
 
   if (loading) return <AppShell><div className="p-8 text-center text-lg">Loading invigilator dashboard...</div></AppShell>;
@@ -181,6 +289,142 @@ export default function InvigilatorPage() {
                 <span className="text-xs opacity-40">{v.created_at as string}</span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Registered Students */}
+      <div className="eg-panel p-4 space-y-3">
+        <h2 className="text-lg font-semibold">Registered Students</h2>
+        {students.length === 0 ? (
+          <div className="text-sm opacity-60">No registered students found.</div>
+        ) : (
+          <div className="space-y-2">
+            {students.map((s) => (
+              <div key={s.registration_id} className="flex items-center justify-between text-sm p-3 rounded bg-black/10">
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-xs opacity-50">{s.student_usn}</span>
+                  <span className="font-medium">{s.student_name}</span>
+                  {s.attempt_status && (
+                    <span className={`px-2 py-0.5 rounded text-xs ${
+                      s.attempt_decision === "MATCH" ? "bg-green-500/20 text-green-300" :
+                      s.attempt_decision === "NO_MATCH" ? "bg-red-500/20 text-red-300" :
+                      "bg-yellow-500/20 text-yellow-300"
+                    }`}>
+                      {s.attempt_status} / {s.attempt_decision || "PENDING"}
+                    </span>
+                  )}
+                  {s.reference_face_url && (
+                    <span className="text-xs text-[var(--accent)]">Reference enrolled</span>
+                  )}
+                </div>
+                {s.attempt_id && (
+                  <button
+                    onClick={() => handleStartVerify(s.student_id, s.attempt_id!)}
+                    className="eg-btn eg-btn-primary text-xs px-3 py-1"
+                  >
+                    Verify Face
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Face Verification Modal */}
+      {verifyAttemptId && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="glass-surface max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Face Verification</h3>
+              <button onClick={handleCloseVerify} className="text-[var(--text-muted)] hover:text-white text-xl">&times;</button>
+            </div>
+
+            {verifyCtx?.student && (
+              <div className="text-sm opacity-60">
+                Student: {verifyCtx.student.name} ({verifyCtx.student.usn})
+              </div>
+            )}
+
+            {/* Reference face display */}
+            {verifyCtx?.attempt?.reference_face_url && (
+              <div className="space-y-1">
+                <span className="eg-mono-sm text-[var(--text-muted)]">Stored Reference</span>
+                <img
+                  src={verifyCtx.attempt.reference_face_url}
+                  alt="Reference face"
+                  className="w-48 h-36 object-cover rounded border border-[var(--border)]"
+                />
+              </div>
+            )}
+
+            {/* Camera capture */}
+            {verifyState === "capturing" && (
+              <div className="space-y-3">
+                <span className="eg-mono-sm text-[var(--text-muted)]">CAPTURE PROBE IMAGE</span>
+                <CameraCapture
+                  onCapture={(blob) => handleCapture(blob)}
+                  onRetake={() => setProbeImage(null)}
+                />
+                {probeImage && (
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleVerifyNow}
+                      className="eg-btn eg-btn-primary px-6 py-2"
+                    >
+                      Verify Now
+                    </button>
+                    <button
+                      onClick={() => setProbeImage(null)}
+                      className="eg-btn px-4 py-2"
+                    >
+                      Retake
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Verifying state */}
+            {verifyState === "verifying" && (
+              <div className="text-center py-8">
+                <div className="text-lg animate-pulse">Verifying identity...</div>
+              </div>
+            )}
+
+            {/* Result */}
+            {verifyState === "done" && verifyResult && (
+              <div className="space-y-3">
+                <DecisionDisplay
+                  decision={verifyResult.decision}
+                  failureReason={verifyCtx?.attempt?.failure_reason || null}
+                />
+                {verifyResult.evidence.length > 0 && (
+                  <EvidenceDisplay evidence={verifyResult.evidence as VerificationContext["evidence"]} />
+                )}
+                <button onClick={handleCloseVerify} className="eg-btn w-full py-2">
+                  Close
+                </button>
+              </div>
+            )}
+
+            {/* Error */}
+            {verifyState === "error" && (
+              <div className="space-y-3">
+                <div className="text-sm" style={{ color: "var(--danger)" }}>
+                  {verifyError || "Verification failed"}
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={handleVerifyNow} className="eg-btn eg-btn-primary px-6 py-2">
+                    Retry
+                  </button>
+                  <button onClick={handleCloseVerify} className="eg-btn px-4 py-2">
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -25,6 +25,7 @@ from app.models.invigilator_assignment import InvigilatorAssignment
 from app.models.entry_verification import EntryVerification
 from app.models.attendance import AttendanceRecord
 from app.models.security_event import SecurityEvent
+from app.models.student import Student
 from app.services import examination_session as session_svc
 from app.services import invigilator_assignment as assign_svc
 
@@ -280,6 +281,68 @@ def get_dashboard(
         security_event_count=security_event_count,
         recent_verifications=recent_verifications,
     )
+
+
+class RegisteredStudentResponse(BaseModel):
+    registration_id: int
+    student_id: int
+    student_usn: str
+    student_name: str
+    attempt_id: int | None = None
+    attempt_status: str | None = None
+    attempt_decision: str | None = None
+    reference_face_url: str | None = None
+
+
+class RegisteredStudentsResponse(BaseModel):
+    items: list[RegisteredStudentResponse]
+    total: int
+
+
+@router.get(
+    "/registered-students",
+    response_model=RegisteredStudentsResponse,
+    summary="List registered students for the invigilator's assigned exam with IV attempt status",
+)
+def get_registered_students(
+    user: dict = Depends(require_role([Role.INVIGILATOR])),
+    db: Session = Depends(get_db),
+):
+    """List all students registered for the invigilator's exam, with their
+    identity verification attempt status. Used by the invigilator page to
+    show students and their verification readiness."""
+    from app.models.exam_registration import ExamRegistration
+    from app.models.identity_verification import IdentityVerificationAttempt
+
+    profile = _get_profile(db, user)
+
+    registrations = (
+        db.query(ExamRegistration)
+        .filter(ExamRegistration.exam_id == profile.exam_id)
+        .all()
+    )
+
+    items = []
+    for reg in registrations:
+        student = db.query(Student).filter(Student.id == reg.student_id).first()
+        attempt = (
+            db.query(IdentityVerificationAttempt)
+            .filter(IdentityVerificationAttempt.exam_registration_id == reg.id)
+            .order_by(IdentityVerificationAttempt.id.desc())
+            .first()
+        )
+        items.append(RegisteredStudentResponse(
+            registration_id=reg.id,
+            student_id=reg.student_id,
+            student_usn=student.usn if student else "UNKNOWN",
+            student_name=student.name if student else "Unknown",
+            attempt_id=attempt.id if attempt else None,
+            attempt_status=attempt.status if attempt else None,
+            attempt_decision=attempt.decision if attempt else None,
+            reference_face_url=attempt.reference_face_url if attempt else None,
+        ))
+
+    return RegisteredStudentsResponse(items=items, total=len(items))
 
 
 @router.post(
