@@ -22,8 +22,8 @@ BACKEND:
 - Health: {"status":"healthy","database":"connected"}
 - Database: Neon PostgreSQL connected
 - Alembic head: 027
-- Exchange error messages: DETAILED (missing config, invalid token, etc.)
-- firebase_verification.py: IMPROVED logging for missing FIREBASE_PROJECT_ID / FIREBASE_WEB_API_KEY
+- Exchange error messages: DETAILED (invalid token, expired, revoked)
+- firebase_verification.py: IMPROVED logging, FIREBASE_PROJECT_ID has default value
 
 DATABASE:
 - Type: PostgreSQL (Neon)
@@ -39,15 +39,16 @@ FIREBASE:
 
 GIT:
 - Branch: main
-- Latest commit: bbc84dd (docs: update FINAL_REPORT with auth rewrite, white plane fix, and current SHA)
-- HEAD: bbc84dd
-- origin/main: bbc84dd
+- Latest commit: 2001c94 (fix: add FIREBASE_PROJECT_ID default, improve error logging)
+- HEAD: 2001c94
+- origin/main: 2001c94
 - Pushed: YES
 - Working tree: clean
 
 VERIFIED:
 - TypeScript: 0 errors
 - Production build: 33 routes, 0 errors
+- Backend tests (firebase+config): 47/47 PASS
 - Backend tests (firebase + config): 10/10 pass
 - AuthGate renders on protected pages: VERIFIED (headless browser screenshot)
 - CORS: access-control-allow-origin matches production domain

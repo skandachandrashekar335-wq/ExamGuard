@@ -10,7 +10,7 @@ Frontend:  https://exam-guardian-management.vercel.app  DEPLOYED (Vercel, projec
 Backend:   https://examguard-production-ef78.up.railway.app  DEPLOYED (Railway)
 Database:  Neon PostgreSQL  CONNECTED
 Firebase:  exam-guard-75675  CONFIGURED
-Git HEAD:  bbc84dd
+Git HEAD:  2001c94
 
 AUTH FLOW STATUS
 ----------------
@@ -19,13 +19,14 @@ Firebase -> ExamGuard exchange:   Backend exchange endpoint working (401 for inv
 Post-login navigation:           AuthPhase state machine handles transitions
 Duplicate exchange race:         exchangeInProgress ref inside doExchange() prevents duplicates
 Auth gate coverage:              VERIFIED - AuthGate renders on all protected routes
-Firebase token verification:     FIXED - Identity Toolkit v1 + Web API Key (not project_id)
+Firebase token verification:     FIXED - FIREBASE_PROJECT_ID now has default, guard removed
 Auth error handling:             NEW - authPhase="error", authError state, detailed backend messages
 White plane artifact:            FIXED - side-by-side identity card layout (text left, face viz right)
 Face visualization:              IMPROVED - detailed SVG with gradient, scan lines, pulse animation
 
 VERIFIED COMMITS (current session)
 -----------------------------------
+2001c94 fix: add FIREBASE_PROJECT_ID default, improve error logging
 bbc84dd docs: update FINAL_REPORT with auth rewrite, white plane fix, and current SHA
 94bb674 fix: replace white plane artifact with side-by-side identity card layout
 c117abb fix: fill white plane artifact in identity verification bento card

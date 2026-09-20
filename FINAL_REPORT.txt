@@ -2,7 +2,7 @@ EXAMGUARD FINAL PRODUCTION REPORT
 ============================================================
 
 DATE: 2026-09-20
-GIT COMMIT: bbc84dd (docs: update FINAL_REPORT with auth rewrite, white plane fix, and current SHA)
+GIT COMMIT: 2001c94 (fix: add FIREBASE_PROJECT_ID default, improve error logging)
 GIT PUSH: PUSHED to origin/main
 
 ==================================================
@@ -10,16 +10,29 @@ EXAMGUARD PRODUCTION STATUS: DEPLOYED & FUNCTIONAL
 ==================================================
 
 The application is deployed and functional. All code-level bugs have been
-fixed, including Google auth lifecycle, UI polish, and visual artifacts.
+fixed, including Google auth lifecycle, UI polish, visual artifacts, and
+Firebase token verification failure.
 
-LATEST CHANGES (since c3326d4):
+ROOT CAUSE FIX (2001c94):
+- FIREBASE_PROJECT_ID had no default value (None) in config.py
+- firebase_verification.py guarded with `if not project_id: return None`
+  BEFORE making the HTTP call — but project_id is NOT used in the call
+- This silently failed verification for ALL tokens when env var was missing
+- Fix: Added default "exam-guard-75675" (matches frontend), removed guard,
+  improved error logging with Firebase response body details
+
+LATEST CHANGES (2001c94 — root cause fix):
+- config.py: FIREBASE_PROJECT_ID defaults to "exam-guard-75675" (matches frontend)
+- firebase_verification.py: removed project_id guard that blocked verification before HTTP call
+- firebase_verification.py: logs Firebase error response body (status + error code)
+- auth.py: user-facing error no longer exposes config variable names
+- test: updated assertion for new error message format
+
+PRIOR CHANGES (since c3326d4):
 - AuthContext rewritten with authPhase state machine (eliminates race conditions)
 - AppShell rewritten with self-contained AuthGate component
 - Fixed handleSignIn scope bug (was referenced in AppShell but defined inside AuthGate)
 - Auth spinner CSS, error state UI, Google icon SVG added
-- Backend firebase_verification.py: logging for missing config
-- Backend auth.py: detailed exchange error messages
-- Frontend firebase.ts: improved exchange error parsing
 - White plane artifact FIXED: side-by-side identity card layout (text left, face viz right)
 - Face visualization improved with detailed SVG (face mesh, scan lines, pulse animation)
 

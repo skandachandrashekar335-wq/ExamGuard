@@ -7,16 +7,15 @@ Frontend:  https://exam-guardian-management.vercel.app (Vercel project: exam-gua
 Backend:   https://examguard-production-ef78.up.railway.app
 Database:  Neon PostgreSQL (connected)
 Firebase:  exam-guard-75675 (Google Auth)
-Git:       main branch, HEAD = bbc84dd
+Git:       main branch, HEAD = 2001c94
 
 DEPLOYED COMMITS (latest session)
 --------------------------------
+2001c94 fix: add FIREBASE_PROJECT_ID default, improve error logging
 bbc84dd docs: update FINAL_REPORT with auth rewrite, white plane fix, and current SHA
 94bb674 fix: replace white plane artifact with side-by-side identity card layout
 c117abb fix: fill white plane artifact in identity verification bento card
 1daf461 fix: auth lifecycle state machine, AppShell AuthGate, and features page polish
-9311531 audit: final documentation sync and Firebase Web API Key security review
-c3326d4 docs: update README and TRD to reflect current project state
 
 VERIFICATION RESULTS
 --------------------
@@ -48,28 +47,25 @@ NOT TESTED (requires real browser)
 
 CRITICAL FIXES THIS SESSION
 ----------------------------
-1. AuthContext REWRITTEN: authPhase state machine replaces race-prone
-   signInInProgress/exchangeInProgress refs. Proper React state management
-   with useCallback for doExchange.
+1. ROOT CAUSE FIX: FIREBASE_PROJECT_ID had no default (None) in config.py.
+   firebase_verification.py guarded with `if not project_id: return None`
+   BEFORE making the HTTP call — but project_id is NOT used in the call.
+   This silently failed verification for ALL tokens when env var was missing.
+   Fix: Added default "exam-guard-75675" (matches frontend), removed guard.
 
-2. AppShell REWRITTEN: Self-contained AuthGate component (no children props).
-   Fixed handleSignIn scope bug (was referenced in AppShell but defined inside AuthGate).
-   Handles all unauthenticated UX states: loading, popup, exchanging, error, authenticated.
+2. Backend firebase_verification.py: Logs Firebase error response body
+   (HTTP status + error code) for better diagnostics.
 
-3. Backend exchange error messages: Detailed error responses from auth.py
-   (missing FIREBASE_PROJECT_ID, missing FIREBASE_WEB_API_KEY, invalid token).
+3. Backend auth.py: User-facing error no longer exposes config variable
+   names (says "invalid, expired, or revoked" instead).
 
-4. Backend firebase_verification.py: Improved logging for missing config
-   variables at startup and during verification.
+4. AuthContext REWRITTEN: authPhase state machine replaces race-prone
+   signInInProgress/exchangeInProgress refs.
 
-5. White plane artifact FIXED: Identity Verification bento card redesigned
+5. AppShell REWRITTEN: Self-contained AuthGate component (no children props).
+
+6. White plane artifact FIXED: Identity Verification bento card redesigned
    as side-by-side layout (text/badges left, face visualization right).
-
-6. Face visualization IMPROVED: Larger SVG with gradient fill, scan lines,
-   pulse animation, corner markers, data lines.
-
-7. Backend test regression FIXED: test_garbage_token_returns_401 updated to
-   accept new error message format from auth.py changes.
 
 AUTH FLOW VERIFICATION
 ----------------------
@@ -94,5 +90,5 @@ REMAINING ITEMS
 ---------------
 - Full end-to-end Google OAuth login test requires manual user verification (see above)
 - Railway FIREBASE_WEB_API_KEY env var: recommended to set explicitly (startup warning when not set)
-- Railway CORS_ORIGINS env var: overridden by code (hardcoded production origins)
+- Railway FIREBASE_PROJECT_ID env var: now has default, not required
 - Firebase Web API Key: PUBLIC by design, safe as config.py default (matches frontend firebase_init.ts)
