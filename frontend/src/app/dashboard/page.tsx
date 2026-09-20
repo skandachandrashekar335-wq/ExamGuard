@@ -74,6 +74,12 @@ interface BatchResult {
 }
 
 import { apiRequest, qs } from "@/lib/api";
+import {
+  getDemoStatus,
+  loadDemoData,
+  resetDemoData,
+  type DemoStatusResponse,
+} from "@/lib/demo-api";
 
 const STATUS_BADGE: Record<string, string> = {
   VERIFIED: "eg-badge-success",
@@ -103,6 +109,11 @@ export default function DashboardPage() {
   const [selectedDocs, setSelectedDocs] = useState<Set<number>>(new Set());
   const { user, isAuthenticated, examGuardToken } = useAuth();
 
+  // Demo data state
+  const [demoStatus, setDemoStatus] = useState<DemoStatusResponse | null>(null);
+  const [demoLoading, setDemoLoading] = useState(false);
+  const [demoMessage, setDemoMessage] = useState("");
+
   const fetchDashboard = useCallback(() => {
     if (!selectedExamId) { setDashboard(null); return; }
     setLoading(true);
@@ -127,6 +138,50 @@ export default function DashboardPage() {
   }, [examGuardToken]);
 
   useEffect(() => { fetchDashboard(); }, [fetchDashboard, isAuthenticated]);
+
+  // Demo data status check
+  useEffect(() => {
+    if (isAuthenticated) {
+      getDemoStatus()
+        .then(setDemoStatus)
+        .catch(() => {});
+    }
+  }, [isAuthenticated]);
+
+  const handleLoadDemo = async () => {
+    setDemoLoading(true);
+    setDemoMessage("");
+    try {
+      const result = await loadDemoData();
+      setDemoMessage(result.message);
+      setDemoStatus({
+        loaded: true,
+        demo_exam_id: result.demo_exam_id,
+        demo_hall_id: result.demo_hall_id,
+        demo_student_id: result.demo_student_id,
+        demo_session_id: result.demo_session_id,
+        demo_attempt_id: result.demo_attempt_id,
+      });
+    } catch (e: any) {
+      setDemoMessage(e.message || "Failed to load demo data");
+    } finally {
+      setDemoLoading(false);
+    }
+  };
+
+  const handleResetDemo = async () => {
+    setDemoLoading(true);
+    setDemoMessage("");
+    try {
+      const result = await resetDemoData();
+      setDemoMessage(result.message);
+      setDemoStatus({ loaded: false, demo_exam_id: null, demo_hall_id: null, demo_student_id: null, demo_session_id: null, demo_attempt_id: null });
+    } catch (e: any) {
+      setDemoMessage(e.message || "Failed to reset demo data");
+    } finally {
+      setDemoLoading(false);
+    }
+  };
 
   const filteredStudents =
     dashboard?.students.filter(
@@ -175,6 +230,63 @@ export default function DashboardPage() {
           <Link href="/" className="eg-breadcrumb">← HOME</Link>
           <h1 className="eg-page-title">Verification Dashboard</h1>
           <p className="eg-page-desc">Exam-level verification status overview</p>
+        </div>
+
+        {/* Demo Environment Card */}
+        <div className="glass-surface p-4 mb-6" style={{ borderColor: "rgba(107,78,255,0.2)" }}>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="eg-eyebrow" style={{ color: "var(--accent)" }}>Demo Environment</span>
+              </div>
+              <p className="text-sm text-[var(--text-secondary)]">
+                Load a complete ExamGuard demonstration scenario with an exam, hall, candidate, session and verification-ready data.
+              </p>
+              {demoMessage && (
+                <p className="text-xs mt-2" style={{ color: demoMessage.includes("success") || demoMessage.includes("ready") ? "var(--success)" : "var(--text-muted)" }}>
+                  {demoMessage}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              {demoStatus?.loaded ? (
+                <>
+                  <div className="text-right hidden sm:block">
+                    <div className="text-xs text-[var(--text-muted)]">
+                      Exam: <span className="text-[var(--text-secondary)]">ExamGuard Demo Examination</span>
+                    </div>
+                    <div className="text-xs text-[var(--text-muted)]">
+                      Candidate: <span style={{ fontFamily: "var(--font-mono)" }} className="text-[var(--text-secondary)]">DEMO001</span>
+                    </div>
+                    <div className="text-xs text-[var(--text-muted)]">
+                      Hall: <span className="text-[var(--text-secondary)]">Demo Hall A</span>
+                    </div>
+                  </div>
+                  <Link
+                    href={`/identity-verifications/${demoStatus.demo_attempt_id || ""}`}
+                    className="eg-btn eg-btn-primary px-4 py-2 text-sm"
+                  >
+                    Open Demo Session
+                  </Link>
+                  <button
+                    onClick={handleResetDemo}
+                    disabled={demoLoading}
+                    className="eg-btn eg-btn-ghost px-3 py-2 text-sm"
+                  >
+                    {demoLoading ? "..." : "Reset"}
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={handleLoadDemo}
+                  disabled={demoLoading}
+                  className="eg-btn eg-btn-primary px-5 py-2 text-sm"
+                >
+                  {demoLoading ? "Loading Demo Data..." : "Load Demo Data"}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="eg-filter-bar">

@@ -34,6 +34,7 @@ from app.api.v1.analytics import router as analytics_router
 from app.api.v1.invigilator_assignments import router as invigilator_assignments_router
 from app.api.v1.invigilator import router as invigilator_router
 from app.api.v1.hall_ticket_mappings import router as hall_ticket_mappings_router
+from app.api.v1.demo import router as demo_router
 
 router = APIRouter()
 
@@ -71,6 +72,7 @@ router.include_router(analytics_router)
 router.include_router(invigilator_assignments_router)
 router.include_router(invigilator_router)
 router.include_router(hall_ticket_mappings_router)
+router.include_router(demo_router)
 
 
 @router.get("/ping")

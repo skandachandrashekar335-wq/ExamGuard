@@ -27,6 +27,7 @@ import VerificationState, {
 import AuditTimeline from "@/components/AuditTimeline";
 import OverrideDialog from "@/components/OverrideDialog";
 import AppShell from "@/components/AppShell";
+import { getDemoReferenceImageBlob } from "@/lib/demo-api";
 
 function fileToBase64(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -62,6 +63,8 @@ export default function IdentityVerificationDetailPage() {
   const [showReview, setShowReview] = useState(false);
   const [reviewNotes, setReviewNotes] = useState("");
   const [showOverride, setShowOverride] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
+  const [probeMode, setProbeMode] = useState<"camera" | "upload">("camera");
 
   const fetchContext = useCallback(async () => {
     try {
@@ -151,6 +154,19 @@ export default function IdentityVerificationDetailPage() {
     }
   };
 
+  const handleLoadDemoReference = async () => {
+    setDemoLoading(true);
+    try {
+      const blob = await getDemoReferenceImageBlob();
+      setReferenceImage(blob);
+      setActionMsg("Demo reference image loaded");
+    } catch (e: unknown) {
+      setActionMsg(e instanceof Error ? e.message : "Failed to load demo reference");
+    } finally {
+      setDemoLoading(false);
+    }
+  };
+
   const handleStart = async () => {
     setActionMsg("");
     try {
@@ -226,24 +242,78 @@ export default function IdentityVerificationDetailPage() {
 
             {/* Camera + Reference Image */}
             {canVerify && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <ImageUpload
-                  label="Reference Image"
-                  onImage={(blob) => setReferenceImage(blob)}
-                  onClear={() => setReferenceImage(null)}
-                  disabled={uiState !== "READY"}
-                />
-                <CameraCapture
-                  onCapture={(blob, url) => {
-                    setProbeImage(blob);
-                    setProbeDataUrl(url);
-                  }}
-                  onRetake={() => {
-                    setProbeImage(null);
-                    setProbeDataUrl(null);
-                  }}
-                  disabled={uiState !== "READY"}
-                />
+              <div className="space-y-4">
+                {/* Reference Image with Demo Load Option */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <ImageUpload
+                      label="Reference Image"
+                      onImage={(blob) => setReferenceImage(blob)}
+                      onClear={() => setReferenceImage(null)}
+                      disabled={uiState !== "READY"}
+                    />
+                    <button
+                      onClick={handleLoadDemoReference}
+                      disabled={demoLoading || uiState !== "READY"}
+                      className="eg-btn eg-btn-ghost w-full text-xs py-1.5"
+                    >
+                      {demoLoading ? "Loading..." : "Load Demo Reference"}
+                    </button>
+                  </div>
+
+                  {/* Probe Image — Camera or Upload toggle */}
+                  <div className="space-y-2">
+                    <div className="flex gap-1 mb-1">
+                      <button
+                        onClick={() => setProbeMode("camera")}
+                        className={`eg-btn text-xs px-3 py-1 ${probeMode === "camera" ? "eg-btn-primary" : "eg-btn-ghost"}`}
+                        disabled={uiState !== "READY"}
+                      >
+                        Use Camera
+                      </button>
+                      <button
+                        onClick={() => setProbeMode("upload")}
+                        className={`eg-btn text-xs px-3 py-1 ${probeMode === "upload" ? "eg-btn-primary" : "eg-btn-ghost"}`}
+                        disabled={uiState !== "READY"}
+                      >
+                        Upload Test Photo
+                      </button>
+                    </div>
+
+                    {probeMode === "camera" ? (
+                      <CameraCapture
+                        onCapture={(blob, url) => {
+                          setProbeImage(blob);
+                          setProbeDataUrl(url);
+                        }}
+                        onRetake={() => {
+                          setProbeImage(null);
+                          setProbeDataUrl(null);
+                        }}
+                        disabled={uiState !== "READY"}
+                      />
+                    ) : (
+                      <div>
+                        <ImageUpload
+                          label="Test Photo (probe)"
+                          onImage={(blob) => {
+                            setProbeImage(blob);
+                            setProbeDataUrl(URL.createObjectURL(blob));
+                          }}
+                          onClear={() => {
+                            setProbeImage(null);
+                            setProbeDataUrl(null);
+                          }}
+                          disabled={uiState !== "READY"}
+                        />
+                        <p className="text-[10px] text-[var(--text-muted)] mt-1">
+                          Upload a test image to demonstrate face verification.
+                          Supported: JPG, PNG
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
