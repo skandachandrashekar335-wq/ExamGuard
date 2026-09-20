@@ -41,9 +41,8 @@ WORKDIR /app
 # Copy dependency definition first (for Docker layer caching)
 COPY pyproject.toml ./
 
-# Install Python dependencies
-RUN pip install --no-cache-dir "." && \
-    pip install --no-cache-dir "uniface[cpu]>=4.0.0" || true
+# Install Python dependencies (including uniface for real face verification)
+RUN pip install --no-cache-dir ".[uniface]"
 
 # Copy application code
 COPY . ./

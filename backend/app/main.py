@@ -55,6 +55,17 @@ def _validate_production_config() -> None:
             "Set FACE_VERIFICATION_PROVIDER='uniface' for real face verification."
         )
 
+    if settings.FACE_VERIFICATION_PROVIDER == "uniface":
+        try:
+            from uniface.detection import RetinaFace  # noqa: F401
+            from uniface.recognition import ArcFace  # noqa: F401
+            logger.info("STARTUP: UniFace provider available — real face verification enabled")
+        except ImportError as e:
+            warnings.append(
+                f"FACE_VERIFICATION_PROVIDER='uniface' but uniface package not installed: {e}. "
+                "Face verification will fail. Install with: pip install 'uniface[cpu]>=4.0.0'"
+            )
+
     if not settings.DATABASE_URL or "password" in settings.DATABASE_URL:
         warnings.append("DATABASE_URL may contain default credentials")
 
@@ -122,6 +133,7 @@ def create_app() -> FastAPI:
         except Exception:
             result["database"] = "disconnected"
             result["status"] = "degraded"
+        result["face_provider"] = settings.FACE_VERIFICATION_PROVIDER
         return result
 
     # Extended health/metrics endpoints (always registered)

@@ -1,0 +1,5 @@
+# ExamGuard Backend — Nixpacks configuration
+# Ensures uniface[cpu] is installed alongside base dependencies.
+
+[phases.build]
+cmds = ["pip install '.[uniface]'"]
