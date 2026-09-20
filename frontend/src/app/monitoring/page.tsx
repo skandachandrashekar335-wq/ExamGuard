@@ -532,7 +532,7 @@ export default function MonitoringPage() {
               <div className="eg-mono-sm text-[var(--text-muted)] mb-3">
                 EVENT FILTERS
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              <div className="eg-filter-bar">
                 <FilterSelect
                   label="CATEGORY"
                   value={filterCategory}
@@ -572,15 +572,15 @@ export default function MonitoringPage() {
                   onChange={setFilterLimit}
                   placeholder="50"
                 />
-              </div>
-              <div className="mt-3 flex justify-end">
-                <button
-                  type="button"
-                  onClick={applyFilters}
-                  className="eg-btn eg-btn-primary"
-                >
-                  APPLY
-                </button>
+                <div className="eg-filter-actions">
+                  <button
+                    type="button"
+                    onClick={applyFilters}
+                    className="eg-btn eg-btn-primary"
+                  >
+                    APPLY
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -642,7 +642,7 @@ export default function MonitoringPage() {
               <div className="eg-mono-sm text-[var(--text-muted)] mb-3">
                 ALERT FILTERS
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="eg-filter-bar">
                 <FilterSelect
                   label="SEVERITY"
                   value={alertSeverity}
@@ -657,15 +657,15 @@ export default function MonitoringPage() {
                   options={EVENT_TYPES.map((t) => ({ value: t, label: t }))}
                   blank="ALL"
                 />
-              </div>
-              <div className="mt-3 flex justify-end">
-                <button
-                  type="button"
-                  onClick={applyAlertFilters}
-                  className="eg-btn eg-btn-primary"
-                >
-                  APPLY
-                </button>
+                <div className="eg-filter-actions">
+                  <button
+                    type="button"
+                    onClick={applyAlertFilters}
+                    className="eg-btn eg-btn-primary"
+                  >
+                    APPLY
+                  </button>
+                </div>
               </div>
             </div>
 

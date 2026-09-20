@@ -243,11 +243,15 @@ export default function IdentityVerificationDetailPage() {
             {/* Camera + Reference Image */}
             {canVerify && (
               <div className="space-y-4">
+                <p className="text-xs text-[var(--text-muted)]">
+                  Upload your face as the reference, then upload a different photo of yourself as the test image to demonstrate face matching.
+                </p>
                 {/* Reference Image with Demo Load Option */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
+                    <span className="eg-mono-sm text-[var(--text-muted)] block">REFERENCE FACE</span>
                     <ImageUpload
-                      label="Reference Image"
+                      label="Reference Face (your face photo)"
                       onImage={(blob) => setReferenceImage(blob)}
                       onClear={() => setReferenceImage(null)}
                       disabled={uiState !== "READY"}
@@ -257,12 +261,13 @@ export default function IdentityVerificationDetailPage() {
                       disabled={demoLoading || uiState !== "READY"}
                       className="eg-btn eg-btn-ghost w-full text-xs py-1.5"
                     >
-                      {demoLoading ? "Loading..." : "Load Demo Reference"}
+                      {demoLoading ? "Loading..." : "Use Demo Reference (synthetic)"}
                     </button>
                   </div>
 
                   {/* Probe Image — Camera or Upload toggle */}
                   <div className="space-y-2">
+                    <span className="eg-mono-sm text-[var(--text-muted)] block">TEST IMAGE</span>
                     <div className="flex gap-1 mb-1">
                       <button
                         onClick={() => setProbeMode("camera")}
@@ -295,7 +300,7 @@ export default function IdentityVerificationDetailPage() {
                     ) : (
                       <div>
                         <ImageUpload
-                          label="Test Photo (probe)"
+                          label="Test Photo (different photo of your face)"
                           onImage={(blob) => {
                             setProbeImage(blob);
                             setProbeDataUrl(URL.createObjectURL(blob));
@@ -307,7 +312,7 @@ export default function IdentityVerificationDetailPage() {
                           disabled={uiState !== "READY"}
                         />
                         <p className="text-[10px] text-[var(--text-muted)] mt-1">
-                          Upload a test image to demonstrate face verification.
+                          Upload a different photo of the same person to test face matching.
                           Supported: JPG, PNG
                         </p>
                       </div>
@@ -325,8 +330,18 @@ export default function IdentityVerificationDetailPage() {
                   disabled={!referenceImage || !probeImage || uiState !== "READY"}
                   className="eg-btn eg-btn-primary px-6 py-2 disabled:opacity-30"
                 >
-                  Verify Identity
+                  {uiState === "READY" ? "Verify Identity" : "Processing..."}
                 </button>
+                {!referenceImage && (
+                  <span className="text-xs text-[var(--text-muted)]">
+                    Upload a reference face photo first
+                  </span>
+                )}
+                {referenceImage && !probeImage && (
+                  <span className="text-xs text-[var(--text-muted)]">
+                    Upload or capture a test photo
+                  </span>
+                )}
                 {verifyError && (
                   <span className="text-xs" style={{ color: "var(--danger)" }}>
                     {verifyError}

@@ -498,7 +498,12 @@ def verify_face(
             category=category.value,
             detail=f"error_type={e.error.error_type.value}",
         )
-        raise ValueError(f"Provider error: {e.error.message}") from e
+        user_message = e.error.message
+        if e.error.error_type.value == "NO_FACE_DETECTED":
+            user_message = "No face detected. Upload an image containing one clear face."
+        elif e.error.error_type.value == "MULTIPLE_FACES_DETECTED":
+            user_message = "Multiple faces detected. Please upload a single-person image."
+        raise ValueError(user_message) from e
     except Exception as e:
         from app.services.face_verification.audit import log_verification_event
         fail_attempt(
@@ -511,7 +516,7 @@ def verify_face(
             category="PROVIDER_INTERNAL_ERROR",
             detail=f"error_type={type(e).__name__}",
         )
-        raise ValueError("Face verification provider encountered an error") from e
+        raise ValueError("Face verification service encountered an error. Please try again.") from e
 
     # 6. Convert result → evidence records
     evidence_records = []

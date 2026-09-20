@@ -176,6 +176,7 @@ export default function DashboardPage() {
   };
 
   const handleResetDemo = async () => {
+    if (!window.confirm("Reset Demo Data?\n\nThis removes only ExamGuard demonstration records.")) return;
     setDemoLoading(true);
     setDemoMessage("");
     try {
