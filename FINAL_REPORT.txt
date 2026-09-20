@@ -2,7 +2,7 @@ EXAMGUARD FINAL PRODUCTION REPORT
 ============================================================
 
 DATE: 2026-09-20
-GIT COMMIT: 43afffd (fix: white plane artifacts, demo RBAC UX, production face verification warning)
+GIT COMMIT: 4f72484 (fix: monitoring filter layout, reset confirmation, IV UX, face verification error messages)
 GIT PUSH: PUSHED to origin/main
 
 ==================================================
@@ -21,7 +21,18 @@ ROOT CAUSE FIX (2001c94):
 - Fix: Added default "exam-guard-75675" (matches frontend), removed guard,
   improved error logging with Firebase response body details
 
-LATEST CHANGES (43afffd — white plane artifacts, demo RBAC UX, production face verification warning):
+LATEST CHANGES (4f72484 — monitoring filter layout, reset confirmation, IV UX, face verification error messages):
+- monitoring/page.tsx: Replaced raw Tailwind grid with eg-filter-bar CSS system for proper responsive layout
+- monitoring/page.tsx: Moved Apply buttons into eg-filter-actions within the grid
+- dashboard/page.tsx: Added confirmation dialog before Reset Demo Data ("Reset Demo Data?\n\nThis removes only ExamGuard demonstration records.")
+- identity-verifications/[id]/page.tsx: Clearer labels for Reference Face vs Test Image sections
+- identity-verifications/[id]/page.tsx: Helpful hints when images are missing ("Upload a reference face photo first", "Upload or capture a test photo")
+- identity-verifications/[id]/page.tsx: Button shows "Processing..." during verification
+- identity_verification.py: User-friendly error messages for NO_FACE_DETECTED ("No face detected. Upload an image containing one clear face.")
+- identity_verification.py: User-friendly error messages for MULTIPLE_FACES_DETECTED ("Multiple faces detected. Please upload a single-person image.")
+- identity_verification.py: Improved general error message ("Face verification service encountered an error. Please try again.")
+
+PRIOR CHANGES (43afffd — white plane artifacts, demo RBAC UX, production face verification warning):
 - DecisionDisplay.tsx: Added glass-surface class, replaced border-white with var(--border), added rounded
 - VerificationState.tsx: Added glass-surface class, replaced border-white with var(--border), active step uses var(--accent)
 - ImageUpload.tsx: Replaced border-white with var(--border), added rounded class

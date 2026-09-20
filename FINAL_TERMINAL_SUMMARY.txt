@@ -46,9 +46,9 @@ FIREBASE:
 
 GIT:
 - Branch: main
-- Latest commit: 43afffd (fix: white plane artifacts, demo RBAC UX, production face verification warning)
-- HEAD: 43afffd
-- origin/main: 43afffd
+- Latest commit: 4f72484 (fix: monitoring filter layout, reset confirmation, IV UX, face verification error messages)
+- HEAD: 4f72484
+- origin/main: 4f72484
 - Pushed: YES
 - Working tree: clean
 
