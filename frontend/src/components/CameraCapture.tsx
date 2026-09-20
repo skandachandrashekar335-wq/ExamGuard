@@ -111,8 +111,8 @@ export default function CameraCapture({
   };
 
   return (
-    <div className="border border-white/10 bg-[#0a0a0a]">
-      <div className="px-4 py-2 border-b border-white/10 flex items-center justify-between">
+    <div className="border border-[var(--border)] bg-[#0a0a0a] rounded">
+      <div className="px-4 py-2 border-b border-[var(--border)] flex items-center justify-between">
         <span className="eg-mono-sm text-[var(--text-secondary)]">
           Camera
         </span>
@@ -172,7 +172,7 @@ export default function CameraCapture({
 
         {state === "error" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6">
-            <span className="eg-mono text-red-400 text-center">
+            <span className="eg-mono text-[var(--danger)] text-center">
               {errorMessage}
             </span>
             <button onClick={startCamera} className="eg-btn px-4 py-2">
@@ -191,7 +191,7 @@ export default function CameraCapture({
       </div>
 
       {state === "active" && (
-        <div className="px-4 py-3 border-t border-white/10 flex justify-center">
+        <div className="px-4 py-3 border-t border-[var(--border)] flex justify-center">
           <button
             onClick={captureFrame}
             disabled={disabled}
@@ -203,7 +203,7 @@ export default function CameraCapture({
       )}
 
       {state === "captured" && (
-        <div className="px-4 py-3 border-t border-white/10 flex justify-center">
+        <div className="px-4 py-3 border-t border-[var(--border)] flex justify-center">
           <button
             onClick={retake}
             disabled={disabled}

@@ -118,7 +118,7 @@ export default function InvigilatorPage() {
           <button
             onClick={load}
             disabled={actionLoading}
-            className="px-4 py-2 rounded border border-white/20"
+            className="px-4 py-2 rounded border border-[var(--border)]"
           >
             Refresh
           </button>

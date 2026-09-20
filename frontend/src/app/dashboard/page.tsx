@@ -73,7 +73,7 @@ interface BatchResult {
   }[];
 }
 
-import { apiRequest, qs } from "@/lib/api";
+import { apiRequest, qs, ApiError } from "@/lib/api";
 import {
   getDemoStatus,
   loadDemoData,
@@ -148,6 +148,8 @@ export default function DashboardPage() {
     }
   }, [isAuthenticated]);
 
+  const canManageDemo = user?.role === "ADMIN" || user?.role === "OPERATOR";
+
   const handleLoadDemo = async () => {
     setDemoLoading(true);
     setDemoMessage("");
@@ -163,7 +165,11 @@ export default function DashboardPage() {
         demo_attempt_id: result.demo_attempt_id,
       });
     } catch (e: any) {
-      setDemoMessage(e.message || "Failed to load demo data");
+      if (e instanceof ApiError && e.status === 403) {
+        setDemoMessage("Demo data management requires Administrator or Operator access.");
+      } else {
+        setDemoMessage(e.message || "Failed to load demo data");
+      }
     } finally {
       setDemoLoading(false);
     }
@@ -177,7 +183,11 @@ export default function DashboardPage() {
       setDemoMessage(result.message);
       setDemoStatus({ loaded: false, demo_exam_id: null, demo_hall_id: null, demo_student_id: null, demo_session_id: null, demo_attempt_id: null });
     } catch (e: any) {
-      setDemoMessage(e.message || "Failed to reset demo data");
+      if (e instanceof ApiError && e.status === 403) {
+        setDemoMessage("Demo data management requires Administrator or Operator access.");
+      } else {
+        setDemoMessage(e.message || "Failed to reset demo data");
+      }
     } finally {
       setDemoLoading(false);
     }
@@ -268,22 +278,30 @@ export default function DashboardPage() {
                   >
                     Open Demo Session
                   </Link>
-                  <button
-                    onClick={handleResetDemo}
-                    disabled={demoLoading}
-                    className="eg-btn eg-btn-ghost px-3 py-2 text-sm"
-                  >
-                    {demoLoading ? "..." : "Reset"}
-                  </button>
+                  {canManageDemo && (
+                    <button
+                      onClick={handleResetDemo}
+                      disabled={demoLoading}
+                      className="eg-btn eg-btn-ghost px-3 py-2 text-sm"
+                    >
+                      {demoLoading ? "..." : "Reset"}
+                    </button>
+                  )}
                 </>
               ) : (
-                <button
-                  onClick={handleLoadDemo}
-                  disabled={demoLoading}
-                  className="eg-btn eg-btn-primary px-5 py-2 text-sm"
-                >
-                  {demoLoading ? "Loading Demo Data..." : "Load Demo Data"}
-                </button>
+                canManageDemo ? (
+                  <button
+                    onClick={handleLoadDemo}
+                    disabled={demoLoading}
+                    className="eg-btn eg-btn-primary px-5 py-2 text-sm"
+                  >
+                    {demoLoading ? "Loading Demo Data..." : "Load Demo Data"}
+                  </button>
+                ) : (
+                  <span className="text-xs text-[var(--text-muted)]">
+                    Demo data not loaded. Ask an administrator to load it.
+                  </span>
+                )
               )}
             </div>
           </div>

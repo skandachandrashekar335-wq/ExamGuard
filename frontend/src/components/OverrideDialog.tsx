@@ -39,7 +39,7 @@ export default function OverrideDialog({
   };
 
   return (
-    <div className="border border-white/20 p-4 bg-[#0a0a0a]">
+    <div className="border border-[var(--border)] p-4 bg-[#0a0a0a] rounded">
       <h4 className="eg-mono-sm text-[var(--text-secondary)] mb-3">
         Human Override
       </h4>
@@ -63,7 +63,7 @@ export default function OverrideDialog({
                 onClick={() => setNewDecision(d)}
                 disabled={submitting}
                 className={`eg-btn px-3 py-1 text-[10px] disabled:opacity-30 ${
-                  newDecision === d ? "border-white text-white" : ""
+                  newDecision === d ? "border-[var(--accent)] text-[var(--text-primary)]" : ""
                 }`}
               >
                 {d}
@@ -84,13 +84,13 @@ export default function OverrideDialog({
             }}
             disabled={submitting}
             rows={3}
-            className="w-full bg-black border border-white/10 px-3 py-2 text-sm text-white placeholder:text-[var(--text-muted)] focus:outline-none focus:border-white/30 resize-none disabled:opacity-30"
+            className="w-full bg-black border border-[var(--border)] px-3 py-2 text-sm text-white placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] resize-none disabled:opacity-30 rounded"
             placeholder="Explain the reason for this override..."
           />
         </div>
 
         {error && (
-          <p className="text-xs text-red-400">{error}</p>
+          <p className="text-xs text-[var(--danger)]">{error}</p>
         )}
 
         <p className="eg-mono-sm text-[var(--text-muted)]">
@@ -108,7 +108,7 @@ export default function OverrideDialog({
           <button
             onClick={handleSubmit}
             disabled={submitting || !reason.trim()}
-            className="eg-btn px-4 py-2 border-white/40 text-white disabled:opacity-30"
+            className="eg-btn eg-btn-primary px-4 py-2 disabled:opacity-30"
           >
             {submitting ? "Confirming..." : "Confirm Override"}
           </button>

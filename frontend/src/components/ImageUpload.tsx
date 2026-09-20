@@ -41,8 +41,8 @@ export default function ImageUpload({
   };
 
   return (
-    <div className="border border-white/10 bg-[#0a0a0a]">
-      <div className="px-4 py-2 border-b border-white/10 flex items-center justify-between">
+    <div className="border border-[var(--border)] bg-[#0a0a0a] rounded">
+      <div className="px-4 py-2 border-b border-[var(--border)] flex items-center justify-between">
         <span className="eg-mono-sm text-[var(--text-secondary)]">{label}</span>
         {fileName && (
           <span className="eg-mono-sm text-[var(--text-tertiary)] truncate max-w-[120px]">
@@ -76,7 +76,7 @@ export default function ImageUpload({
       </div>
 
       {preview && (
-        <div className="px-4 py-3 border-t border-white/10 flex justify-center">
+        <div className="px-4 py-3 border-t border-[var(--border)] flex justify-center">
           <button
             onClick={clear}
             disabled={disabled}

@@ -48,6 +48,13 @@ def _validate_production_config() -> None:
             f"— expected 'deterministic', 'none', or 'uniface'"
         )
 
+    if settings.FACE_VERIFICATION_PROVIDER == "deterministic":
+        warnings.append(
+            "FACE_VERIFICATION_PROVIDER='deterministic' in production — "
+            "face verification returns hardcoded scores without processing images. "
+            "Set FACE_VERIFICATION_PROVIDER='uniface' for real face verification."
+        )
+
     if not settings.DATABASE_URL or "password" in settings.DATABASE_URL:
         warnings.append("DATABASE_URL may contain default credentials")
 

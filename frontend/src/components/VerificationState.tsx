@@ -19,7 +19,7 @@ export default function VerificationState({ current }: Props) {
   const currentIdx = STATES.findIndex((s) => s.key === current);
 
   return (
-    <div className="border border-white/10 p-4">
+    <div className="glass-surface border border-[var(--border)] p-4 rounded">
       <span className="eg-mono-sm text-[var(--text-muted)] block mb-3">
         Verification State
       </span>
@@ -27,10 +27,10 @@ export default function VerificationState({ current }: Props) {
         {STATES.map((s, i) => (
           <div key={s.key} className="flex items-center gap-1">
             <div
-              className={`px-2 py-1 text-[10px] font-mono border ${
+              className={`px-2 py-1 text-[10px] font-mono border rounded ${
                 i <= currentIdx
-                  ? "border-white/30 text-white bg-white/5"
-                  : "border-white/5 text-[var(--text-muted)]"
+                  ? "border-[var(--accent)] text-[var(--text-primary)] bg-[var(--accent-soft)]"
+                  : "border-[var(--border)] text-[var(--text-muted)]"
               }`}
             >
               {s.label}
@@ -38,7 +38,7 @@ export default function VerificationState({ current }: Props) {
             {i < STATES.length - 1 && (
               <div
                 className={`w-3 h-px ${
-                  i < currentIdx ? "bg-white/30" : "bg-white/5"
+                  i < currentIdx ? "bg-[var(--accent)]" : "bg-[var(--border)]"
                 }`}
               />
             )}

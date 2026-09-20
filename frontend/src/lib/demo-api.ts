@@ -43,6 +43,7 @@ export async function getDemoReferenceImageBlob(): Promise<Blob> {
   const res = await fetch(`${API_BASE}/api/v1/demo/reference-image`, {
     headers,
   });
+  if (res.status === 403) throw new Error("Demo reference image requires Administrator or Operator access.");
   if (!res.ok) throw new Error("Failed to load demo reference image");
   return res.blob();
 }
