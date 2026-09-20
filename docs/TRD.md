@@ -6,12 +6,12 @@
 
 - **Framework**: FastAPI (Python 3.14.x)
 - **ORM**: SQLAlchemy 2.x
-- **Migrations**: Alembic (26 migrations, head at 026)
+- **Migrations**: Alembic (27 migrations, head at 027)
 - **Database**: PostgreSQL
 - **API**: REST API under `/api/v1/` prefix
-- **Auth**: Firebase ID token verification (server-side REST), ExamGuard JWT (HS256, 30 min)
+- **Auth**: Firebase ID token verification (server-side REST via Identity Toolkit API), ExamGuard JWT (HS256, 30 min)
 - **RBAC**: Role-based access control (ADMIN > OPERATOR > REVIEWER)
-- **CORS**: Configurable via `CORS_ORIGINS` env var
+- **CORS**: Configurable via `CORS_ORIGINS` env var; production Vercel domains hardcoded in `main.py` middleware
 - **Monitoring**: In-memory event/alert buffers (Phase 19, no persistence)
 - **Rate Limiting**: Per-attempt and global per-minute (configurable)
 - **File Upload**: Multipart support, size limits configurable
@@ -21,15 +21,15 @@
 - **Framework**: Next.js 16.x with App Router
 - **Language**: TypeScript 5.x
 - **CSS**: Tailwind CSS v4
-- **Styling**: Monochrome editorial design (Playfair Display / Source Serif 4 / JetBrains Mono)
+- **Styling**: Glassmorphism design system (cream/sage/lavender/purple accent `#6B4EFF`, Playfair Display / Source Serif 4 / JetBrains Mono)
 - **Auth State**: AuthContext bridging Firebase → ExamGuard session
 - **API Clients**: Typed fetch clients (`iv-api.ts`, `entry-verification-api.ts`, etc.)
 - **Build**: `next build` (Turbopack), typecheck via `npx tsc`
 
 ### Database Architecture
 
-- **Migration System**: Alembic 26 migrations (001-026)
-- **Head revision**: `026_create_users_table.py`
+- **Migration System**: Alembic 27 migrations (001-027)
+- **Head revision**: `027_create_invigilator_assignments_table.py`
 - **Models**: 29+ SQLAlchemy models
 - **Soft-delete**: `is_active` field used throughout
 - **Indexes**: Unique on email and firebase_uid; indexed on is_active
@@ -271,9 +271,10 @@ See BACKEND_SCHEMA.md for complete table/listing.
 
 - `SECRET_KEY`: str = "change-me-to-a-random-secret-key" (must change for production)
 - `DATABASE_URL`: str = "postgresql://user:password@localhost:5432/examguard"
-- `CORS_ORIGINS`: list[str] = ["http://localhost:3000"]
+- `CORS_ORIGINS`: list[str] = ["http://localhost:3000", "https://exam-guardian-management.vercel.app", ...] (production domains also hardcoded in `main.py`)
 - `NEXT_PUBLIC_API_URL`: str = "http://localhost:8000"
 - `FIREBASE_PROJECT_ID`: str | None = None (env-driven)
+- `FIREBASE_WEB_API_KEY`: str | None = "AIzaSyCRoOlMP-VO6dgg_TeXhwAkRsE94rZG7GQ" (for Identity Toolkit token exchange)
 - `INITIAL_ADMIN_EMAILS`: list[str] = [] (initial provisioning only)
 - `FACE_VERIFICATION_PROVIDER`: str = "deterministic"
 - `FACE_VERIFICATION_MAX_IMAGE_SIZE_MB`: int = 5

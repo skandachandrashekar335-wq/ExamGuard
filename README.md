@@ -4,10 +4,18 @@ AI-powered Examination Entry Verification, Anti-Proxy, Security, and Attendance 
 
 ## Project Status
 
-- **Phase:** 12 IN PROGRESS (12.1, 12.2 complete)
-- **Backend:** 1986 tests passing (0 failures, 0 errors)
-- **Frontend:** 24 pages (Next.js 16.3.3, React 19, TypeScript, Tailwind v4)
+- **Phase:** 16 COMPLETE
+- **Frontend:** 33 routes (Next.js 16.3.3, React 19, TypeScript, Tailwind v4)
 - **Tech stack:** FastAPI + SQLAlchemy + PostgreSQL (backend), Next.js + TypeScript + Tailwind (frontend)
+- **Firebase project:** `exam-guard-75675`
+
+### Production Deployment
+
+| Service | URL | Status |
+|---|---|---|
+| Frontend | https://exam-guardian-management.vercel.app | Vercel |
+| Backend API | https://examguard-production-ef78.up.railway.app | Railway |
+| Database | Neon PostgreSQL (serverless) | Connected |
 
 ### Phase 8 — Face Verification
 
@@ -46,7 +54,7 @@ AI-powered Examination Entry Verification, Anti-Proxy, Security, and Attendance 
 - **11.5** Admin risk UI: proxy-risk-api.ts client, risk panel on entry verification detail page with signals table, assessment summary/history, detect/assess buttons
 - **11.6** Integration & hardening: 86 integration tests, security/privacy audit, 2 consecutive full suite runs (1889 passed)
 
-### Phase 12 — Attendance Management (IN PROGRESS)
+### Phase 12 — Attendance Management (COMPLETE)
 
 - **12.1** Domain foundation: AttendanceRecord + AttendanceEvent models, 3 enums (AttendanceStatus, EntryMethod, AttendanceEventType), migration 022, 42 model tests
 - **12.2** Service layer: 7 service functions (record, get, list, events, manual, summary, history), 55 service tests
@@ -136,7 +144,11 @@ Copy `.env.example` to `.env` and configure as needed. Required variables:
 |---|---|---|
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:password@localhost:5432/examguard` |
 | `SECRET_KEY` | Application secret key | `change-me-to-a-random-secret-key` |
-| `CORS_ORIGINS` | Allowed CORS origins | `["http://localhost:3000"]` |
+| `CORS_ORIGINS` | Allowed CORS origins (JSON array) | `["http://localhost:3000", "https://exam-guardian-management.vercel.app", ...]` |
+| `FIREBASE_PROJECT_ID` | Firebase project ID | `exam-guard-75675` |
+| `FIREBASE_WEB_API_KEY` | Firebase Web API Key (for Identity Toolkit token exchange) | `AIzaSyCRoOlMP-VO6dgg_TeXhwAkRsE94rZG7GQ` |
+
+> **Note:** Production CORS also hardcodes Vercel domains in `main.py` middleware as a safety net.
 
 ## Architecture
 
