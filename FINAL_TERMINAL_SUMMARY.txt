@@ -9,11 +9,14 @@ FRONTEND:
 - Deployed: YES (Vercel, project: exam-guard)
 - Build: PASS (Next.js Turbopack, 33 routes)
 - TypeScript: 0 errors
-- Auth lifecycle: REWRITTEN (authPhase state machine: initializing/idle/popup/exchanging/authenticated/error)
-- Auth error handling: NEW (authError state, clearAuthError, detailed backend error messages)
-- AuthGate: REWRITTEN (self-contained component, no children props, handles all unauthenticated UX)
+- Auth lifecycle: REWRITTEN (authPhase state machine)
+- Auth error handling: NEW (authError state, clearAuthError)
+- AuthGate: REWRITTEN (self-contained component, no children props)
 - White plane artifact: FIXED (side-by-side identity card layout)
 - Face visualization: IMPROVED (detailed SVG with gradient, scan lines, pulse animation)
+- Demo Environment card: NEW (dashboard, Load Demo Data / Open Demo Session / Reset)
+- IV detail page: NEW (camera/upload probe toggle, Load Demo Reference button)
+- demo-api.ts: NEW (typed API client for demo endpoints)
 - All pages protected: VERIFIED (AuthGate renders on all protected routes)
 
 BACKEND:
@@ -23,7 +26,10 @@ BACKEND:
 - Database: Neon PostgreSQL connected
 - Alembic head: 027
 - Exchange error messages: DETAILED (invalid token, expired, revoked)
-- firebase_verification.py: IMPROVED logging, FIREBASE_PROJECT_ID has default value
+- firebase_verification.py: FIREBASE_PROJECT_ID has default value
+- Demo Data Loader: NEW (POST /demo/load, /demo/reset, /demo/status, /demo/reference-image)
+- Synthetic face generator: NEW (deterministic PNG for demo reference image)
+- Demo tests: 8/8 PASS
 
 DATABASE:
 - Type: PostgreSQL (Neon)
@@ -39,16 +45,16 @@ FIREBASE:
 
 GIT:
 - Branch: main
-- Latest commit: 379d8ec (docs: update all reports with root cause fix (2001c94))
-- HEAD: 379d8ec
-- origin/main: 379d8ec
+- Latest commit: 31910c8 (feat: demo data loader for live presentations)
+- HEAD: 31910c8
+- origin/main: 31910c8
 - Pushed: YES
 - Working tree: clean
 
 VERIFIED:
 - TypeScript: 0 errors
 - Production build: 33 routes, 0 errors
-- Backend tests (firebase+config): 47/47 PASS
+- Backend tests (firebase+config+demo): 18/18 PASS
 - Backend tests (firebase + config): 10/10 pass
 - AuthGate renders on protected pages: VERIFIED (headless browser screenshot)
 - CORS: access-control-allow-origin matches production domain

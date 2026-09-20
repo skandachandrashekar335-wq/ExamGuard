@@ -2,7 +2,7 @@ EXAMGUARD FINAL PRODUCTION REPORT
 ============================================================
 
 DATE: 2026-09-20
-GIT COMMIT: f994995 (docs: update FINAL_TERMINAL_SUMMARY with latest commit hash)
+GIT COMMIT: 31910c8 (feat: demo data loader for live presentations)
 GIT PUSH: PUSHED to origin/main
 
 ==================================================
@@ -21,12 +21,23 @@ ROOT CAUSE FIX (2001c94):
 - Fix: Added default "exam-guard-75675" (matches frontend), removed guard,
   improved error logging with Firebase response body details
 
-LATEST CHANGES (2001c94 — root cause fix):
+LATEST CHANGES (31910c8 — demo data loader):
+- New POST /demo/load endpoint: idempotent demo scenario creation
+  (subject, exam, student, registration, hall, seat, session, identity attempt)
+- New POST /demo/reset endpoint: cleanup demo records only
+- New GET /demo/status endpoint: check if demo data is loaded
+- New GET /demo/reference-image endpoint: deterministic synthetic face PNG
+- Synthetic face generator (Pillow) for stable reference image
+- Dashboard: compact Demo Environment card with Load/Open/Reset
+- IV detail page: camera/upload probe toggle, Load Demo Reference button
+- demo-api.ts: typed API client for demo endpoints
+- 8 new backend tests (all pass)
+
+PRIOR CHANGES (2001c94 — root cause fix):
 - config.py: FIREBASE_PROJECT_ID defaults to "exam-guard-75675" (matches frontend)
 - firebase_verification.py: removed project_id guard that blocked verification before HTTP call
 - firebase_verification.py: logs Firebase error response body (status + error code)
 - auth.py: user-facing error no longer exposes config variable names
-- test: updated assertion for new error message format
 
 PRIOR CHANGES (since c3326d4):
 - AuthContext rewritten with authPhase state machine (eliminates race conditions)
