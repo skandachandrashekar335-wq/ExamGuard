@@ -2,7 +2,7 @@ EXAMGUARD FINAL PRODUCTION REPORT
 ============================================================
 
 DATE: 2026-09-20
-GIT COMMIT: 31910c8 (feat: demo data loader for live presentations)
+GIT COMMIT: 18fdd91 (fix: race condition in token getter + demo RBAC for REVIEWER)
 GIT PUSH: PUSHED to origin/main
 
 ==================================================
@@ -21,17 +21,22 @@ ROOT CAUSE FIX (2001c94):
 - Fix: Added default "exam-guard-75675" (matches frontend), removed guard,
   improved error logging with Firebase response body details
 
-LATEST CHANGES (31910c8 — demo data loader):
-- New POST /demo/load endpoint: idempotent demo scenario creation
-  (subject, exam, student, registration, hall, seat, session, identity attempt)
-- New POST /demo/reset endpoint: cleanup demo records only
-- New GET /demo/status endpoint: check if demo data is loaded
-- New GET /demo/reference-image endpoint: deterministic synthetic face PNG
-- Synthetic face generator (Pillow) for stable reference image
-- Dashboard: compact Demo Environment card with Load/Open/Reset
+LATEST CHANGES (18fdd91 — auth race condition fix + demo RBAC):
+- AuthContext.tsx: setTokenGetter called synchronously in doExchange BEFORE
+  setAuthState. React runs child effects before parent effects; the useEffect
+  that previously called setTokenGetter fired AFTER dashboard component effects,
+  leaving _tokenGetter=null when getDemoStatus() first ran.
+- demo.py: /demo/status and /demo/reference-image now allow all roles
+  (ADMIN, OPERATOR, REVIEWER, INVIGILATOR) — both are read-only.
+  /demo/load and /demo/reset remain restricted to ADMIN/OPERATOR only.
+
+PRIOR CHANGES (31910c8 — demo data loader):
+- POST /demo/load: idempotent demo scenario creation
+- POST /demo/reset: cleanup demo records only
+- GET /demo/status: check if demo data is loaded
+- GET /demo/reference-image: deterministic synthetic face PNG
+- Dashboard: Demo Environment card with Load/Open/Reset
 - IV detail page: camera/upload probe toggle, Load Demo Reference button
-- demo-api.ts: typed API client for demo endpoints
-- 8 new backend tests (all pass)
 
 PRIOR CHANGES (2001c94 — root cause fix):
 - config.py: FIREBASE_PROJECT_ID defaults to "exam-guard-75675" (matches frontend)

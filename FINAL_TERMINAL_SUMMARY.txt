@@ -45,9 +45,9 @@ FIREBASE:
 
 GIT:
 - Branch: main
-- Latest commit: 31910c8 (feat: demo data loader for live presentations)
-- HEAD: 31910c8
-- origin/main: 31910c8
+- Latest commit: 18fdd91 (fix: race condition in token getter + demo RBAC for REVIEWER)
+- HEAD: 18fdd91
+- origin/main: 18fdd91
 - Pushed: YES
 - Working tree: clean
 
