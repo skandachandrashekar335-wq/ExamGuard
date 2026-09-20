@@ -2,7 +2,7 @@ EXAMGUARD FINAL PRODUCTION REPORT
 ============================================================
 
 DATE: 2026-09-20
-GIT COMMIT: 4f72484 (fix: monitoring filter layout, reset confirmation, IV UX, face verification error messages)
+GIT COMMIT: d897a18 (fix: make UniFace face verification production-ready)
 GIT PUSH: PUSHED to origin/main
 
 ==================================================
@@ -21,7 +21,14 @@ ROOT CAUSE FIX (2001c94):
 - Fix: Added default "exam-guard-75675" (matches frontend), removed guard,
   improved error logging with Firebase response body details
 
-LATEST CHANGES (4f72484 — monitoring filter layout, reset confirmation, IV UX, face verification error messages):
+LATEST CHANGES (d897a18 — make UniFace face verification production-ready):
+- nixpacks.toml: NEW — tells Railway to install `pip install '.[uniface]'` (includes uniface[cpu])
+- Dockerfile: Fixed — removed `|| true` from uniface install, now required
+- main.py: Startup validation — checks if uniface can import when FACE_VERIFICATION_PROVIDER=uniface
+- main.py: Health endpoint now reports face_provider setting
+- main.py: Startup warning if uniface package missing when provider set to uniface
+
+PRIOR CHANGES (4f72484 — monitoring filter layout, reset confirmation, IV UX, face verification error messages):
 - monitoring/page.tsx: Replaced raw Tailwind grid with eg-filter-bar CSS system for proper responsive layout
 - monitoring/page.tsx: Moved Apply buttons into eg-filter-actions within the grid
 - dashboard/page.tsx: Added confirmation dialog before Reset Demo Data ("Reset Demo Data?\n\nThis removes only ExamGuard demonstration records.")

@@ -28,6 +28,9 @@ BACKEND:
 - Exchange error messages: DETAILED (invalid token, expired, revoked)
 - firebase_verification.py: FIREBASE_PROJECT_ID has default value
 - Startup warning: FACE_VERIFICATION_PROVIDER='deterministic' in production
+- UniFace deployment: nixpacks.toml installs uniface[cpu] on Railway
+- Startup validation: checks uniface imports when provider=uniface
+- Health endpoint: reports face_provider setting
 - Demo Data Loader: NEW (POST /demo/load, /demo/reset, /demo/status, /demo/reference-image)
 - Synthetic face generator: NEW (deterministic PNG for demo reference image)
 - Demo tests: 8/8 PASS
@@ -46,9 +49,9 @@ FIREBASE:
 
 GIT:
 - Branch: main
-- Latest commit: 4f72484 (fix: monitoring filter layout, reset confirmation, IV UX, face verification error messages)
-- HEAD: 4f72484
-- origin/main: 4f72484
+- Latest commit: d897a18 (fix: make UniFace face verification production-ready)
+- HEAD: d897a18
+- origin/main: d897a18
 - Pushed: YES
 - Working tree: clean
 
