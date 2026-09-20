@@ -164,6 +164,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         is_active: result.user.is_active,
         firebase_uid: result.user.firebase_uid,
       };
+      setTokenGetter(() => result.token);
       setAuthState({
         ...AuthStateDefault,
         user: authUser,

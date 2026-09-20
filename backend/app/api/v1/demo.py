@@ -106,7 +106,7 @@ def _get_demo_user(db: Session, claims: dict) -> User:
 @router.get("/status", response_model=DemoStatusResponse)
 def demo_status(
     db: Session = Depends(get_db),
-    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.REVIEWER, Role.INVIGILATOR])),
 ):
     """Check whether demo data has been loaded."""
     subject = db.execute(
@@ -154,7 +154,7 @@ def demo_status(
 
 @router.get("/reference-image")
 def demo_reference_image(
-    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.REVIEWER, Role.INVIGILATOR])),
 ):
     """Serve the deterministic demo candidate reference face image.
 
