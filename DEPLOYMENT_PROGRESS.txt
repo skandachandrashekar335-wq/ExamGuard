@@ -10,34 +10,42 @@ Frontend:  https://exam-guardian-management.vercel.app  DEPLOYED (Vercel, projec
 Backend:   https://examguard-production-ef78.up.railway.app  DEPLOYED (Railway)
 Database:  Neon PostgreSQL  CONNECTED
 Firebase:  exam-guard-75675  CONFIGURED
-Git HEAD:  c3326d41da489c52e2986625998b5f6e9418e067
+Git HEAD:  bbc84dd
 
 AUTH FLOW STATUS
 ----------------
-Firebase Google Sign-In:         Popup opens correctly
-Firebase -> ExamGuard exchange:   Backend exchange endpoint working
-Post-login navigation:           FIXED - routes to /dashboard via AppShell
-Duplicate exchange race:         FIXED - signInInProgress + exchangeInProgress refs
-Auth gate coverage:              VERIFIED - all pages protected by AppShell
+Firebase Google Sign-In:         Popup opens correctly (headless verified)
+Firebase -> ExamGuard exchange:   Backend exchange endpoint working (401 for invalid = correct)
+Post-login navigation:           AuthPhase state machine handles transitions
+Duplicate exchange race:         exchangeInProgress ref inside doExchange() prevents duplicates
+Auth gate coverage:              VERIFIED - AuthGate renders on all protected routes
 Firebase token verification:     FIXED - Identity Toolkit v1 + Web API Key (not project_id)
-onAuthStateChanged race:         FIXED - signInInProgress prevents callback interference
+Auth error handling:             NEW - authPhase="error", authError state, detailed backend messages
+White plane artifact:            FIXED - side-by-side identity card layout (text left, face viz right)
+Face visualization:              IMPROVED - detailed SVG with gradient, scan lines, pulse animation
 
 VERIFIED COMMITS (current session)
 -----------------------------------
+bbc84dd docs: update FINAL_REPORT with auth rewrite, white plane fix, and current SHA
+94bb674 fix: replace white plane artifact with side-by-side identity card layout
+c117abb fix: fill white plane artifact in identity verification bento card
+1daf461 fix: auth lifecycle state machine, AppShell AuthGate, and features page polish
+9311531 audit: final documentation sync and Firebase Web API Key security review
 c3326d4 docs: update README and TRD to reflect current project state
-7a56595 fix: resolve Google auth redirect issue and Firebase token verification
-255f7d5 docs: add production QA report for deployment verification
-48f358d fix: always include production Vercel domains in CORS allow_origins
-53660bf fix: add production Vercel domains to CORS_ORIGINS default
-0fdc1fe style: redesign form controls for professional enterprise look
 
-AUTH FIXES (commit 7a56595)
-----------------------------
-1. AuthContext: Added signInInProgress ref to prevent onAuthStateChanged callback
-   from interfering after signInWithGoogle completes its own exchange
-2. firebase_verification.py: Removed project_id fallback as API key for Identity
-   Toolkit (always fails). Now returns None (401) when FIREBASE_WEB_API_KEY missing
-3. config.py: Added FIREBASE_WEB_API_KEY default matching frontend (public key)
+AUTH FIXES (commit 1daf461)
+-----------------------------
+1. AuthContext: REWRITTEN with authPhase enum (initializing/idle/popup/exchanging/authenticated/error)
+   - Replaces race-prone signInInProgress/exchangeInProgress refs with proper React state
+   - doExchange() extracted as useCallback with exchangeInProgress ref
+   - authError state + clearAuthError for error handling
+2. AppShell: REWRITTEN with self-contained AuthGate component
+   - No children props (was causing handleSignIn scope bug)
+   - Handles: loading, popup, exchanging, error, authenticated states
+3. Backend firebase_verification.py: Improved logging for missing FIREBASE_PROJECT_ID/FIREBASE_WEB_API_KEY
+4. Backend auth.py: Detailed error messages from exchange endpoint
+5. Frontend firebase.ts: Improved exchange error parsing (tries to parse JSON error detail)
+6. Backend test fix: test_garbage_token_returns_401 updated for new error message format
 
 FIREBASE WEB API KEY NOTE
 --------------------------
@@ -46,6 +54,13 @@ The Firebase Web API Key is PUBLIC by design - embedded in frontend JavaScript
 project for Identity Toolkit calls and cannot perform privileged operations.
 Backend default matches frontend. Railway should set FIREBASE_WEB_API_KEY env var
 for production best practice.
+
+MANUAL VERIFICATION REQUIRED
+------------------------------
+The Google OAuth popup flow has NOT been tested in a real browser with a real
+Google account. The AuthGate renders correctly (headless browser verified), but
+the full popup -> exchange -> authenticated -> redirect flow requires manual
+user testing.
 
 HISTORICAL PHASES (completed)
 -----------------------------

@@ -2,7 +2,7 @@ EXAMGUARD FINAL PRODUCTION REPORT
 ============================================================
 
 DATE: 2026-09-20
-GIT COMMIT: 94bb674 (fix: replace white plane artifact with side-by-side identity card layout)
+GIT COMMIT: bbc84dd (docs: update FINAL_REPORT with auth rewrite, white plane fix, and current SHA)
 GIT PUSH: PUSHED to origin/main
 
 ==================================================
@@ -65,20 +65,35 @@ STATUS: CONNECTED
 MIGRATIONS: 27 (head 027)
 
 =================================================
-AUTH FLOW (VERIFIED)
+AUTH FLOW (CODE VERIFIED, MANUAL USER TEST REQUIRED)
 =================================================
-1. User navigates to protected route
-2. AppShell shows "Sign In Required" with Google button
-3. User clicks "Continue with Google"
-4. Firebase popup opens -> user signs in
-5. signInInProgress ref prevents onAuthStateChanged from interfering
-6. exchangeInProgress ref prevents duplicate token exchange
-7. Backend verifies token via Identity Toolkit v1 REST API
-8. FIREBASE_WEB_API_KEY used for API call (not project_id)
-9. Auth state updates with ExamGuard JWT
-10. AppShell useEffect detects justSignedIn && authed -> navigates to /dashboard
-11. DashboardPage mounts -> fetches exams with token -> auto-selects first exam
-12. Dashboard data renders
+1. User navigates to protected route (e.g. /examination-sessions)
+2. AppShell renders AuthGate (self-contained component, no children props)
+3. AuthGate shows "ExamGuard / AUTHENTICATION REQUIRED / Continue with Google"
+4. User clicks "Continue with Google"
+5. signInWithGoogle() called: signInWithPopup(GoogleAuthProvider)
+6. Firebase popup opens -> user selects Google account -> popup closes
+7. AuthContext sets authPhase = "popup" (AuthGate shows "Waiting for Google sign-in...")
+8. authPhase transitions to "exchanging" (AuthGate shows "Connecting to ExamGuard...")
+9. doExchange() calls POST /api/v1/auth/firebase/exchange with Firebase ID token
+10. Backend: auth.py extracts token, calls firebase_verification.verify_firebase_token()
+11. firebase_verification.py: HTTP POST to identitytoolkit.googleapis.com/v1/accounts:signInWithIdToken
+12. Uses FIREBASE_WEB_API_KEY (default in config.py, public by design) + Firebase ID token
+13. Identity Toolkit returns Firebase user profile (uid, email, display_name)
+14. Backend maps Firebase identity -> ExamGuard user (creates if new, assigns REVIEWER role)
+15. Backend issues ExamGuard JWT (HS256, 30 min expiry, claims: sub, role)
+16. Frontend receives JWT + user object + requiresOnboarding flag
+17. AuthContext updates: user, firebaseIdToken, isAuthenticated = true, authPhase = "authenticated"
+18. AuthGate detects authPhase === "authenticated" -> renders children (AppShell layout)
+19. AppShell useEffect: justSignedIn && authed -> router.push("/dashboard")
+20. DashboardPage mounts -> fetches exams with token -> auto-selects first exam
+21. Dashboard data renders
+
+AUTH ERROR HANDLING:
+- authPhase = "error" or authError set: AuthGate shows error card with "Try Again" button
+- Exchange failure: backend returns 401 with detailed message (missing config, invalid token, etc.)
+- clearAuthError() resets error state before retry
+- doExchange() has exchangeInProgress ref to prevent duplicate calls
 
 =================================================
 FIREBASE WEB API KEY SECURITY NOTE
@@ -121,6 +136,7 @@ VERIFICATION CHECKLIST
 | Production build 33 routes | PASS |
 | Firebase token verification | FIXED |
 | FIREBASE_WEB_API_KEY default | DOCUMENTED |
+| Manual Google OAuth test | REQUIRED |
 
 =================================================
 CONCLUSION
@@ -131,3 +147,8 @@ has been eliminated with a side-by-side identity card layout. Auth
 lifecycle rewritten with proper state machine (no race conditions).
 Firebase Web API Key is a public credential (safe as default). Railway
 should set FIREBASE_WEB_API_KEY env var for production best practice.
+
+MANUAL VERIFICATION REQUIRED: The Google OAuth popup flow has not been
+tested in a real browser with a real Google account. The AuthGate renders
+correctly (headless browser verified), but the full popup -> exchange ->
+authenticated -> redirect flow requires manual user testing.

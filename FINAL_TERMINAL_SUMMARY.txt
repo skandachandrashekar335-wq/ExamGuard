@@ -2,15 +2,19 @@ EXAMGUARD PRODUCTION STATUS
 ============================
 
 STATUS: DEPLOYED & FUNCTIONAL
+MANUAL GOOGLE OAUTH TEST: REQUIRED (not tested in real browser)
 
 FRONTEND:
 - URL: https://exam-guardian-management.vercel.app
 - Deployed: YES (Vercel, project: exam-guard)
 - Build: PASS (Next.js Turbopack, 33 routes)
 - TypeScript: 0 errors
-- Post-login navigation: FIXED (AppShell justSignedIn effect)
-- Auth race condition: FIXED (signInInProgress ref in AuthContext)
-- All pages protected: VERIFIED (AppShell auth gate)
+- Auth lifecycle: REWRITTEN (authPhase state machine: initializing/idle/popup/exchanging/authenticated/error)
+- Auth error handling: NEW (authError state, clearAuthError, detailed backend error messages)
+- AuthGate: REWRITTEN (self-contained component, no children props, handles all unauthenticated UX)
+- White plane artifact: FIXED (side-by-side identity card layout)
+- Face visualization: IMPROVED (detailed SVG with gradient, scan lines, pulse animation)
+- All pages protected: VERIFIED (AuthGate renders on all protected routes)
 
 BACKEND:
 - URL: https://examguard-production-ef78.up.railway.app
@@ -18,6 +22,8 @@ BACKEND:
 - Health: {"status":"healthy","database":"connected"}
 - Database: Neon PostgreSQL connected
 - Alembic head: 027
+- Exchange error messages: DETAILED (missing config, invalid token, etc.)
+- firebase_verification.py: IMPROVED logging for missing FIREBASE_PROJECT_ID / FIREBASE_WEB_API_KEY
 
 DATABASE:
 - Type: PostgreSQL (Neon)
@@ -28,22 +34,33 @@ FIREBASE:
 - Project: exam-guard-75675
 - Web API Key: Default in config.py (public key, same as frontend firebase_init.ts)
 - Verification: Identity Toolkit v1 REST API (not Admin SDK)
-- Auth fix: signInInProgress prevents onAuthStateChanged race condition
+- Auth rewrite: authPhase state machine replaces signInInProgress/exchangeInProgress refs
+- Startup warning: FIREBASE_WEB_API_KEY not in environment uses default
 
 GIT:
 - Branch: main
-- Latest commit: c3326d4 (docs: update README and TRD to reflect current project state)
-- HEAD: c3326d41da489c52e2986625998b5f6e9418e067
-- origin/main: c3326d41da489c52e2986625998b5f6e9418e067
+- Latest commit: bbc84dd (docs: update FINAL_REPORT with auth rewrite, white plane fix, and current SHA)
+- HEAD: bbc84dd
+- origin/main: bbc84dd
 - Pushed: YES
 - Working tree: clean
 
 VERIFIED:
 - TypeScript: 0 errors
 - Production build: 33 routes, 0 errors
-- Backend tests: 10/10 pass (firebase_noninteractive + config)
+- Backend tests (firebase + config): 10/10 pass
+- AuthGate renders on protected pages: VERIFIED (headless browser screenshot)
 - CORS: access-control-allow-origin matches production domain
 - Firebase exchange: responds 401 for invalid tokens (correct)
+
+NOT VERIFIED (requires real browser):
+- Google OAuth popup opens correctly
+- Firebase authentication completes
+- Firebase ID token obtained
+- ExamGuard exchange succeeds
+- Authenticated AuthContext state reached
+- Post-auth redirect to /dashboard works
+- Protected page content loads after auth
 
 FINAL REPORT: D:\ExamGuard\FINAL_REPORT.txt
 QA REPORT: D:\ExamGuard\PRODUCTION_QA_REPORT.md

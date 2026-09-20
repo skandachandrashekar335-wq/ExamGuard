@@ -23,16 +23,22 @@
 
 ### Google Sign-In Flow
 
-1. User clicks "Continue with Google" or "ACCESS SYSTEM"
-2. Firebase Authentication popup opens (`signInWithPopup` with `GoogleAuthProvider`)
-3. User selects Google account
-4. Frontend gets Firebase ID token (`user.getIdToken()`)
-5. Frontend calls `POST /api/v1/auth/firebase/exchange` with the Firebase ID token
-6. Backend verifies token server-side, maps Firebase identity to ExamGuard user
-7. User receives REVIEWER role by default; ADMIN only via `INITIAL_ADMIN_EMAILS`
-8. ExamGuard JWT issued (30 min expiry, HS256)
-9. Frontend AuthContext updated with user state, role, `isAuthenticated: true`
-10. Role-specific UI navigation visible
+1. User clicks "Continue with Google" in AuthGate
+2. `signInWithGoogle()` called: `signInWithPopup(GoogleAuthProvider)` with `prompt: "select_account"`
+3. AuthContext sets `authPhase = "popup"` (AuthGate shows "Waiting for Google sign-in...")
+4. Firebase popup opens -> user selects Google account -> popup closes
+5. `authPhase` transitions to `"exchanging"` (AuthGate shows "Connecting to ExamGuard...")
+6. `doExchange()` calls `POST /api/v1/auth/firebase/exchange` with Firebase ID token
+7. Backend verifies token via Identity Toolkit v1 REST API
+8. Uses `FIREBASE_WEB_API_KEY` (default in config.py, public by design) + Firebase ID token
+9. Maps Firebase identity to ExamGuard user (creates if new, assigns REVIEWER role)
+10. ExamGuard JWT issued (30 min expiry, HS256, claims: `sub`, `role`)
+11. Frontend receives JWT + user object + `requiresOnboarding` flag
+12. `AuthContext` updates: `user`, `firebaseIdToken`, `isAuthenticated: true`, `authPhase: "authenticated"`
+13. `AuthGate` detects `authPhase === "authenticated"` -> renders children (AppShell layout)
+14. AppShell useEffect: `justSignedIn && authed` -> `router.push("/dashboard")`
+15. DashboardPage mounts -> fetches exams with token -> auto-selects first exam
+16. Dashboard data renders
 
 ### Sign-Out Flow
 
@@ -57,10 +63,12 @@
 ### Unauthenticated Behavior
 
 - When unauthenticated and trying to access a protected route:
-  - Frontend AuthContext loading state → authenticated state transition fails
-  - User redirected to `/` (landing page)
-  - Auth error handled gracefully (no credential leakage in error messages)
-- Protected API endpoints return 401 for unauthenticated requests
+  - AppShell renders `AuthGate` component (self-contained, no children props)
+  - AuthGate shows: ExamGuard logo, "AUTHENTICATION REQUIRED", "Continue with Google" button, "Back to Home" link
+  - If auth fails: AuthGate shows error card with "Try Again" button and error message
+  - If popup/exchange in progress: AuthGate shows spinner with status message
+  - All protected API endpoints return 401 for unauthenticated requests
+- `authPhase` state machine: `initializing` → `idle` → `popup` → `exchanging` → `authenticated` (or `error`)
 
 ### Logout Behavior
 
@@ -343,8 +351,12 @@
 - `requiresOnboarding`: boolean — whether user needs to complete onboarding (new users: true until role assigned)
 - `displayName`: string — formatted user name (e.g., "John Doe (john@example.com)") or "User" / "Guest"
 - `isAuthenticated`: boolean — whether user is authenticated
-- `signInWithGoogle`: () => Promise<void> — initiate Google sign-in
+- `authPhase`: "initializing" | "idle" | "popup" | "exchanging" | "authenticated" | "error" — current auth lifecycle phase
+- `authError`: string | null — error message from failed auth attempts
+- `signInWithGoogle`: () => Promise<void> — initiate Google sign-in (sets authPhase to "popup")
 - `signOut`: () => Promise<void> — clear both Firebase and ExamGuard sessions
+- `clearAuthError`: () => void — reset authError and authPhase to "idle"
+- `doExchange`: (token: string) => Promise<void> — exchange Firebase token for ExamGuard JWT (extracted as useCallback)
 
 ### ExamAttempt State (Backend)
 
