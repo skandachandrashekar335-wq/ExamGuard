@@ -2,7 +2,7 @@ EXAMGUARD FINAL PRODUCTION REPORT
 ============================================================
 
 DATE: 2026-09-20
-GIT COMMIT: 18fdd91 (fix: race condition in token getter + demo RBAC for REVIEWER)
+GIT COMMIT: 43afffd (fix: white plane artifacts, demo RBAC UX, production face verification warning)
 GIT PUSH: PUSHED to origin/main
 
 ==================================================
@@ -21,7 +21,20 @@ ROOT CAUSE FIX (2001c94):
 - Fix: Added default "exam-guard-75675" (matches frontend), removed guard,
   improved error logging with Firebase response body details
 
-LATEST CHANGES (18fdd91 — auth race condition fix + demo RBAC):
+LATEST CHANGES (43afffd — white plane artifacts, demo RBAC UX, production face verification warning):
+- DecisionDisplay.tsx: Added glass-surface class, replaced border-white with var(--border), added rounded
+- VerificationState.tsx: Added glass-surface class, replaced border-white with var(--border), active step uses var(--accent)
+- ImageUpload.tsx: Replaced border-white with var(--border), added rounded class
+- CameraCapture.tsx: Replaced border-white with var(--border), added rounded, text-red-400 -> var(--danger)
+- EvidenceDisplay.tsx: Replaced border-white with var(--border), progress bar uses var(--accent), added rounded
+- OverrideDialog.tsx: Replaced border-white with var(--border), added rounded, text-red-400 -> var(--danger)
+- dashboard/page.tsx: Role-based demo card visibility (ADMIN/OPERATOR only see Load/Reset buttons)
+- dashboard/page.tsx: Friendly 403 error messages ("Demo data management requires Administrator or Operator access.")
+- demo-api.ts: 403 error handling for getDemoReferenceImageBlob
+- main.py: Startup warning when FACE_VERIFICATION_PROVIDER='deterministic' in production
+- invigilator/page.tsx: Replaced border-white with var(--border)
+
+PRIOR CHANGES (18fdd91 — auth race condition fix + demo RBAC):
 - AuthContext.tsx: setTokenGetter called synchronously in doExchange BEFORE
   setAuthState. React runs child effects before parent effects; the useEffect
   that previously called setTokenGetter fired AFTER dashboard component effects,
@@ -158,13 +171,16 @@ VERIFICATION CHECKLIST
 | Auth lifecycle (authPhase) | REWRITTEN |
 | Auth error handling | NEW |
 | AuthGate self-contained | VERIFIED |
-| White plane artifact | FIXED |
+| White plane artifact | FIXED (CSS variables, glass-surface) |
 | Face visualization | IMPROVED |
 | All pages protected | VERIFIED |
 | TypeScript 0 errors | PASS |
 | Production build 33 routes | PASS |
 | Firebase token verification | FIXED |
 | FIREBASE_WEB_API_KEY default | DOCUMENTED |
+| FACE_VERIFICATION_PROVIDER warning | NEW (startup warning in production) |
+| Demo card role visibility | NEW (ADMIN/OPERATOR only) |
+| Demo 403 error messages | NEW (friendly messages) |
 | Manual Google OAuth test | REQUIRED |
 
 =================================================

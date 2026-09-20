@@ -10,7 +10,7 @@ Frontend:  https://exam-guardian-management.vercel.app  DEPLOYED (Vercel, projec
 Backend:   https://examguard-production-ef78.up.railway.app  DEPLOYED (Railway)
 Database:  Neon PostgreSQL  CONNECTED
 Firebase:  exam-guard-75675  CONFIGURED
-Git HEAD:  5b06795
+Git HEAD:  43afffd
 
 AUTH FLOW STATUS
 ----------------
@@ -21,11 +21,15 @@ Duplicate exchange race:         exchangeInProgress ref inside doExchange() prev
 Auth gate coverage:              VERIFIED - AuthGate renders on all protected routes
 Firebase token verification:     FIXED - FIREBASE_PROJECT_ID now has default, guard removed
 Auth error handling:             NEW - authPhase="error", authError state, detailed backend messages
-White plane artifact:            FIXED - side-by-side identity card layout (text left, face viz right)
+White plane artifact:            FIXED - CSS variables, glass-surface class, rounded borders
 Face visualization:              IMPROVED - detailed SVG with gradient, scan lines, pulse animation
 
 VERIFIED COMMITS (current session)
 -----------------------------------
+43afffd fix: white plane artifacts, demo RBAC UX, production face verification warning
+4f7ff5f docs: update reports with auth race condition fix (18fdd91)
+18fdd91 fix: race condition in token getter + demo RBAC for REVIEWER
+31910c8 feat: demo data loader for live presentations
 2001c94 fix: add FIREBASE_PROJECT_ID default, improve error logging
 bbc84dd docs: update FINAL_REPORT with auth rewrite, white plane fix, and current SHA
 94bb674 fix: replace white plane artifact with side-by-side identity card layout

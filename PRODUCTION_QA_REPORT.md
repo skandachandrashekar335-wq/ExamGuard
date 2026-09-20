@@ -7,10 +7,14 @@ Frontend:  https://exam-guardian-management.vercel.app (Vercel project: exam-gua
 Backend:   https://examguard-production-ef78.up.railway.app
 Database:  Neon PostgreSQL (connected)
 Firebase:  exam-guard-75675 (Google Auth)
-Git:       main branch, HEAD = 2001c94
+Git:       main branch, HEAD = 43afffd
 
 DEPLOYED COMMITS (latest session)
 --------------------------------
+43afffd fix: white plane artifacts, demo RBAC UX, production face verification warning
+4f7ff5f docs: update reports with auth race condition fix (18fdd91)
+18fdd91 fix: race condition in token getter + demo RBAC for REVIEWER
+31910c8 feat: demo data loader for live presentations
 2001c94 fix: add FIREBASE_PROJECT_ID default, improve error logging
 bbc84dd docs: update FINAL_REPORT with auth rewrite, white plane fix, and current SHA
 94bb674 fix: replace white plane artifact with side-by-side identity card layout
@@ -32,6 +36,11 @@ VERIFICATION RESULTS
 [PASS] Latest form CSS (eg-form-group, eg-input-error, eg-textarea) deployed
 [PASS] Next.js dev indicator removed (devIndicators: false)
 [PASS] Backend test_garbage_token_returns_401 fixed for new error message format
+[PASS] CSS variable borders (var(--border)) applied to 7 components
+[PASS] glass-surface class applied to DecisionDisplay and VerificationState
+[PASS] Role-based demo card visibility (ADMIN/OPERATOR only)
+[PASS] Friendly 403 error messages for demo endpoints
+[PASS] FACE_VERIFICATION_PROVIDER=deterministic startup warning in production
 
 NOT TESTED (requires real browser)
 ----------------------------------
@@ -67,6 +76,19 @@ CRITICAL FIXES THIS SESSION
 6. White plane artifact FIXED: Identity Verification bento card redesigned
    as side-by-side layout (text/badges left, face visualization right).
 
+7. CSS variable standardization: Replaced border-white/N with var(--border),
+   text-red-400 with var(--danger), added glass-surface and rounded classes
+   to DecisionDisplay, VerificationState, ImageUpload, CameraCapture,
+   EvidenceDisplay, OverrideDialog, and invigilator page.
+
+8. Demo RBAC UX: Dashboard Demo Environment card Load/Reset buttons now
+   visible only to ADMIN/OPERATOR. REVIEWER sees "ask an administrator" message.
+   Friendly 403 error messages for unauthorized demo access.
+
+9. Production face verification warning: Backend main.py now warns at startup
+   when FACE_VERIFICATION_PROVIDER='deterministic' in production (returns
+   hardcoded scores without processing images).
+
 AUTH FLOW VERIFICATION
 ----------------------
 Google -> Firebase (exam-guard-75675) -> exchange endpoint -> JWT token
@@ -90,5 +112,6 @@ REMAINING ITEMS
 ---------------
 - Full end-to-end Google OAuth login test requires manual user verification (see above)
 - Railway FIREBASE_WEB_API_KEY env var: recommended to set explicitly (startup warning when not set)
+- Railway FACE_VERIFICATION_PROVIDER env var: set to 'uniface' for real face verification (startup warning when 'deterministic')
 - Railway FIREBASE_PROJECT_ID env var: now has default, not required
 - Firebase Web API Key: PUBLIC by design, safe as config.py default (matches frontend firebase_init.ts)
