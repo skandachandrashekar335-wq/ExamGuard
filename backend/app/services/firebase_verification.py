@@ -35,15 +35,13 @@ def _verify_firebase_token_http(token: str) -> Optional[Dict[str, Any]]:
     if not token or not token.strip():
         return None
 
-    project_id = settings.FIREBASE_PROJECT_ID
     web_api_key = settings.FIREBASE_WEB_API_KEY
-    if not project_id:
-        logger.warning("FIREBASE_PROJECT_ID not configured — cannot verify token")
-        return None
-
     if not web_api_key:
         logger.warning("FIREBASE_WEB_API_KEY not configured — cannot verify token")
         return None
+
+    if not settings.FIREBASE_PROJECT_ID:
+        logger.warning("FIREBASE_PROJECT_ID not configured (using default) — verification will proceed")
 
     api_key = web_api_key
     url = f"https://identitytoolkit.googleapis.com/v1/accounts:lookup?key={api_key}"
@@ -65,7 +63,12 @@ def _verify_firebase_token_http(token: str) -> Optional[Dict[str, Any]]:
                 }
             return None
         else:
-            logger.warning("Firebase token verification failed: HTTP %s", response.status_code)
+            try:
+                error_body = response.json()
+                error_msg = error_body.get("error", {}).get("message", "unknown")
+                logger.warning("Firebase token verification failed: HTTP %s — %s", response.status_code, error_msg)
+            except (json.JSONDecodeError, KeyError):
+                logger.warning("Firebase token verification failed: HTTP %s — no error body", response.status_code)
             return None
     except httpx.RequestError as e:
         logger.error("Firebase token verification network error: %s", e)

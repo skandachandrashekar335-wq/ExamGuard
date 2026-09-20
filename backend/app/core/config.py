@@ -111,7 +111,7 @@ class Settings(BaseSettings):
     #   FIREBASE_WEB_API_KEY (Web API Key from Firebase Console > Project Settings)
     #   FIREBASE_CLIENT_EMAIL (optional, for service account)
     #   FIREBASE_CLIENT_ID (frontend web app client ID)
-    FIREBASE_PROJECT_ID: str | None = None
+    FIREBASE_PROJECT_ID: str = "exam-guard-75675"
     # Firebase Web API Key — PUBLIC by design (embedded in every Firebase web app's
     # client-side JavaScript in firebase_init.ts). This is NOT a secret; it identifies
     # the Firebase project for Identity Toolkit token exchange. The default matches

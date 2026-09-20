@@ -41,7 +41,7 @@ class TestFirebaseExchangeSecurity:
         )
         assert resp.status_code == 401
         detail = resp.json()["detail"]
-        assert any(kw in detail for kw in ("Invalid", "Missing", "Firebase token verification failed"))
+        assert "Firebase token verification failed" in detail
 
     def test_malformed_jwt_returns_401(self, client):
         """JWT-structured but invalid → 401."""
