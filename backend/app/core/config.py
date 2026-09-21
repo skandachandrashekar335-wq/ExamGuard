@@ -127,7 +127,7 @@ class Settings(BaseSettings):
     # If the user's email matches and they are not already ADMIN,
     # their role is promoted to ADMIN and a new JWT is issued.
     # This is server-side only — not exposed via NEXT_PUBLIC_* variables.
-    INITIAL_ADMIN_EMAILS: list[str] = ["admin-skandachandrashekhar335@gmail.com"]
+    INITIAL_ADMIN_EMAILS: list[str] = ["skandachandrashekhar335@gmail.com"]
 
     @model_validator(mode="after")
     def validate_secret_key(self) -> "Settings":

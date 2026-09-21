@@ -13,18 +13,18 @@ The application is deployed and functional. All code-level bugs have been
 fixed, including Google auth lifecycle, UI polish, visual artifacts, and
 Firebase token verification failure.
 
-ROOT CAUSE FIX (2001c94):
-- FIREBASE_PROJECT_ID had no default value (None) in config.py
-- firebase_verification.py guarded with `if not project_id: return None`
-  BEFORE making the HTTP call — but project_id is NOT used in the call
-- This silently failed verification for ALL tokens when env var was missing
-- Fix: Added default "exam-guard-75675" (matches frontend), removed guard,
-  improved error logging with Firebase response body details
+ROOT CAUSE (FINAL - email mismatch in INITIAL_ADMIN_EMAILS):
+- User model has server_default="REVIEWER" for role column
+- Firebase exchange endpoint creates new users with role="REVIEWER" by default
+- INITIAL_ADMIN_EMAILS was set to ["admin-skandachandrashekhar335@gmail.com"]
+- But the stored database email is skandachandrashekhar335@gmail.com (WITHOUT "admin-" prefix)
+- The INITIAL_ADMIN_EMAILS email comparison therefore FAILS - promotion never occurs
+- User remains REVIEWER regardless of config
+- Fix: Updated INITIAL_ADMIN_EMAILS to ["skandachandrashekhar335@gmail.com"] to match stored email
 
-LATEST CHANGES (admin RBAC + Permissions-Policy + auth session fix):
-
-ADMIN RBAC FIX:
-- config.py: INITIAL_ADMIN_EMAILS now defaults to ["admin-skandachandrashekhar335@gmail.com"]
+ADMIN RBAC FIX (previous, already working):
+- auth.py: INITIAL_ADMIN_EMAILS check now runs on EVERY login (not just when no admin exists)
+- Email comparison is case-insensitive for robustness
 - .env: INITIAL_ADMIN_EMAILS updated to include target admin email
 - auth.py: INITIAL_ADMIN_EMAILS check now runs on EVERY login (not just when no admin exists)
 - Email comparison is case-insensitive for robustness
