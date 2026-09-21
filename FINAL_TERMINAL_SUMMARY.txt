@@ -2,7 +2,10 @@ EXAMGUARD PRODUCTION STATUS
 ============================
 
 STATUS: DEPLOYED & FUNCTIONAL
-MANUAL GOOGLE OAUTH TEST: REQUIRED (not tested in real browser)
+ADMIN ROLE FIX: INITIAL_ADMIN_EMAILS checked on every login, target email promoted to ADMIN
+PERMISSIONS-POLICY: camera=(self), added Chrome privacy-sandbox feature denials
+COOP WARNINGS: Non-functional (Firebase popup, does not prevent auth)
+MANUAL GOOGLE OAUTH TEST: REQUIRED (sign out → sign in → verify ADMIN role)
 
 FRONTEND:
 - URL: https://exam-guardian-management.vercel.app
@@ -24,7 +27,7 @@ BACKEND:
 - Deployed: YES (Railway)
 - Health: {"status":"healthy","database":"connected"}
 - Database: Neon PostgreSQL connected
-- Alembic head: 027
+- Alembic head: 028
 - Exchange error messages: DETAILED (invalid token, expired, revoked)
 - firebase_verification.py: FIREBASE_PROJECT_ID has default value
 - Startup warning: FACE_VERIFICATION_PROVIDER='deterministic' in production

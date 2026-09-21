@@ -122,11 +122,12 @@ class Settings(BaseSettings):
     FIREBASE_CLIENT_ID: str | None = None
     FIREBASE_AUTH_DOMAIN: str | None = None
 
-    # Initial admin provisioning (for initial setup only)
-    # List of email addresses that should be granted ADMIN role on first provisioning.
-    # This is ONLY used when no ADMIN currently exists in the system.
-    # Once an admin exists, this setting is ignored on subsequent logins.
-    INITIAL_ADMIN_EMAILS: list[str] = []
+    # Admin email allowlist for automatic ADMIN role promotion.
+    # Checked on EVERY successful Firebase login (case-insensitive).
+    # If the user's email matches and they are not already ADMIN,
+    # their role is promoted to ADMIN and a new JWT is issued.
+    # This is server-side only — not exposed via NEXT_PUBLIC_* variables.
+    INITIAL_ADMIN_EMAILS: list[str] = ["admin-skandachandrashekhar335@gmail.com"]
 
     @model_validator(mode="after")
     def validate_secret_key(self) -> "Settings":

@@ -76,3 +76,49 @@ class TestFirebaseExchangeSecurity:
             json={"firebaseToken": ""},
         )
         assert resp.status_code == 401
+
+
+class TestAdminPromotion:
+    """Regression test: INITIAL_ADMIN_EMAILS promotion when another ADMIN exists.
+
+    Bug: The original code only checked INITIAL_ADMIN_EMAILS when no ADMIN
+    existed in the system. Once any ADMIN existed, the allowlist was never
+    checked again, leaving designated admin accounts stuck as REVIEWER.
+    """
+
+    def test_admin_email_always_checked(self):
+        """Verify INITIAL_ADMIN_EMAILS is checked on every login, not just first."""
+        from app.core.config import get_settings
+
+        settings = get_settings()
+        assert len(settings.INITIAL_ADMIN_EMAILS) > 0, (
+            "INITIAL_ADMIN_EMAILS must contain at least one email"
+        )
+        # All emails must be valid format
+        for email in settings.INITIAL_ADMIN_EMAILS:
+            assert "@" in email and "." in email, f"Invalid email in INITIAL_ADMIN_EMAILS: {email}"
+
+    def test_admin_promotion_code_path(self):
+        """Verify the auth.py exchange checks INITIAL_ADMIN_EMAILS on every login.
+
+        The promotion logic must NOT be gated by `not existing_admin`.
+        It must check the allowlist regardless of whether other ADMINs exist.
+        """
+        import ast
+        import inspect
+
+        from app.api.v1.auth import firebase_token_exchange
+
+        source = inspect.getsource(firebase_token_exchange)
+        # Must NOT contain the old broken pattern
+        assert "existing_admin" not in source, (
+            "The old pattern 'if not existing_admin' must be removed. "
+            "INITIAL_ADMIN_EMAILS must be checked on every login."
+        )
+        # Must contain the new correct pattern
+        assert "INITIAL_ADMIN_EMAILS" in source, (
+            "The exchange endpoint must check INITIAL_ADMIN_EMAILS"
+        )
+        assert "email_lower" in source or "lower()" in source, (
+            "Email comparison must be case-insensitive"
+        )

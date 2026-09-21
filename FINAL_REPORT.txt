@@ -1,9 +1,9 @@
 EXAMGUARD FINAL PRODUCTION REPORT
 ============================================================
 
-DATE: 2026-09-20
-GIT COMMIT: d897a18 (fix: make UniFace face verification production-ready)
-GIT PUSH: PUSHED to origin/main
+DATE: 2026-09-21
+GIT COMMIT: pending (fix: admin RBAC + Permissions-Policy + auth session + docs)
+GIT PUSH: PENDING
 
 ==================================================
 EXAMGUARD PRODUCTION STATUS: DEPLOYED & FUNCTIONAL
@@ -20,6 +20,45 @@ ROOT CAUSE FIX (2001c94):
 - This silently failed verification for ALL tokens when env var was missing
 - Fix: Added default "exam-guard-75675" (matches frontend), removed guard,
   improved error logging with Firebase response body details
+
+LATEST CHANGES (admin RBAC + Permissions-Policy + auth session fix):
+
+ADMIN RBAC FIX:
+- config.py: INITIAL_ADMIN_EMAILS now defaults to ["admin-skandachandrashekhar335@gmail.com"]
+- .env: INITIAL_ADMIN_EMAILS updated to include target admin email
+- auth.py: INITIAL_ADMIN_EMAILS check now runs on EVERY login (not just when no admin exists)
+- Email comparison is case-insensitive for robustness
+- On next login: user.role is promoted to ADMIN, new JWT issued with role=ADMIN
+- Regression test added: TestAdminPromotion class in test_firebase_noninteractive.py
+
+PERMISSIONS-POLICY FIX (next.config.ts):
+- camera=() → camera=(self): camera access now allowed on same origin (was DENYING camera!)
+- Added: attribution-reporting=(), private-aggregation=(), join-ad-interest-group=(), run-ad-auction=()
+- These suppress Chrome's built-in Permissions-Policy feature warnings
+
+COOP WARNINGS (classified):
+- Cross-Origin-Opener-Policy warnings for window.closed/window.close
+- Source: Firebase Google sign-in popup
+- Classification: NON-FUNCTIONAL — browser security warnings that don't prevent authentication
+- Firebase auth works correctly despite these warnings
+
+401/403 INVESTIGATION:
+- examination-sessions 401: Stale JWT (REVIEWER) or missing token. Resolved by fresh login.
+- invigilator/dashboard 403: Requires INVIGILATOR role only. ADMIN gets 403 by design.
+  This endpoint is for INVIGILATOR role — ADMIN does not need it.
+- exams/178/dashboard 403: Requires ADMIN|OPERATOR. After fresh ADMIN login, works.
+
+LATEST CHANGES (c9e7b57 — reference face persistence and end-to-end verification chain):
+- Model: Added reference_face_url column to IdentityVerificationAttempt
+- Migration 028: Adds reference_face_url column (applied to Neon DB)
+- New endpoints:
+  - POST /{attempt_id}/reference-face — upload and persist reference face to Cloudinary
+  - GET /{attempt_id}/reference-face — retrieve stored reference face URL
+  - GET /invigilator/registered-students — list students with IV attempt status
+- verify-face: reference_image is now optional (uses stored reference if omitted)
+- IV detail page: Save Reference Face button, stored reference display
+- Invigilator page: Registered students list, face verification modal with camera
+- Frontend types/API updated for new fields
 
 LATEST CHANGES (d897a18 — make UniFace face verification production-ready):
 - nixpacks.toml: NEW — tells Railway to install `pip install '.[uniface]'` (includes uniface[cpu])

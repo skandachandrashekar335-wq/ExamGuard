@@ -157,16 +157,16 @@ async def firebase_token_exchange(
     db.commit()
     db.refresh(user)
 
-    # Step 4: Check if initial admin provisioning is needed
-    # Only if no ADMIN currently exists in the system
+    # Step 4: Check if user email is in the admin allowlist
+    # Always check INITIAL_ADMIN_EMAILS on every login, regardless of
+    # whether other admins exist. This ensures designated admin accounts
+    # are always promoted, even if they were initially created as REVIEWER.
+    # Email comparison is case-insensitive for robustness.
     settings = get_settings()
-    result = db.execute(select(User).filter(User.role == "ADMIN"))
-    existing_admin = result.scalar_one_or_none()
-
-    if not existing_admin and settings.INITIAL_ADMIN_EMAILS:
-        # Check if this user's email is in the initial provisioning list
-        if email and email in settings.INITIAL_ADMIN_EMAILS:
-            # Grant ADMIN role for initial provisioning only
+    if settings.INITIAL_ADMIN_EMAILS and email:
+        email_lower = email.lower()
+        admin_emails_lower = [e.lower() for e in settings.INITIAL_ADMIN_EMAILS]
+        if email_lower in admin_emails_lower and user.role != "ADMIN":
             user.role = "ADMIN"
             db.commit()
 
@@ -195,5 +195,5 @@ async def firebase_token_exchange(
             "firebase_uid": user.firebase_uid,
         },
         "token": examguard_token,
-        "requires_onboarding": user.role != "ADMIN" and not existing_admin,
+        "requires_onboarding": user.role != "ADMIN",
     }
