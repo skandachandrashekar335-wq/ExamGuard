@@ -27,6 +27,7 @@ export async function getDemoStatus(): Promise<DemoStatusResponse> {
 export async function loadDemoData(): Promise<DemoLoadResponse> {
   return apiRequest<DemoLoadResponse>("/api/v1/demo/load", {
     method: "POST",
+    headers: getAuthHeaders(),
   });
 }
 

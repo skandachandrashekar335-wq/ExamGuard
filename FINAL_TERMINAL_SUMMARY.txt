@@ -3,6 +3,14 @@ EXAMGUARD PRODUCTION STATUS
 
 STATUS: DEPLOYED & FUNCTIONAL
 ADMIN ROLE FIX: INITIAL_ADMIN_EMAILS checked on every login, target email promoted to ADMIN
+
+DEMO MODE: WORKFLOW FIXED
+- Demo load works for any authenticated user (ADMIN/OPERATOR/INVIGILATOR/REVIEWER)
+- Backend: demo_load authorization changed to get_current_user
+- Frontend: loadDemoData() includes auth headers
+- Dashboard: Demo card visible to all authenticated users
+- Demo scenario: deterministic, idempotent (DEMO-CA, DEMO001, Demo Hall A)
+
 PERMISSIONS-POLICY: camera=(self), added Chrome privacy-sandbox feature denials
 COOP WARNINGS: Non-functional (Firebase popup, does not prevent auth)
 MANUAL GOOGLE OAUTH TEST: REQUIRED (sign out → sign in → verify ADMIN role)

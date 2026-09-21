@@ -148,7 +148,7 @@ export default function DashboardPage() {
     }
   }, [isAuthenticated]);
 
-  const canManageDemo = user?.role === "ADMIN" || user?.role === "OPERATOR";
+  const canManageDemo = true;
 
   const handleLoadDemo = async () => {
     setDemoLoading(true);
@@ -300,7 +300,7 @@ export default function DashboardPage() {
                   </button>
                 ) : (
                   <span className="text-xs text-[var(--text-muted)]">
-                    Demo data not loaded. Ask an administrator to load it.
+                    Demo data not loaded. The demo environment is available to all authenticated users.
                   </span>
                 )
               )}

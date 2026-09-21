@@ -178,7 +178,7 @@ def demo_reference_image(
 @router.post("/load", response_model=DemoLoadResponse)
 def demo_load(
     db: Session = Depends(get_db),
-    claims: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+    claims: dict = Depends(get_current_user),
 ):
     """Load (or reload) the deterministic demo scenario.
 
@@ -188,6 +188,11 @@ def demo_load(
 
     The identity verification attempt is created in CREATED status
     with method=FACE, ready for the real face verification pipeline.
+
+    Any authenticated ExamGuard user may load the demo scenario.
+    The endpoint is restricted to creating only the fixed demo
+    scenario — no arbitrary exams, students, or records are
+    permitted, and no frontend-controlled payload is accepted.
     """
     # ── Subject ──
     subject, _ = _find_or_create(

@@ -29,6 +29,24 @@ ADMIN RBAC FIX (previous, already working):
 - auth.py: INITIAL_ADMIN_EMAILS check now runs on EVERY login (not just when no admin exists)
 - Email comparison is case-insensitive for robustness
 - On next login: user.role is promoted to ADMIN, new JWT issued with role=ADMIN
+
+DEMO MODE FIX (presentation workflow):
+- backend/app/api/v1/demo.py: Changed demo_load authorization from 
+  require_role([ADMIN, OPERATOR]) to get_current_user, enabling any 
+  authenticated user to load the fixed demo scenario
+- frontend/src/lib/demo-api.ts: Added getAuthHeaders() to loadDemoData() 
+  so the POST request includes the user's JWT
+- frontend/src/app/dashboard/page.tsx: 
+  - canManageDemo changed from role-based to always true for authenticated users
+  - Demo Environment card now visible to all authenticated users
+  - Error message updated from 'Ask an administrator to load it' to 
+    'The demo environment is available to all authenticated users'
+- Demo scenario is deterministic and idempotent using DEMO-CA, DEMO001, 
+  Demo Hall A identifiers
+- Repeated demo_load calls are idempotent - no duplicates created
+- Demo data isolated from normal exam records with deterministic identifiers
+
+
 - Regression test added: TestAdminPromotion class in test_firebase_noninteractive.py
 
 PERMISSIONS-POLICY FIX (next.config.ts):
