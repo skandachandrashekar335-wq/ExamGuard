@@ -45,7 +45,8 @@ settings = get_settings()
 DEMO_SUBJECT_CODE = "DEMO-CA"
 DEMO_EXAM_DEPT = "Demo"
 DEMO_EXAM_SEMESTER = 1
-DEMO_STUDENT_USN = "DEMO001"
+DEMO_STUDENT_USNS = ["DEMO001", "DEMO002", "DEMO003"]
+DEMO_STUDENT_NAMES = ["Demo Candidate 1", "Demo Candidate 2", "Demo Candidate 3"]
 DEMO_HALL_BUILDING = "Demo Building"
 DEMO_HALL_ROOM = "A1"
 DEMO_ENTRY_CODE = "DEMO_MAIN"
@@ -56,9 +57,10 @@ class DemoLoadResponse(BaseModel):
     message: str
     demo_exam_id: int
     demo_hall_id: int
-    demo_student_id: int
+    demo_student_ids: list[int]
+    demo_student_usns: list[str]
     demo_session_id: int
-    demo_attempt_id: int
+    demo_attempt_ids: list[int]
     demo_invigilator_assignment_id: int | None = None
 
 
@@ -66,9 +68,10 @@ class DemoStatusResponse(BaseModel):
     loaded: bool
     demo_exam_id: int | None = None
     demo_hall_id: int | None = None
-    demo_student_id: int | None = None
+    demo_student_ids: list[int] | None = None
+    demo_student_usns: list[str] | None = None
     demo_session_id: int | None = None
-    demo_attempt_id: int | None = None
+    demo_attempt_ids: list[int] | None = None
 
 
 # ── Helpers ───────────────────────────────────────────────────────
@@ -119,36 +122,33 @@ def demo_status(
     exam = db.execute(
         select(Exam).filter_by(subject_id=subject.id)
     ).scalar_one_or_none()
-    student = db.execute(
-        select(Student).filter_by(usn=DEMO_STUDENT_USN)
-    ).scalar_one_or_none()
+    students = db.execute(
+        select(Student).filter(Student.usn.in_(DEMO_STUDENT_USNS))
+    ).scalars().all()
 
     session = None
-    attempt = None
+    attempts = None
     if exam:
         session = db.execute(
             select(ExaminationSession).filter_by(exam_id=exam.id)
         ).scalar_one_or_none()
-    if student and exam:
-        reg = db.execute(
-            select(ExamRegistration).filter_by(
-                student_id=student.id, exam_id=exam.id
-            )
-        ).scalar_one_or_none()
-        if reg:
-            attempt = db.execute(
-                select(IdentityVerificationAttempt).filter_by(
-                    exam_registration_id=reg.id
-                )
-            ).scalar_one_or_none()
+    if students:
+        attempts = db.execute(
+            select(IdentityVerificationAttempt)
+            .filter(IdentityVerificationAttempt.exam_registration_id.in_(
+                db.select(ExamRegistration.exam_registration_id)
+                .where(ExamRegistration.student_id.in_([s.id for s in students]))
+            ))
+        ).scalars().all()
 
     return DemoStatusResponse(
         loaded=True,
         demo_exam_id=exam.id if exam else None,
         demo_hall_id=session.exam_hall_id if session else None,
-        demo_student_id=student.id if student else None,
+        demo_student_ids=[s.id for s in students] if students else None,
+        demo_student_usns=[s.usn for s in students] if students else None,
         demo_session_id=session.id if session else None,
-        demo_attempt_id=attempt.id if attempt else None,
+        demo_attempt_ids=[a.id for a in attempts] if attempts else None,
     )
 
 
@@ -222,19 +222,25 @@ def demo_load(
         },
     )
 
-    # ── Student ──
-    student, _ = _find_or_create(
-        db, Student,
-        unique_filters={"usn": DEMO_STUDENT_USN},
-        defaults={"name": "Demo Candidate"},
-    )
+    # ── Students (3 candidates) ──
+    students = []
+    for i, (usn, name) in enumerate(zip(DEMO_STUDENT_USNS, DEMO_STUDENT_NAMES), 1):
+        student, _ = _find_or_create(
+            db, Student,
+            unique_filters={"usn": usn},
+            defaults={"name": name},
+        )
+        students.append(student)
 
-    # ── Exam Registration ──
-    registration, _ = _find_or_create(
-        db, ExamRegistration,
-        unique_filters={"student_id": student.id, "exam_id": exam.id},
-        defaults={"status": "REGISTERED"},
-    )
+    # ── Exam Registrations (one per student) ──
+    registrations = []
+    for student in students:
+        registration, _ = _find_or_create(
+            db, ExamRegistration,
+            unique_filters={"student_id": student.id, "exam_id": exam.id},
+            defaults={"status": "REGISTERED"},
+        )
+        registrations.append(registration)
 
     # ── Exam Hall ──
     hall, _ = _find_or_create(
@@ -251,21 +257,24 @@ def demo_load(
         },
     )
 
-    # ── Seat Assignment ──
-    seat, _ = _find_or_create(
-        db, SeatAssignment,
-        unique_filters={
-            "exam_registration_id": registration.id,
-            "exam_hall_id": hall.id,
-        },
-        defaults={
-            "seat_number": "1",
-            "row_number": 1,
-            "column_number": 1,
-            "exam_id": exam.id,
-            "student_id": student.id,
-        },
-    )
+    # ── Seat Assignments (one per student) ──
+    seat_assignments = []
+    for i, (student, registration) in enumerate(zip(students, registrations), 1):
+        seat, _ = _find_or_create(
+            db, SeatAssignment,
+            unique_filters={
+                "exam_registration_id": registration.id,
+                "exam_hall_id": hall.id,
+            },
+            defaults={
+                "seat_number": str(i),
+                "row_number": 1,
+                "column_number": i,
+                "exam_id": exam.id,
+                "student_id": student.id,
+            },
+        )
+        seat_assignments.append(seat)
 
     # ── Entry Point ──
     entry_point, _ = _find_or_create(
@@ -292,18 +301,21 @@ def demo_load(
         },
     )
 
-    # ── Identity Verification Attempt ──
-    attempt, _ = _find_or_create(
-        db, IdentityVerificationAttempt,
-        unique_filters={"exam_registration_id": registration.id},
-        defaults={
-            "student_id": student.id,
-            "hall_ticket_id": None,
-            "verification_method": "FACE",
-            "status": "CREATED",
-            "decision": "PENDING",
-        },
-    )
+    # ── Identity Verification Attempts (one per student) ──
+    attempts = []
+    for student, registration in zip(students, registrations):
+        attempt, _ = _find_or_create(
+            db, IdentityVerificationAttempt,
+            unique_filters={"exam_registration_id": registration.id},
+            defaults={
+                "student_id": student.id,
+                "hall_ticket_id": None,
+                "verification_method": "FACE",
+                "status": "CREATED",
+                "decision": "PENDING",
+            },
+        )
+        attempts.append(attempt)
 
     # ── Invigilator Assignment (for the current user) ──
     invigilator_assignment_id = None
@@ -330,9 +342,10 @@ def demo_load(
         message="Demo data loaded successfully",
         demo_exam_id=exam.id,
         demo_hall_id=hall.id,
-        demo_student_id=student.id,
+        demo_student_ids=[s.id for s in students],
+        demo_student_usns=[s.usn for s in students],
         demo_session_id=session.id,
-        demo_attempt_id=attempt.id,
+        demo_attempt_ids=[a.id for a in attempts],
         demo_invigilator_assignment_id=invigilator_assignment_id,
     )
 
@@ -398,13 +411,14 @@ def demo_reset(
         db.delete(exam)
         deleted += 1
 
-    # Delete demo student
-    student = db.execute(
-        select(Student).filter_by(usn=DEMO_STUDENT_USN)
-    ).scalar_one_or_none()
-    if student:
-        db.delete(student)
-        deleted += 1
+    # Delete demo students
+    for usn in DEMO_STUDENT_USNS:
+        student = db.execute(
+            select(Student).filter_by(usn=usn)
+        ).scalar_one_or_none()
+        if student:
+            db.delete(student)
+            deleted += 1
 
     # Delete demo hall
     hall = db.execute(

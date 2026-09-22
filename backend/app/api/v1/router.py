@@ -35,6 +35,7 @@ from app.api.v1.invigilator_assignments import router as invigilator_assignments
 from app.api.v1.invigilator import router as invigilator_router
 from app.api.v1.hall_ticket_mappings import router as hall_ticket_mappings_router
 from app.api.v1.demo import router as demo_router
+from app.api.v1.users import router as users_router
 
 router = APIRouter()
 
@@ -73,6 +74,7 @@ router.include_router(invigilator_assignments_router)
 router.include_router(invigilator_router)
 router.include_router(hall_ticket_mappings_router)
 router.include_router(demo_router)
+router.include_router(users_router)
 
 
 @router.get("/ping")

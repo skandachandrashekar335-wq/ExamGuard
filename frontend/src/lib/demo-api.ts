@@ -5,9 +5,10 @@ export interface DemoLoadResponse {
   message: string;
   demo_exam_id: number;
   demo_hall_id: number;
-  demo_student_id: number;
+  demo_student_ids: number[];
+  demo_student_usns: string[];
   demo_session_id: number;
-  demo_attempt_id: number;
+  demo_attempt_ids: number[];
   demo_invigilator_assignment_id: number | null;
 }
 
@@ -15,9 +16,10 @@ export interface DemoStatusResponse {
   loaded: boolean;
   demo_exam_id: number | null;
   demo_hall_id: number | null;
-  demo_student_id: number | null;
+  demo_student_ids: number[] | null;
+  demo_student_usns: string[] | null;
   demo_session_id: number | null;
-  demo_attempt_id: number | null;
+  demo_attempt_ids: number[] | null;
 }
 
 export async function getDemoStatus(): Promise<DemoStatusResponse> {
