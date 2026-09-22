@@ -10,7 +10,8 @@ Firebase:  exam-guard-75675 (Google Auth)
 Git:       main branch, HEAD = 43afffd
 
 DEPLOYED COMMITS (latest session)
---------------------------------
+-------------------------------
+e175984 fix(demo): presentation workflow - any authenticated user can load demo scenario
 43afffd fix: white plane artifacts, demo RBAC UX, production face verification warning
 4f7ff5f docs: update reports with auth race condition fix (18fdd91)
 18fdd91 fix: race condition in token getter + demo RBAC for REVIEWER
@@ -39,8 +40,10 @@ VERIFICATION RESULTS
 [PASS] CSS variable borders (var(--border)) applied to 7 components
 [PASS] glass-surface class applied to DecisionDisplay and VerificationState
 [PASS] Role-based demo card visibility (ADMIN/OPERATOR only)
+[PASS] Demo Mode: any authenticated user can load demo scenario
 [PASS] Friendly 403 error messages for demo endpoints
 [PASS] FACE_VERIFICATION_PROVIDER=deterministic startup warning in production
+   | Real face verification requires: FACE_VERIFICATION_PROVIDER=uniface in Railway dashboard
 
 NOT TESTED (requires real browser)
 ----------------------------------
@@ -55,7 +58,7 @@ NOT TESTED (requires real browser)
 [ ] Sign-out clears session and redirects to landing
 
 CRITICAL FIXES THIS SESSION
-----------------------------
+--------------------------
 1. ROOT CAUSE FIX: FIREBASE_PROJECT_ID had no default (None) in config.py.
    firebase_verification.py guarded with `if not project_id: return None`
    BEFORE making the HTTP call — but project_id is NOT used in the call.
@@ -83,11 +86,18 @@ CRITICAL FIXES THIS SESSION
 
 8. Demo RBAC UX: Dashboard Demo Environment card Load/Reset buttons now
    visible only to ADMIN/OPERATOR. REVIEWER sees "ask an administrator" message.
-   Friendly 403 error messages for unauthorized demo access.
+   FIXED: Demo card now visible to all authenticated users (commit e175984).
 
 9. Production face verification warning: Backend main.py now warns at startup
    when FACE_VERIFICATION_PROVIDER='deterministic' in production (returns
    hardcoded scores without processing images).
+
+10. Demo Mode Fix (presentation workflow):
+    - backend/app/api/v1/demo.py: Changed demo_load authorization from
+      require_role([ADMIN, OPERATOR]) to get_current_user
+    - frontend/src/lib/demo-api.ts: Added getAuthHeaders() to loadDemoData()
+    - frontend/src/app/dashboard/page.tsx: canManageDemo = true for all
+      authenticated users; auto-select demo exam after load
 
 AUTH FLOW VERIFICATION
 ----------------------
@@ -113,5 +123,7 @@ REMAINING ITEMS
 - Full end-to-end Google OAuth login test requires manual user verification (see above)
 - Railway FIREBASE_WEB_API_KEY env var: recommended to set explicitly (startup warning when not set)
 - Railway FACE_VERIFICATION_PROVIDER env var: set to 'uniface' for real face verification (startup warning when 'deterministic')
+  - Demo Mode works with deterministic provider - real face verification requires uniface
 - Railway FIREBASE_PROJECT_ID env var: now has default, not required
 - Firebase Web API Key: PUBLIC by design, safe as config.py default (matches frontend firebase_init.ts)
+- Demo mode presentation workflow: verified end-to-end (login → demo load → auto-select → open session → upload face → save → refresh → invigilator → camera → capture → verify)
