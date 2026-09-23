@@ -17,7 +17,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -449,4 +449,231 @@ def demo_reset(
         "status": "reset",
         "message": f"Demo data reset complete. {deleted} records removed.",
         "records_deleted": deleted,
+    }
+
+
+# ── Demo-specific presentation workflow endpoints ────────────────
+# These endpoints allow any authenticated user to perform demo-specific
+# operations (upload reference face, assign invigilator, start session)
+# but ONLY on deterministic demo records. They do NOT weaken normal RBAC.
+
+def _is_demo_attempt(db: Session, attempt_id: int) -> bool:
+    """Check if an attempt belongs to a demo student."""
+    attempt = db.execute(
+        select(IdentityVerificationAttempt).filter_by(id=attempt_id)
+    ).scalar_one_or_none()
+    if not attempt:
+        return False
+    student = db.execute(
+        select(Student).filter(Student.usn.in_(DEMO_STUDENT_USNS))
+        .filter(Student.id == attempt.student_id)
+    ).scalar_one_or_none()
+    return student is not None
+
+
+def _get_demo_session(db: Session) -> "ExaminationSession | None":
+    """Get the deterministic demo examination session."""
+    subject = db.execute(
+        select(Subject).filter_by(code=DEMO_SUBJECT_CODE)
+    ).scalar_one_or_none()
+    if not subject:
+        return None
+    exam = db.execute(
+        select(Exam).filter_by(subject_id=subject.id)
+    ).scalar_one_or_none()
+    if not exam:
+        return None
+    return db.execute(
+        select(ExaminationSession).filter_by(exam_id=exam.id)
+    ).scalar_one_or_none()
+
+
+class DemoUploadReferenceRequest(BaseModel):
+    attempt_id: int = Field(..., gt=0)
+    reference_image: str = Field(..., min_length=1, description="Base64-encoded face image")
+    image_format: str = Field(default="image/jpeg")
+
+
+class DemoAssignInvigilatorRequest(BaseModel):
+    email: str = Field(..., min_length=1, description="Invigilator email address")
+
+
+class DemoStartSessionRequest(BaseModel):
+    performed_by: str | None = None
+
+
+@router.post("/upload-reference-face")
+def demo_upload_reference_face(
+    body: DemoUploadReferenceRequest,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(get_current_user),
+):
+    """Upload a reference face for a demo student.
+
+    Any authenticated user may call this endpoint, but ONLY for attempts
+    belonging to deterministic demo students (DEMO001-003). Real
+    production reference-face upload still requires ADMIN/OPERATOR via
+    the normal /identity-verifications/{id}/reference-face endpoint.
+    """
+    import base64
+
+    if not _is_demo_attempt(db, body.attempt_id):
+        raise HTTPException(
+            status_code=422,
+            detail="Attempt is not a demo student reference. Use the standard endpoint.",
+        )
+
+    attempt = db.execute(
+        select(IdentityVerificationAttempt).filter_by(id=body.attempt_id)
+    ).scalar_one_or_none()
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+
+    try:
+        ref_bytes = base64.b64decode(body.reference_image, validate=True)
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid base64 encoding")
+
+    if len(ref_bytes) == 0:
+        raise HTTPException(status_code=422, detail="Image is empty")
+
+    from app.core.config import get_settings
+    settings = get_settings()
+    max_size = settings.FACE_VERIFICATION_MAX_IMAGE_SIZE_MB * 1024 * 1024
+    if len(ref_bytes) > max_size:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Image exceeds {settings.FACE_VERIFICATION_MAX_IMAGE_SIZE_MB}MB limit",
+        )
+
+    from app.storage.cloudinary import CloudinaryStorage
+    storage = CloudinaryStorage()
+    ext = ".png" if body.image_format == "image/png" else ".jpg"
+    key = f"face-references/attempt-{body.attempt_id}{ext}"
+
+    try:
+        url = storage.save(key, ref_bytes)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save image: {e}")
+
+    attempt.reference_face_url = url
+    db.commit()
+    db.refresh(attempt)
+
+    return {
+        "status": "saved",
+        "attempt_id": body.attempt_id,
+        "reference_face_url": url,
+    }
+
+
+@router.post("/assign-invigilator")
+def demo_assign_invigilator(
+    body: DemoAssignInvigilatorRequest,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(get_current_user),
+):
+    """Assign an invigilator to the demo session by email.
+
+    Any authenticated user may call this, but it ONLY modifies the
+    deterministic demo session's invigilator assignment.
+    """
+    session = _get_demo_session(db)
+    if not session:
+        raise HTTPException(status_code=404, detail="Demo session not loaded. Load demo data first.")
+
+    user = db.execute(
+        select(User).filter(User.email.ilike(body.email))
+    ).scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No user found with email {body.email}. The invigilator must sign in at least once.",
+        )
+
+    exam = db.execute(select(Exam).filter_by(id=session.exam_id)).scalar_one_or_none()
+    entry_point = db.execute(
+        select(EntryPoint).filter_by(code=DEMO_ENTRY_CODE)
+    ).scalar_one_or_none()
+
+    ia, _ = _find_or_create(
+        db, InvigilatorAssignment,
+        unique_filters={
+            "user_id": user.id,
+            "exam_id": session.exam_id,
+            "exam_hall_id": session.exam_hall_id,
+        },
+        defaults={
+            "entry_point_id": entry_point.id if entry_point else None,
+            "notes": "Assigned via demo presentation workflow",
+        },
+    )
+    db.commit()
+
+    return {
+        "status": "assigned",
+        "assignment_id": ia.id,
+        "user_id": user.id,
+        "email": user.email,
+        "exam_id": session.exam_id,
+        "exam_hall_id": session.exam_hall_id,
+    }
+
+
+@router.post("/start-session")
+def demo_start_session(
+    body: DemoStartSessionRequest = DemoStartSessionRequest(),
+    db: Session = Depends(get_db),
+    _user: dict = Depends(get_current_user),
+):
+    """Start the demo examination session.
+
+    Transitions the deterministic demo session from NOT_STARTED → IN_PROGRESS.
+    Any authenticated user may call this, but ONLY the demo session is affected.
+    """
+    from app.services import examination_session as session_svc
+
+    session = _get_demo_session(db)
+    if not session:
+        raise HTTPException(status_code=404, detail="Demo session not loaded. Load demo data first.")
+
+    try:
+        updated = session_svc.start_session(
+            db, session.id,
+            performed_by=body.performed_by or _user.get("email", "demo-presenter"),
+        )
+        return {
+            "status": "started",
+            "session_id": updated.id,
+            "session_status": updated.status,
+            "gate_status": updated.gate_status,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.get("/session-status")
+def demo_session_status(
+    db: Session = Depends(get_db),
+    _user: dict = Depends(get_current_user),
+):
+    """Get the current demo session status."""
+    session = _get_demo_session(db)
+    if not session:
+        return {"loaded": False}
+
+    exam = db.execute(select(Exam).filter_by(id=session.exam_id)).scalar_one_or_none()
+    hall = db.execute(
+        select(ExamHall).filter_by(id=session.exam_hall_id)
+    ).scalar_one_or_none()
+
+    return {
+        "loaded": True,
+        "session_id": session.id,
+        "session_status": session.status,
+        "gate_status": session.gate_status,
+        "exam_name": exam.exam_name if exam else None,
+        "exam_date": str(exam.exam_date) if exam else None,
+        "hall_name": hall.name if hall else None,
+        "started_at": str(session.started_at) if session.started_at else None,
     }
