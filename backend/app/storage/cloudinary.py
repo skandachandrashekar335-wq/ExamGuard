@@ -17,6 +17,7 @@ the adapter falls back to LocalStorage for development functionality.
 
 import os
 from pathlib import Path
+from typing import Optional
 import uuid
 
 import cloudinary

@@ -1,13 +1,12 @@
 EXAMGUARD FINAL PRODUCTION REPORT
 ============================================================
 
-DATE: 2026-09-23
-GIT COMMIT: 0e79782
-GIT PUSH: COMPLETE (origin/main)
+DATE: 2026-09-24
+TEST SUITE: 2512 passed / 0 failed / 0 errors (backend full suite)
 
-==================================================
+=================================================
 EXAMGUARD PRODUCTION STATUS: DEPLOYED & FUNCTIONAL
-==================================================
+=================================================
 
 COMPLETE TWO-COMPUTER PRESENTATION WORKFLOW IMPLEMENTED.
 DEMO PRESENTATION CONTROL CENTER fully functional on Dashboard.
@@ -93,7 +92,18 @@ FACE VERIFICATION PROVIDER:
 - To enable real biometric verification:
   Set FACE_VERIFICATION_PROVIDER=uniface in Railway dashboard env vars
 
-ROOT CAUSES FIXED:
+ROOT CAUSES FIXED (2026-09-24 engineering session):
+1. SQLite server_default="true" stored TEXT — is_active == True matched 0 rows
+   Fix: server_default=true() on 10 Boolean model columns (compiles TRUE on PG)
+2. Demo load/status used first exam (stale date) — _latest_demo_exam by id DESC
+3. Demo reset delete order violated FKs — ordered deletes + flush
+4. Shared StaticPool connection raced under concurrency tests — shared-cache DB
+5. Import audit pagination unstable when two imports share a timestamp
+6. Seat capacity 409 from stale seats under SQLite integer PK reuse
+7. Face provider tests matched internal prefix instead of user-facing message
+8. LATE_ENTRY tests used past exam_date (always late vs created_at=now)
+
+ROOT CAUSES FIXED (prior sessions):
 1. INITIAL_ADMIN_EMAILS email mismatch (skandachandrashekhar335@gmail.com)
 2. Demo load authorization (any authenticated user)
 3. Demo operations blocked by RBAC (demo-specific endpoints added)

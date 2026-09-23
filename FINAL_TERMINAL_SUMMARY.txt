@@ -2,7 +2,17 @@ EXAMGUARD PRODUCTION STATUS
 ============================
 
 STATUS: DEPLOYED & FUNCTIONAL
-GIT COMMIT: 0e79782 (origin/main)
+TEST SUITE: 2512 passed, 0 failed, 0 errors (2026-09-24)
+GIT COMMIT: see `git log -1` (this file updated with latest push)
+
+ENGINEERING FIXES (2026-09-24):
+- Models: server_default=true() (SQLite boolean default was TEXT 'true')
+- Demo API: latest exam selection, FK-ordered reset, active filters
+- Conftest: shared-cache SQLite + NullPool + keep-alive (concurrency tests)
+- Import audit: stable started_at DESC, id DESC ordering
+- Seat assignment tests: cleanup stale seats under SQLite PK reuse
+- Face provider tests: match real "timed out" user messages
+- LATE_ENTRY tests: future exam_date
 
 ADMIN ROLE FIX: INITIAL_ADMIN_EMAILS checked on every login, target email promoted to ADMIN
 

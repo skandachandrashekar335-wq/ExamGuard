@@ -21,6 +21,7 @@ import json
 import struct
 import sys
 import types
+from datetime import date, time
 from unittest.mock import MagicMock, patch
 
 import cv2
@@ -159,7 +160,7 @@ def sample_data():
 
         exam = Exam(
             subject_id=subject.id, exam_name="P84 Exam Final",
-            exam_date="2026-12-01", start_time="09:00", end_time="12:00",
+            exam_date=date(2026, 12, 1), start_time=time(9, 0), end_time=time(12, 0),
             semester=1, department="P84 Dept",
         )
         db.add(exam)
@@ -1052,7 +1053,7 @@ class TestLifecycle:
                 "app.services.face_verification.get_face_verification_provider",
                 return_value=provider,
             ):
-                with pytest.raises(ValueError, match="Provider error"):
+                with pytest.raises(ValueError, match="timed out"):
                     verify_face(
                         db, face_attempt.id,
                         reference_image=FAKE_JPEG, probe_image=FAKE_JPEG,

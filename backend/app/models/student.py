@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String, func
+from sqlalchemy import Boolean, DateTime, String, func, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models import Base
@@ -24,7 +24,7 @@ class Student(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
-        server_default="true",
+        server_default=true(),
         index=True,
         comment="Soft-delete flag. Inactive students are hidden from active operations.",
     )

@@ -7,6 +7,7 @@ invariants, API error sanitization, privacy, and regression.
 
 import json
 import time
+from datetime import date, datetime, time as dtime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -125,7 +126,7 @@ def sample_data():
 
         exam = Exam(
             subject_id=subject.id, exam_name="P86 Exam Final",
-            exam_date="2026-12-01", start_time="09:00", end_time="12:00",
+            exam_date=date(2026, 12, 1), start_time=dtime(9, 0), end_time=dtime(12, 0),
             semester=1, department="P86 Dept",
         )
         db.add(exam)

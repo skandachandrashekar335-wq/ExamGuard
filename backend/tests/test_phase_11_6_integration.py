@@ -117,7 +117,7 @@ def _create_exam(db, subject, exam_name="INT Exam", start_hour=9):
     e = Exam(
         subject_id=subject.id,
         exam_name=exam_name,
-        exam_date=date(2026, 9, 15),
+        exam_date=date.today() + timedelta(days=1),
         start_time=time(start_hour, 0),
         end_time=time(start_hour + 3, 0),
         semester=6,

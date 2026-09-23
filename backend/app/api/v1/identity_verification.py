@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
-from app.auth import Role, require_role
+from app.auth import Role, get_invigilator_scope, check_invigilator_scope, require_role
 from app.core.database import get_db
 from app.schemas.identity_verification import (
     IdentityVerificationContextResponse,
@@ -20,6 +20,23 @@ from app.services import identity_verification as iv_service
 from app.services import identity_verification_decision as iv_decision
 
 router = APIRouter(prefix="/identity-verifications", tags=["Identity Verifications"])
+
+
+def _enforce_attempt_scope(db: Session, user: dict, attempt) -> None:
+    """Enforce INVIGILATOR scope on an attempt. No-op for other roles."""
+    if user.get("role") != Role.INVIGILATOR:
+        return
+    from app.models.exam_registration import ExamRegistration
+
+    scope = get_invigilator_scope(user, db)
+    exam_id = None
+    if attempt.exam_registration_id:
+        reg = db.query(ExamRegistration).filter(
+            ExamRegistration.id == attempt.exam_registration_id
+        ).first()
+        if reg:
+            exam_id = reg.exam_id
+    check_invigilator_scope(scope, resource_exam_id=exam_id, resource_hall_id=None)
 
 
 class CompleteRequest(BaseModel):
@@ -224,6 +241,7 @@ def get_reference_face(
     attempt = iv_service.get_attempt(db, attempt_id)
     if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
+    _enforce_attempt_scope(db, _user, attempt)
     if not attempt.reference_face_url:
         raise HTTPException(
             status_code=404,
@@ -271,6 +289,24 @@ def list_attempts(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
+    # INVIGILATOR may only list attempts for their assigned exam
+    if _user.get("role") == Role.INVIGILATOR:
+        from app.models.exam_registration import ExamRegistration as _ER
+
+        scope = get_invigilator_scope(_user, db)
+        if scope is not None:
+            allowed_reg_ids = [
+                r.id for r in db.query(_ER).filter(_ER.exam_id == scope.exam_id).all()
+            ]
+            if exam_registration_id is not None:
+                if exam_registration_id not in allowed_reg_ids:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Access denied: resource outside your assigned exam",
+                    )
+            else:
+                exam_registration_id = allowed_reg_ids[0] if allowed_reg_ids else -1
+
     result = iv_service.list_attempts(
         db,
         page=page,
@@ -305,6 +341,7 @@ def get_attempt(
         raise HTTPException(
             status_code=404, detail="Identity verification attempt not found"
         )
+    _enforce_attempt_scope(db, _user, attempt)
     evidence = (
         db.query(iv_service.IdentityVerificationEvidence)
         .filter(iv_service.IdentityVerificationEvidence.attempt_id == attempt_id)
@@ -334,6 +371,7 @@ def get_attempt_context(
         raise HTTPException(
             status_code=404, detail="Identity verification attempt not found"
         )
+    _enforce_attempt_scope(db, _user, ctx["attempt"])
     attempt = ctx["attempt"]
     evidence = ctx["evidence"]
     student = ctx["student"]
@@ -396,12 +434,14 @@ def verify_face(
     attempt_id: int,
     body: VerifyFaceRequest,
     db: Session = Depends(get_db),
-    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ):
     """Run face verification and persist evidence signals.
 
     The provider produces evidence. Authorization decisions are made
     separately via the evaluate endpoint.
+
+    INVIGILATOR may only verify attempts within their assigned exam scope.
 
     If reference_image is provided, it is used directly.
     If omitted, the stored reference_face_url on the attempt is fetched
@@ -419,6 +459,12 @@ def verify_face(
     settings = get_settings()
     max_size_bytes = settings.FACE_VERIFICATION_MAX_IMAGE_SIZE_MB * 1024 * 1024
 
+    # Always load attempt first so INVIGILATOR scope can be enforced
+    attempt = iv_service.get_attempt(db, attempt_id)
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+    _enforce_attempt_scope(db, _user, attempt)
+
     # Resolve reference image bytes
     if body.reference_image is not None:
         try:
@@ -430,9 +476,6 @@ def verify_face(
             )
     else:
         # Fetch stored reference from attempt
-        attempt = iv_service.get_attempt(db, attempt_id)
-        if not attempt:
-            raise HTTPException(status_code=404, detail="Attempt not found")
         if not attempt.reference_face_url:
             raise HTTPException(
                 status_code=422,
@@ -527,13 +570,14 @@ def complete_attempt(
 def evaluate_and_complete(
     attempt_id: int,
     db: Session = Depends(get_db),
-    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
 ):
     attempt = iv_service.get_attempt(db, attempt_id)
     if not attempt:
         raise HTTPException(
             status_code=404, detail="Identity verification attempt not found"
         )
+    _enforce_attempt_scope(db, _user, attempt)
     if attempt.status not in (
         iv_service.IdentityVerificationStatus.CREATED.value,
         iv_service.IdentityVerificationStatus.IN_PROGRESS.value,

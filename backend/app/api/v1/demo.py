@@ -90,6 +90,19 @@ def _find_or_create(db: Session, model, unique_filters: dict, defaults: dict):
     return obj, True
 
 
+def _latest_demo_exam(db: Session, subject_id: int) -> Exam | None:
+    """Return the most recent exam for the demo subject.
+
+    Older demo loads may have created exams on previous dates; always
+    operate on the newest one so status/session lookups stay deterministic.
+    """
+    return db.execute(
+        select(Exam)
+        .filter_by(subject_id=subject_id)
+        .order_by(Exam.id.desc())
+    ).scalars().first()
+
+
 def _get_demo_user(db: Session, claims: dict) -> User:
     """Get the current user as a User model instance."""
     firebase_uid = claims.get("sub")
@@ -115,15 +128,13 @@ def demo_status(
 ):
     """Check whether demo data has been loaded."""
     subject = db.execute(
-        select(Subject).filter_by(code=DEMO_SUBJECT_CODE)
+        select(Subject).filter_by(code=DEMO_SUBJECT_CODE, is_active=True)
     ).scalar_one_or_none()
 
     if not subject:
         return DemoStatusResponse(loaded=False)
 
-    exam = db.execute(
-        select(Exam).filter_by(subject_id=subject.id)
-    ).scalar_one_or_none()
+    exam = _latest_demo_exam(db, subject.id)
     students = db.execute(
         select(Student).filter(Student.usn.in_(DEMO_STUDENT_USNS))
     ).scalars().all()
@@ -132,16 +143,26 @@ def demo_status(
     attempts = None
     if exam:
         session = db.execute(
-            select(ExaminationSession).filter_by(exam_id=exam.id)
-        ).scalar_one_or_none()
-    if students:
-        attempts = db.execute(
-            select(IdentityVerificationAttempt)
-            .filter(IdentityVerificationAttempt.exam_registration_id.in_(
-                db.select(ExamRegistration.exam_registration_id)
-                .where(ExamRegistration.student_id.in_([s.id for s in students]))
-            ))
-        ).scalars().all()
+            select(ExaminationSession)
+            .filter_by(exam_id=exam.id)
+            .order_by(ExaminationSession.id.desc())
+        ).scalars().first()
+    if exam and students:
+        student_ids = [s.id for s in students]
+        reg_ids = [
+            r.id for r in db.execute(
+                select(ExamRegistration).filter(
+                    ExamRegistration.exam_id == exam.id,
+                    ExamRegistration.student_id.in_(student_ids),
+                )
+            ).scalars().all()
+        ]
+        if reg_ids:
+            attempts = db.execute(
+                select(IdentityVerificationAttempt)
+                .filter(IdentityVerificationAttempt.exam_registration_id.in_(reg_ids))
+                .order_by(IdentityVerificationAttempt.id)
+            ).scalars().all()
 
     ref_urls = []
     if attempts:
@@ -211,25 +232,42 @@ def demo_load(
             "name": "Computer Applications — Demonstration",
             "semester": DEMO_EXAM_SEMESTER,
             "credits": 3,
+            "is_active": True,
         },
     )
+    if not subject.is_active:
+        subject.is_active = True
+        db.flush()
 
     # ── Exam (tomorrow so it never expires) ──
+    # Reuse the newest existing demo exam so repeated loads across days
+    # never create duplicate exams for the same subject.
     tomorrow = date.today() + timedelta(days=1)
-    exam, _ = _find_or_create(
-        db, Exam,
-        unique_filters={
-            "subject_id": subject.id,
-            "exam_date": tomorrow,
-            "start_time": time(9, 0),
-        },
-        defaults={
-            "exam_name": "ExamGuard Demo Examination",
-            "end_time": time(11, 0),
-            "semester": DEMO_EXAM_SEMESTER,
-            "department": DEMO_EXAM_DEPT,
-        },
-    )
+    exam = _latest_demo_exam(db, subject.id)
+    if exam:
+        exam.exam_date = tomorrow
+        exam.start_time = time(9, 0)
+        exam.end_time = time(11, 0)
+        exam.exam_name = "ExamGuard Demo Examination"
+        exam.semester = DEMO_EXAM_SEMESTER
+        exam.department = DEMO_EXAM_DEPT
+        exam.is_active = True
+        db.flush()
+    else:
+        exam, _ = _find_or_create(
+            db, Exam,
+            unique_filters={
+                "subject_id": subject.id,
+                "exam_date": tomorrow,
+                "start_time": time(9, 0),
+            },
+            defaults={
+                "exam_name": "ExamGuard Demo Examination",
+                "end_time": time(11, 0),
+                "semester": DEMO_EXAM_SEMESTER,
+                "department": DEMO_EXAM_DEPT,
+            },
+        )
 
     # ── Students (3 candidates) ──
     students = []
@@ -298,17 +336,31 @@ def demo_load(
     )
 
     # ── Examination Session ──
-    session, _ = _find_or_create(
-        db, ExaminationSession,
-        unique_filters={"exam_id": exam.id, "exam_hall_id": hall.id},
-        defaults={
-            "status": "NOT_STARTED",
-            "gate_status": "GATES_CLOSED",
-            "expected_capacity": 30,
-            "notes": "Demo session for live presentations",
-            "created_by": "demo-loader",
-        },
-    )
+    session = db.execute(
+        select(ExaminationSession)
+        .filter_by(exam_id=exam.id, exam_hall_id=hall.id)
+        .order_by(ExaminationSession.id.desc())
+    ).scalars().first()
+    if session:
+        if session.status == "COMPLETED" or session.status == "CANCELLED":
+            session.status = "NOT_STARTED"
+            session.gate_status = "GATES_CLOSED"
+            session.started_at = None
+            session.ended_at = None
+            session.gate_open_at = None
+        db.flush()
+    else:
+        session, _ = _find_or_create(
+            db, ExaminationSession,
+            unique_filters={"exam_id": exam.id, "exam_hall_id": hall.id},
+            defaults={
+                "status": "NOT_STARTED",
+                "gate_status": "GATES_CLOSED",
+                "expected_capacity": 30,
+                "notes": "Demo session for live presentations",
+                "created_by": "demo-loader",
+            },
+        )
 
     # ── Identity Verification Attempts (one per student) ──
     attempts = []
@@ -340,8 +392,11 @@ def demo_load(
             defaults={
                 "entry_point_id": entry_point.id,
                 "notes": "Auto-assigned by demo data loader",
+                "is_active": True,
             },
         )
+        if not ia.is_active:
+            ia.is_active = True
         invigilator_assignment_id = ia.id
 
     db.commit()
@@ -379,13 +434,51 @@ def demo_reset(
     if not subject:
         return {"status": "nothing_to_reset", "message": "No demo data found"}
 
-    # Find all demo exams
+    # Find all demo exams (there may be historical duplicates)
     exams = db.execute(
         select(Exam).filter_by(subject_id=subject.id)
     ).scalars().all()
 
+    from app.models.attendance import AttendanceRecord
+    from app.models.entry_verification import EntryVerification
+    from app.models.examination_session import GateEvent
+    from app.models.hall_ticket import HallTicket
+
     for exam in exams:
-        # Delete invigilator assignments for this exam first
+        # Collect session IDs for this exam first
+        sessions = db.execute(
+            select(ExaminationSession).filter_by(exam_id=exam.id)
+        ).scalars().all()
+        session_ids = [s.id for s in sessions]
+
+        # Delete dependent session records BEFORE sessions (FK order)
+        if session_ids:
+            gate_events = db.execute(
+                select(GateEvent).filter(GateEvent.session_id.in_(session_ids))
+            ).scalars().all()
+            for ge in gate_events:
+                db.delete(ge)
+                deleted += 1
+
+            entry_evs = db.execute(
+                select(EntryVerification).filter(
+                    EntryVerification.session_id.in_(session_ids)
+                )
+            ).scalars().all()
+            for ev in entry_evs:
+                db.delete(ev)
+                deleted += 1
+
+            atts = db.execute(
+                select(AttendanceRecord).filter(
+                    AttendanceRecord.session_id.in_(session_ids)
+                )
+            ).scalars().all()
+            for a in atts:
+                db.delete(a)
+                deleted += 1
+
+        # Delete invigilator assignments for this exam
         ias = db.execute(
             select(InvigilatorAssignment).filter_by(exam_id=exam.id)
         ).scalars().all()
@@ -393,11 +486,18 @@ def demo_reset(
             db.delete(ia)
             deleted += 1
 
-        # Delete identity verification attempts for demo registrations
+        # Delete registration-scoped records
         regs = db.execute(
             select(ExamRegistration).filter_by(exam_id=exam.id)
         ).scalars().all()
         for reg in regs:
+            hts = db.execute(
+                select(HallTicket).filter_by(exam_registration_id=reg.id)
+            ).scalars().all()
+            for ht in hts:
+                db.delete(ht)
+                deleted += 1
+
             attempts = db.execute(
                 select(IdentityVerificationAttempt).filter_by(
                     exam_registration_id=reg.id
@@ -407,7 +507,6 @@ def demo_reset(
                 db.delete(att)
                 deleted += 1
 
-            # Delete seat assignments
             seats = db.execute(
                 select(SeatAssignment).filter_by(exam_registration_id=reg.id)
             ).scalars().all()
@@ -415,13 +514,18 @@ def demo_reset(
                 db.delete(s)
                 deleted += 1
 
+            # Attendance rows tied only to this registration
+            reg_atts = db.execute(
+                select(AttendanceRecord).filter_by(exam_registration_id=reg.id)
+            ).scalars().all()
+            for a in reg_atts:
+                db.delete(a)
+                deleted += 1
+
             db.delete(reg)
             deleted += 1
 
         # Delete examination sessions
-        sessions = db.execute(
-            select(ExaminationSession).filter_by(exam_id=exam.id)
-        ).scalars().all()
         for sess in sessions:
             db.delete(sess)
             deleted += 1
@@ -461,6 +565,7 @@ def demo_reset(
     subject.is_active = False
     deleted += 1
 
+    db.flush()
     db.commit()
 
     return {
@@ -492,18 +597,18 @@ def _is_demo_attempt(db: Session, attempt_id: int) -> bool:
 def _get_demo_session(db: Session) -> "ExaminationSession | None":
     """Get the deterministic demo examination session."""
     subject = db.execute(
-        select(Subject).filter_by(code=DEMO_SUBJECT_CODE)
+        select(Subject).filter_by(code=DEMO_SUBJECT_CODE, is_active=True)
     ).scalar_one_or_none()
     if not subject:
         return None
-    exam = db.execute(
-        select(Exam).filter_by(subject_id=subject.id)
-    ).scalar_one_or_none()
+    exam = _latest_demo_exam(db, subject.id)
     if not exam:
         return None
     return db.execute(
-        select(ExaminationSession).filter_by(exam_id=exam.id)
-    ).scalar_one_or_none()
+        select(ExaminationSession)
+        .filter_by(exam_id=exam.id)
+        .order_by(ExaminationSession.id.desc())
+    ).scalars().first()
 
 
 class DemoUploadReferenceRequest(BaseModel):
@@ -609,10 +714,30 @@ def demo_assign_invigilator(
             detail=f"No user found with email {body.email}. The invigilator must sign in at least once.",
         )
 
+    # Demo workflow: the assigned user must be able to open the invigilator
+    # console. Promote to INVIGILATOR only for this demo assignment path.
+    # Scope security is still enforced by invigilator assignment records.
+    if user.role != "INVIGILATOR":
+        user.role = "INVIGILATOR"
+
     exam = db.execute(select(Exam).filter_by(id=session.exam_id)).scalar_one_or_none()
     entry_point = db.execute(
         select(EntryPoint).filter_by(code=DEMO_ENTRY_CODE)
     ).scalar_one_or_none()
+
+    # Only one active invigilator per demo exam+hall. Deactivate others so
+    # session-status and the invigilator console resolve a single assignment.
+    other_ias = db.execute(
+        select(InvigilatorAssignment)
+        .filter(
+            InvigilatorAssignment.exam_id == session.exam_id,
+            InvigilatorAssignment.exam_hall_id == session.exam_hall_id,
+            InvigilatorAssignment.is_active == True,  # noqa: E712
+            InvigilatorAssignment.user_id != user.id,
+        )
+    ).scalars().all()
+    for other in other_ias:
+        other.is_active = False
 
     ia, _ = _find_or_create(
         db, InvigilatorAssignment,
@@ -624,8 +749,11 @@ def demo_assign_invigilator(
         defaults={
             "entry_point_id": entry_point.id if entry_point else None,
             "notes": "Assigned via demo presentation workflow",
+            "is_active": True,
         },
     )
+    if not ia.is_active:
+        ia.is_active = True
     db.commit()
 
     return {
@@ -686,15 +814,24 @@ def demo_session_status(
     ).scalar_one_or_none()
 
     invigilator_email = None
-    ia = db.execute(
-        select(InvigilatorAssignment).filter_by(
+    ias = db.execute(
+        select(InvigilatorAssignment)
+        .filter_by(
             exam_id=session.exam_id,
             exam_hall_id=session.exam_hall_id,
             is_active=True,
         )
-    ).scalar_one_or_none()
-    if ia:
+        .order_by(InvigilatorAssignment.created_at.desc())
+    ).scalars().all()
+
+    # Prefer a user with INVIGILATOR role; fall back to most recent assignment
+    for ia in ias:
         inv_user = db.execute(select(User).filter_by(id=ia.user_id)).scalar_one_or_none()
+        if inv_user and inv_user.role == "INVIGILATOR":
+            invigilator_email = inv_user.email
+            break
+    if invigilator_email is None and ias:
+        inv_user = db.execute(select(User).filter_by(id=ias[0].user_id)).scalar_one_or_none()
         if inv_user:
             invigilator_email = inv_user.email
 

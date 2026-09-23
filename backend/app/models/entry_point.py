@@ -8,6 +8,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
     func,
+    true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -52,7 +53,7 @@ class EntryPoint(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
-        server_default="true",
+        server_default=true(),
         index=True,
         comment="Soft-delete flag. Inactive entry points are hidden from active operations.",
     )

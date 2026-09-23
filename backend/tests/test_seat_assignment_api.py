@@ -32,10 +32,25 @@ def clean_test_data():
         db.execute(delete(HallTicketMatchResult).where(
             HallTicketMatchResult.exam_id.in_(db.query(match_exam_ids))
         ))
+        # Delete every seat tied to SEATSTU registrations/students OR to a
+        # SEATEXAM exam, plus any orphaned seats whose registration row is gone.
+        # SQLite reuses primary keys, so a stale seat for registration id=1
+        # would otherwise collide with a newly created registration.
         db.execute(delete(SeatAssignment).where(
-            SeatAssignment.student_id.in_(
+            (SeatAssignment.student_id.in_(
                 db.query(Student.id).filter(Student.usn.ilike("SEATSTU%"))
-            )
+            ))
+            | (SeatAssignment.exam_id.in_(
+                db.query(Exam.id).filter(Exam.exam_name.ilike("SEATEXAM%"))
+            ))
+            | (SeatAssignment.exam_registration_id.notin_(
+                db.query(ExamRegistration.id)
+            ))
+            | (SeatAssignment.exam_registration_id.in_(
+                db.query(ExamRegistration.id).join(
+                    Student, Student.id == ExamRegistration.student_id
+                ).filter(Student.usn.ilike("SEATSTU%"))
+            ))
         ))
         db.execute(delete(ExamRegistration).where(
             ExamRegistration.student_id.in_(
@@ -963,7 +978,7 @@ class TestSeatAssignmentRegressionCapacityConcurrency:
                 },
             )
             if i < 5:
-                assert resp.status_code == 201, f"Seat {i+1} should succeed"
+                assert resp.status_code == 201, f"Seat {i+1} should succeed: {resp.status_code} {resp.json()}"
             else:
                 assert resp.status_code == 409, f"Seat {i+1} should fail at capacity"
 

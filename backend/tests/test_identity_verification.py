@@ -1,4 +1,5 @@
 import pytest
+from datetime import date, time
 from fastapi.testclient import TestClient
 from sqlalchemy import delete
 
@@ -58,7 +59,7 @@ def sample_data():
 
         exam = Exam(
             subject_id=subject.id, exam_name="IV Test Exam Final",
-            exam_date="2026-12-01", start_time="09:00", end_time="12:00",
+            exam_date=date(2026, 12, 1), start_time=time(9, 0), end_time=time(12, 0),
             semester=1, department="IV Dept",
         )
         db.add(exam)

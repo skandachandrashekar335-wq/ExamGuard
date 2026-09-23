@@ -7,6 +7,7 @@ from sqlalchemy import (
     Integer,
     UniqueConstraint,
     func,
+    true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -39,7 +40,7 @@ class CameraEntryPointMapping(Base):
     is_enabled: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
-        server_default="true",
+        server_default=true(),
         comment="Whether this mapping is currently active",
     )
     created_at: Mapped[datetime] = mapped_column(

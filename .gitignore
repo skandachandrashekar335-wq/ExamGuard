@@ -46,6 +46,8 @@ docker-compose.override.yml
 
 # Uploaded files (development)
 uploads/
+local_storage/
+backend/local_storage/
 
 # AI models / weights
 *.pt

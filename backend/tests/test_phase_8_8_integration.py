@@ -26,6 +26,7 @@ import json
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import date, time as dtime
 from unittest.mock import MagicMock, patch
 
 import cv2
@@ -149,7 +150,7 @@ def sample_data():
 
         exam = Exam(
             subject_id=subject.id, exam_name="INT Exam Final",
-            exam_date="2026-12-01", start_time="09:00", end_time="12:00",
+            exam_date=date(2026, 12, 1), start_time=dtime(9, 0), end_time=dtime(12, 0),
             semester=1, department="INT Dept",
         )
         db.add(exam)

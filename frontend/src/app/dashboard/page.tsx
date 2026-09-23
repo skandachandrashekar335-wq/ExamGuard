@@ -215,7 +215,10 @@ export default function DashboardPage() {
           if (b64) resolve(b64);
           else reject(new Error("Failed to encode image"));
         };
-        reader.onerror = reject;
+        reader.onerror = (event: unknown) => {
+          const err = event as Error;
+          reject(new Error("File read error: " + err.message));
+        };
         reader.readAsDataURL(student.file!);
       });
 
@@ -229,10 +232,12 @@ export default function DashboardPage() {
         )
       );
     } catch (e: any) {
+      // Distinguish between fetch errors, API errors, and encoding errors
+      const errorMsg = e.message || "Upload failed";
       setDemoStudents((prev) =>
         prev.map((s) =>
           s.attempt_id === attemptId
-            ? { ...s, uploading: false, uploadMessage: e.message || "Upload failed" }
+            ? { ...s, uploading: false, uploadMessage: errorMsg }
             : s
         )
       );

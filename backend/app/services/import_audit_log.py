@@ -103,7 +103,7 @@ def list_audit_logs(
 
     total = query.count()
     items = (
-        query.order_by(desc(ImportAuditLog.started_at))
+        query.order_by(desc(ImportAuditLog.started_at), desc(ImportAuditLog.id))
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()

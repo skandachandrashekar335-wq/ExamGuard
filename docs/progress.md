@@ -3,9 +3,19 @@
 ## Current State
 
 - **Phase:** 8–16 COMPLETE (Phase 17+ PLANNED)
-- **Tests:** 2382+ passing, 0 failures, 0 errors
+- **Tests:** 2512 passing, 0 failures, 0 errors (full suite, 2026-09-24)
 - **Frontend:** 33 routes building successfully
 - **Design system:** Glassmorphism (cream/sage/lavender/purple accent `#6B4EFF`, Playfair Display / Source Serif 4 / JetBrains Mono)
+
+### Engineering fixes (2026-09-24 session)
+
+- Boolean `server_default="true"` → `server_default=true()` across 10 models (SQLite stored TEXT `'true'`, so `is_active == True` matched 0 rows)
+- Test DB: shared-cache in-memory SQLite + NullPool + keep-alive connection (fixes concurrency races; StaticPool shared one connection across threads)
+- Demo API: `_latest_demo_exam`, FK-ordered reset, active-subject filters, explicit assignment reactivation
+- Import audit log: stable `order_by(started_at DESC, id DESC)`
+- Seat-assignment test cleanup: stale registration seats under SQLite PK reuse
+- Face-provider error tests: match `timed out` (service raises user message, not `Provider error` prefix)
+- LATE_ENTRY tests: future `exam_date` instead of fixed past date
 
 ---
 

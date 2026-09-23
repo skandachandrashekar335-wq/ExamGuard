@@ -12,6 +12,7 @@ Tests verify:
 import base64
 import json
 import pytest
+from datetime import date, time
 from unittest.mock import patch
 
 import cv2
@@ -106,7 +107,7 @@ def sample_data():
 
         exam = Exam(
             subject_id=subject.id, exam_name="VF Exam Final",
-            exam_date="2026-12-01", start_time="09:00", end_time="12:00",
+            exam_date=date(2026, 12, 1), start_time=time(9, 0), end_time=time(12, 0),
             semester=1, department="VF Dept",
         )
         db.add(exam)
@@ -169,7 +170,7 @@ def exam(db, subject):
     from app.models.exam import Exam
     e = Exam(
         subject_id=subject.id, exam_name="VF Exam Final",
-        exam_date="2026-12-01", start_time="09:00", end_time="12:00",
+        exam_date=date(2026, 12, 1), start_time=time(9, 0), end_time=time(12, 0),
         semester=1, department="VF Dept",
     )
     db.add(e)
@@ -564,7 +565,7 @@ class TestVerifyFaceFailures:
                 "app.services.face_verification.get_face_verification_provider",
                 return_value=provider,
             ):
-                with pytest.raises(ValueError, match="Provider error"):
+                with pytest.raises(ValueError, match="timed out"):
                     verify_face(
                         db, face_attempt.id,
                         reference_image=FAKE_REF_IMAGE_BYTES, probe_image=FAKE_PROBE_IMAGE_BYTES,
