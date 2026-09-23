@@ -1,53 +1,64 @@
 EXAMGUARD FINAL PRODUCTION REPORT
 ============================================================
 
-DATE: 2026-09-21
-GIT COMMIT: pending (fix: admin RBAC + Permissions-Policy + auth session + docs)
-GIT PUSH: PENDING
+DATE: 2026-09-22
+GIT COMMIT: de344c4
+GIT PUSH: COMPLETE (origin/main)
 
 ==================================================
 EXAMGUARD PRODUCTION STATUS: DEPLOYED & FUNCTIONAL
 ==================================================
 
-The application is deployed and functional. All code-level bugs have been
-fixed, including Google auth lifecycle, UI polish, visual artifacts, and
-Firebase token verification failure.
+COMPLETE TWO-COMPUTER PRESENTATION WORKFLOW IMPLEMENTED.
 
-ROOT CAUSE (FINAL - email mismatch in INITIAL_ADMIN_EMAILS):
-- User model has server_default="REVIEWER" for role column
-- Firebase exchange endpoint creates new users with role="REVIEWER" by default
-- INITIAL_ADMIN_EMAILS was set to ["admin-skandachandrashekhar335@gmail.com"]
-- But the stored database email is skandachandrashekhar335@gmail.com (WITHOUT "admin-" prefix)
-- The INITIAL_ADMIN_EMAILS email comparison therefore FAILS - promotion never occurs
-- User remains REVIEWER regardless of config
-- Fix: Updated INITIAL_ADMIN_EMAILS to ["skandachandrashekhar335@gmail.com"] to match stored email
+RBAC MODEL:
+- Normal production endpoints retain ADMIN/OPERATOR role requirements
+- Demo-specific endpoints use get_current_user (any authenticated user)
+  but are scoped to deterministic demo records ONLY
+- Cannot modify arbitrary real exams, students, or assignments
+- Only DEMO001/002/003 students and the demo session are affected
 
-ADMIN RBAC FIX (previous, already working):
-- auth.py: INITIAL_ADMIN_EMAILS check now runs on EVERY login (not just when no admin exists)
-- Email comparison is case-insensitive for robustness
-- .env: INITIAL_ADMIN_EMAILS updated to include target admin email
-- auth.py: INITIAL_ADMIN_EMAILS check now runs on EVERY login (not just when no admin exists)
-- Email comparison is case-insensitive for robustness
-- On next login: user.role is promoted to ADMIN, new JWT issued with role=ADMIN
+DEMO-SPECIFIC ENDPOINTS (any authenticated user, demo records only):
+1. POST /demo/load - Create/load 3 demo students with exam, hall, session
+2. POST /demo/upload-reference-face - Upload face photo to Cloudinary for demo student
+3. POST /demo/assign-invigilator - Assign invigilator by email to demo session
+4. POST /demo/start-session - Start demo session (NOT_STARTED -> IN_PROGRESS)
+5. GET /demo/session-status - Get demo session lifecycle state
+6. POST /demo/reset - Reset all demo records
 
-DEMO MODE FIX (presentation workflow):
-- backend/app/api/v1/demo.py: Changed demo_load authorization from 
-  require_role([ADMIN, OPERATOR]) to get_current_user, enabling any 
-  authenticated user to load the fixed demo scenario
-- frontend/src/lib/demo-api.ts: Added getAuthHeaders() to loadDemoData() 
-  so the POST request includes the user's JWT
-- frontend/src/app/dashboard/page.tsx: 
-  - canManageDemo changed from role-based to always true for authenticated users
-  - Demo Environment card now visible to all authenticated users
-  - Error message updated from 'Ask an administrator to load it' to 
-    'The demo environment is available to all authenticated users'
-- Demo scenario is deterministic and idempotent using DEMO-CA, DEMO001, 
-  Demo Hall A identifiers
-- Repeated demo_load calls are idempotent - no duplicates created
-- Demo data isolated from normal exam records with deterministic identifiers
+WORKFLOW:
+COMPUTER A (Presenter):
+1. Login as any authenticated user
+2. Dashboard -> Load Demo Data -> 3 students created
+3. Upload face photo for DEMO001 -> Saved to Cloudinary
+4. Upload face photo for DEMO002 -> Saved to Cloudinary
+5. Upload face photo for DEMO003 -> Saved to Cloudinary
+6. Enter invigilator email -> Assign
+7. Start Session -> NOT_STARTED -> IN_PROGRESS
 
+COMPUTER B (Invigilator):
+8. Login with assigned invigilator Google account
+9. See assigned active exam/session
+10. Select DEMO001 -> Camera opens -> Capture face
+11. Backend compares captured face against DEMO001's stored reference
+12. Result: MATCH / NO_MATCH / INCONCLUSIVE
+13. Select DEMO002 -> Verify with DEMO002's own reference
+14. Select DEMO003 -> Verify with DEMO003's own reference
 
-- Regression test added: TestAdminPromotion class in test_firebase_noninteractive.py
+FACE VERIFICATION PROVIDER:
+- Production reports: FACE_VERIFICATION_PROVIDER=deterministic
+- Demo workflow works with deterministic provider
+- To enable real biometric verification:
+  Set FACE_VERIFICATION_PROVIDER=uniface in Railway dashboard env vars
+
+ROOT CAUSES FIXED:
+1. INITIAL_ADMIN_EMAILS email mismatch (skandachandrashekhar335@gmail.com)
+2. Demo load authorization (any authenticated user)
+3. Demo operations blocked by RBAC (demo-specific endpoints added)
+4. Only 1 demo student (now 3 students)
+5. No face enrollment UI (professional compact cards added)
+6. Session start from dashboard (demo-specific endpoint)
+7. Invigilator assignment by email (demo-specific endpoint)
 
 PERMISSIONS-POLICY FIX (next.config.ts):
 - camera=() → camera=(self): camera access now allowed on same origin (was DENYING camera!)

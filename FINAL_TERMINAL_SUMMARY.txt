@@ -2,18 +2,24 @@ EXAMGUARD PRODUCTION STATUS
 ============================
 
 STATUS: DEPLOYED & FUNCTIONAL
+GIT COMMIT: de344c4 (origin/main)
+
 ADMIN ROLE FIX: INITIAL_ADMIN_EMAILS checked on every login, target email promoted to ADMIN
 
-DEMO MODE: WORKFLOW FIXED
-- Demo load works for any authenticated user (ADMIN/OPERATOR/INVIGILATOR/REVIEWER)
-- Backend: demo_load authorization changed to get_current_user
-- Frontend: loadDemoData() includes auth headers
-- Dashboard: Demo card visible to all authenticated users
-- Demo scenario: deterministic, idempotent (DEMO-CA, DEMO001, Demo Hall A)
+COMPLETE TWO-COMPUTER PRESENTATION WORKFLOW:
+- Computer A (Presenter): Load Demo Data -> 3 Students -> Upload Faces -> Assign Invigilator -> Start Session
+- Computer B (Invigilator): Login -> See Assigned Exam -> Select Candidate -> Webcam -> Capture -> Verify -> Result
+- RBAC: Normal production endpoints retain ADMIN/OPERATOR. Demo endpoints use get_current_user scoped to demo records only.
+- Demo endpoints: /demo/load, /demo/upload-reference-face, /demo/assign-invigilator, /demo/start-session, /demo/session-status
+- Each student (DEMO001/002/003) has independent reference face
+- Invigilator verifies against THAT candidate's stored reference, not a global demo face
+- Camera: Real browser webcam via CameraCapture component
+- Permissions-Policy: camera=(self) allows same-origin camera access
 
-PERMISSIONS-POLICY: camera=(self), added Chrome privacy-sandbox feature denials
-COOP WARNINGS: Non-functional (Firebase popup, does not prevent auth)
-MANUAL GOOGLE OAUTH TEST: REQUIRED (sign out → sign in → verify ADMIN role)
+FACE VERIFICATION PROVIDER: deterministic (production)
+- Real biometric verification requires FACE_VERIFICATION_PROVIDER=uniface in Railway dashboard
+- Demo workflow functions with deterministic provider
+- Infrastructure for uniface already deployed (nixpacks.toml, Dockerfile, main.py validation)
 
 FRONTEND:
 - URL: https://exam-guardian-management.vercel.app
