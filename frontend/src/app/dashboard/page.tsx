@@ -9,7 +9,12 @@ import {
   getDemoStatus,
   loadDemoData,
   resetDemoData,
+  uploadDemoReferenceFace,
+  assignDemoInvigilator,
+  startDemoSession,
+  getDemoSessionStatus,
   type DemoStatusResponse,
+  type DemoSessionStatus,
 } from "@/lib/demo-api";
 
 interface ExamListItem {
@@ -38,17 +43,6 @@ interface DemoStudent {
   uploadMessage: string;
 }
 
-interface SessionStatus {
-  loaded: boolean;
-  session_id?: number;
-  session_status?: string;
-  gate_status?: string;
-  exam_name?: string;
-  exam_date?: string;
-  hall_name?: string;
-  started_at?: string;
-}
-
 export default function DashboardPage() {
   const [exams, setExams] = useState<ExamListItem[]>([]);
   const [selectedExamId, setSelectedExamId] = useState<number | null>(null);
@@ -58,6 +52,7 @@ export default function DashboardPage() {
   const [demoLoading, setDemoLoading] = useState(false);
   const [demoMessage, setDemoMessage] = useState("");
   const [demoStudents, setDemoStudents] = useState<DemoStudent[]>([]);
+  const [demoLoaded, setDemoLoaded] = useState(false);
 
   const [invigilatorEmail, setInvigilatorEmail] = useState("");
   const [assignLoading, setAssignLoading] = useState(false);
@@ -65,7 +60,10 @@ export default function DashboardPage() {
 
   const [sessionStartLoading, setSessionStartLoading] = useState(false);
   const [sessionMessage, setSessionMessage] = useState("");
-  const [sessionStatus, setSessionStatus] = useState<SessionStatus | null>(null);
+  const [sessionStatus, setSessionStatus] = useState<DemoSessionStatus | null>(null);
+
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -79,41 +77,36 @@ export default function DashboardPage() {
       const status = await getDemoStatus();
       setDemoStatus(status);
       if (status.loaded && status.demo_attempt_ids && status.demo_student_usns) {
-        const students: DemoStudent[] = await Promise.all(
-          status.demo_attempt_ids.map(async (aid, i) => {
-            let refUrl: string | null = null;
-            try {
-              const ref = await apiRequest<{ reference_face_url: string }>(
-                `/api/v1/identity-verifications/${aid}/reference-face`
-              );
-              refUrl = ref.reference_face_url;
-            } catch {
-              // No reference face yet
-            }
-            return {
-              attempt_id: aid,
-              student_id: status.demo_student_ids?.[i] || 0,
-              student_usn: status.demo_student_usns?.[i] || `DEMO00${i + 1}`,
-              student_name: `Demo Candidate ${i + 1}`,
-              reference_face_url: refUrl,
-              file: null,
-              preview: null,
-              uploading: false,
-              uploadMessage: "",
-            };
-          })
-        );
+        setDemoLoaded(true);
+        const names = status.demo_student_names || [];
+        const refUrls = status.reference_face_urls || [];
+        const students: DemoStudent[] = status.demo_attempt_ids.map((aid, i) => ({
+          attempt_id: aid,
+          student_id: status.demo_student_ids?.[i] || 0,
+          student_usn: status.demo_student_usns?.[i] || `DEMO00${i + 1}`,
+          student_name: names[i] || `Demo Candidate ${i + 1}`,
+          reference_face_url: refUrls[i] || null,
+          file: null,
+          preview: null,
+          uploading: false,
+          uploadMessage: "",
+        }));
         setDemoStudents(students);
+      } else {
+        setDemoLoaded(false);
+        setDemoStudents([]);
       }
       try {
-        const sess = await apiRequest<SessionStatus>("/api/v1/demo/session-status");
+        const sess = await getDemoSessionStatus();
         setSessionStatus(sess);
       } catch {
         setSessionStatus(null);
       }
     } catch {
+      setDemoLoaded(false);
       setDemoStatus(null);
       setDemoStudents([]);
+      setSessionStatus(null);
     }
   }, []);
 
@@ -128,7 +121,37 @@ export default function DashboardPage() {
       const result = await loadDemoData();
       setDemoMessage(result.message);
       setSelectedExamId(result.demo_exam_id);
-      await refreshDemoState();
+      setDemoLoaded(true);
+      const students: DemoStudent[] = result.demo_attempt_ids.map((aid, i) => ({
+        attempt_id: aid,
+        student_id: result.demo_student_ids[i],
+        student_usn: result.demo_student_usns[i],
+        student_name: `Demo Candidate ${i + 1}`,
+        reference_face_url: null,
+        file: null,
+        preview: null,
+        uploading: false,
+        uploadMessage: "",
+      }));
+      setDemoStudents(students);
+      setDemoStatus({
+        loaded: true,
+        demo_exam_id: result.demo_exam_id,
+        demo_hall_id: result.demo_hall_id,
+        demo_student_ids: result.demo_student_ids,
+        demo_student_usns: result.demo_student_usns,
+        demo_student_names: students.map((s) => s.student_name),
+        demo_session_id: result.demo_session_id,
+        demo_attempt_ids: result.demo_attempt_ids,
+        reference_face_urls: null,
+      });
+      setSessionStatus(null);
+      try {
+        const sess = await getDemoSessionStatus();
+        setSessionStatus(sess);
+      } catch {
+        setSessionStatus(null);
+      }
     } catch (e: any) {
       setDemoMessage(e.message || "Failed to load demo data");
     } finally {
@@ -137,17 +160,30 @@ export default function DashboardPage() {
   };
 
   const handleResetDemo = async () => {
-    if (!window.confirm("Reset Demo Data?\n\nThis removes only ExamGuard demonstration records.")) return;
-    setDemoLoading(true);
-    setDemoMessage("");
+    setDeleteLoading(true);
     try {
       const result = await resetDemoData();
-      setDemoMessage(result.message);
+      setDemoLoaded(false);
       setDemoStatus(null);
       setDemoStudents([]);
       setSessionStatus(null);
+      setSelectedExamId(null);
+      setDemoMessage(result.message);
+      setConfirmDelete(false);
+      setInvigilatorEmail("");
+      setAssignMessage("");
+      setSessionMessage("");
     } catch (e: any) {
-      setDemoMessage(e.message || "Failed to reset demo data");
+      setDemoMessage(e.message || "Failed to delete demo data");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleRefreshStatus = async () => {
+    setDemoLoading(true);
+    try {
+      await refreshDemoState();
     } finally {
       setDemoLoading(false);
     }
@@ -183,22 +219,12 @@ export default function DashboardPage() {
         reader.readAsDataURL(student.file!);
       });
 
-      const result = await apiRequest<{ status: string; reference_face_url: string }>(
-        "/api/v1/demo/upload-reference-face",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            attempt_id: attemptId,
-            reference_image: base64,
-            image_format: student.file!.type || "image/jpeg",
-          }),
-        }
-      );
+      const result = await uploadDemoReferenceFace(attemptId, base64, student.file!.type || "image/jpeg");
 
       setDemoStudents((prev) =>
         prev.map((s) =>
           s.attempt_id === attemptId
-            ? { ...s, reference_face_url: result.reference_face_url, uploading: false, uploadMessage: "Saved" }
+            ? { ...s, reference_face_url: result.reference_face_url, uploading: false, uploadMessage: "Reference saved" }
             : s
         )
       );
@@ -218,14 +244,12 @@ export default function DashboardPage() {
     setAssignLoading(true);
     setAssignMessage("");
     try {
-      const result = await apiRequest<{ status: string; email: string }>(
-        "/api/v1/demo/assign-invigilator",
-        {
-          method: "POST",
-          body: JSON.stringify({ email: invigilatorEmail }),
-        }
-      );
-      setAssignMessage(`Assigned ${result.email}`);
+      const result = await assignDemoInvigilator(invigilatorEmail);
+      setAssignMessage(`Assigned to ${result.email}`);
+      try {
+        const sess = await getDemoSessionStatus();
+        setSessionStatus(sess);
+      } catch {}
     } catch (e: any) {
       setAssignMessage(e.message || "Failed to assign invigilator");
     } finally {
@@ -237,16 +261,23 @@ export default function DashboardPage() {
     setSessionStartLoading(true);
     setSessionMessage("");
     try {
-      const result = await apiRequest<{ status: string; session_id: number; session_status: string }>(
-        "/api/v1/demo/start-session",
-        { method: "POST", body: JSON.stringify({ performed_by: user?.email || "admin" }) }
+      const result = await startDemoSession(user?.email || "admin");
+      setSessionMessage("Session started");
+      setSessionStatus((prev) =>
+        prev
+          ? { ...prev, session_status: result.session_status, gate_status: result.gate_status, loaded: true }
+          : {
+              loaded: true,
+              session_id: result.session_id,
+              session_status: result.session_status,
+              gate_status: result.gate_status,
+              exam_name: null,
+              exam_date: null,
+              hall_name: null,
+              invigilator_email: null,
+              started_at: null,
+            }
       );
-      setSessionMessage("Session active");
-      setSessionStatus({
-        loaded: true,
-        session_id: result.session_id,
-        session_status: result.session_status,
-      });
     } catch (e: any) {
       setSessionMessage(e.message || "Failed to start session");
     } finally {
@@ -257,6 +288,9 @@ export default function DashboardPage() {
   const allEnrolled = demoStudents.length > 0 && demoStudents.every((s) => s.reference_face_url);
   const sessionActive = sessionStatus?.session_status === "IN_PROGRESS";
 
+  const examName = sessionStatus?.exam_name || "ExamGuard Demo Examination";
+  const hallName = sessionStatus?.hall_name || "Demo Hall A";
+
   return (
     <AppShell>
       <div className="eg-page">
@@ -266,221 +300,286 @@ export default function DashboardPage() {
           <p className="eg-page-desc">Exam-level verification status overview</p>
         </div>
 
-        {/* Demo Environment Card */}
-        <div className="glass-surface p-4 mb-6" style={{ borderColor: "rgba(107,78,255,0.2)" }}>
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="eg-eyebrow" style={{ color: "var(--accent)" }}>Demo Environment</span>
+        {/* Section 0: Demo Environment - Load / Reload */}
+        {!demoLoaded && (
+          <div className="glass-surface p-4 mb-6" style={{ borderColor: "rgba(107,78,255,0.2)" }}>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="eg-eyebrow" style={{ color: "var(--accent)" }}>Demo Environment</span>
+                </div>
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Load a demonstration scenario with 3 candidates, exam, hall, and session.
+                </p>
+                {demoMessage && (
+                  <p className="text-xs mt-2" style={{ color: "var(--success)" }}>{demoMessage}</p>
+                )}
+              </div>
+              <button onClick={handleLoadDemo} disabled={demoLoading} className="eg-btn eg-btn-primary px-5 py-2 text-sm">
+                {demoLoading ? "Loading Demo Data..." : "Load Demo Data"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* DEMO PRESENTATION CONTROL CENTER */}
+        {demoLoaded && (
+          <div className="mb-6">
+            {/* ── Section 1: Demo Data Status ── */}
+            <div className="glass-surface p-4 mb-4" style={{ borderColor: "rgba(107,78,255,0.2)" }}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="eg-eyebrow" style={{ color: "var(--accent)" }}>Demo Presentation Control Center</span>
                 {sessionActive && (
                   <span className="text-xs px-2 py-0.5 rounded" style={{ background: "rgba(45,159,111,0.2)", color: "var(--success)" }}>
                     SESSION ACTIVE
                   </span>
                 )}
               </div>
-              <p className="text-sm text-[var(--text-secondary)]">
-                {demoStatus?.loaded
-                  ? "Demo scenario loaded. Enroll student faces, assign invigilator, and start the session."
-                  : "Load a demonstration scenario with 3 candidates, exam, hall, and session."}
-              </p>
-              {demoMessage && (
-                <p className="text-xs mt-2" style={{ color: demoMessage.includes("success") || demoMessage.includes("ready") ? "var(--success)" : "var(--text-muted)" }}>
-                  {demoMessage}
-                </p>
-              )}
-            </div>
-            <div className="flex items-center gap-3 shrink-0">
-              {demoStatus?.loaded ? (
-                <>
-                  <Link href="/invigilator" className="eg-btn eg-btn-primary px-4 py-2 text-sm">
-                    Open Invigilator
-                  </Link>
-                  <button onClick={handleResetDemo} disabled={demoLoading} className="eg-btn eg-btn-ghost px-3 py-2 text-sm">
-                    {demoLoading ? "..." : "Reset"}
-                  </button>
-                </>
-              ) : (
-                <button onClick={handleLoadDemo} disabled={demoLoading} className="eg-btn eg-btn-primary px-5 py-2 text-sm">
-                  {demoLoading ? "Loading Demo Data..." : "Load Demo Data"}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
 
-        {/* Student Face Enrollment Cards */}
-        {demoStatus?.loaded && demoStudents.length > 0 && (
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold mb-3" style={{ fontFamily: "var(--font-display)" }}>
-              Student Face Enrollment
-            </h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "1rem" }}>
-              {demoStudents.map((student) => (
-                <div
-                  key={student.attempt_id}
-                  className="glass-surface p-4"
-                  style={{ borderColor: student.reference_face_url ? "rgba(45,159,111,0.3)" : "var(--border)" }}
-                >
-                  {/* Header */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <span className="font-mono text-sm font-semibold">{student.student_usn}</span>
-                      <span className="text-xs text-[var(--text-muted)] ml-2">{student.student_name}</span>
-                    </div>
-                    {student.reference_face_url ? (
-                      <span className="text-xs px-2 py-0.5 rounded" style={{ background: "rgba(45,159,111,0.2)", color: "var(--success)" }}>
-                        ENROLLED
-                      </span>
-                    ) : (
-                      <span className="text-xs px-2 py-0.5 rounded" style={{ background: "rgba(255,255,255,0.05)", color: "var(--text-muted)" }}>
-                        PENDING
-                      </span>
-                    )}
-                  </div>
+              <div className="flex items-center gap-2 mb-3">
+                <span style={{ color: "var(--success)", fontSize: "0.875rem" }}>✓</span>
+                <span className="text-sm font-medium">Demo data loaded</span>
+              </div>
 
-                  {/* Face preview + controls */}
-                  <div className="flex gap-4">
-                    {/* Image preview - constrained */}
-                    <div style={{ width: "120px", height: "120px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", border: "1px solid var(--border)" }}>
-                      {student.reference_face_url ? (
-                        <img src={student.reference_face_url} alt={student.student_usn} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      ) : student.preview ? (
-                        <img src={student.preview} alt={student.student_usn} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      ) : (
-                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "0.75rem" }}>
-                          No photo
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Controls */}
-                    <div className="flex-1 flex flex-col justify-between">
-                      <div>
-                        <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>
-                          Face Photo
-                        </label>
-                        <label
-                          className="eg-btn text-xs w-full"
-                          style={{ cursor: "pointer", textAlign: "center", display: "block" }}
-                        >
-                          {student.file ? student.file.name : student.reference_face_url ? "Change Photo" : "Choose Photo"}
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png"
-                            style={{ display: "none" }}
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) handleFileSelect(student.attempt_id, file);
-                            }}
-                          />
-                        </label>
-                      </div>
-
-                      {student.file && !student.reference_face_url && (
-                        <button
-                          onClick={() => handleUploadFace(student.attempt_id)}
-                          disabled={student.uploading}
-                          className="eg-btn eg-btn-primary text-xs mt-2"
-                        >
-                          {student.uploading ? "Saving..." : "Save Reference"}
-                        </button>
-                      )}
-
-                      {student.uploadMessage && (
-                        <p className="text-xs mt-1" style={{ color: student.uploadMessage === "Saved" ? "var(--success)" : "var(--danger)" }}>
-                          {student.uploadMessage}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Session Management */}
-        {demoStatus?.loaded && (
-          <div className="glass-surface p-4 mb-6" style={{ borderColor: "rgba(107,78,255,0.2)" }}>
-            <h2 className="text-lg font-semibold mb-3" style={{ fontFamily: "var(--font-display)" }}>
-              Session Management
-            </h2>
-
-            {/* Session status */}
-            {sessionStatus?.loaded && (
-              <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded" style={{ background: "rgba(255,255,255,0.03)" }}>
-                <div className="text-sm">
+              <div className="flex flex-wrap gap-x-6 gap-y-1 mb-4 text-sm">
+                <div>
                   <span className="text-[var(--text-muted)]">Exam: </span>
-                  <span className="text-[var(--text-secondary)]">{sessionStatus.exam_name || "ExamGuard Demo Examination"}</span>
+                  <span className="text-[var(--text-secondary)]">{examName}</span>
                 </div>
-                <div className="text-sm">
+                <div>
                   <span className="text-[var(--text-muted)]">Hall: </span>
-                  <span className="text-[var(--text-secondary)]">{sessionStatus.hall_name || "Demo Hall A"}</span>
+                  <span className="text-[var(--text-secondary)]">{hallName}</span>
                 </div>
-                <div className="text-sm">
-                  <span className="text-[var(--text-muted)]">Status: </span>
+                <div>
+                  <span className="text-[var(--text-muted)]">Candidates: </span>
+                  <span className="text-[var(--text-secondary)]">{demoStudents.length}</span>
+                </div>
+                <div>
+                  <span className="text-[var(--text-muted)]">Session: </span>
                   {sessionActive ? (
                     <span style={{ color: "var(--success)" }}>IN_PROGRESS</span>
                   ) : (
-                    <span style={{ color: "var(--text-muted)" }}>{sessionStatus.session_status || "NOT_STARTED"}</span>
+                    <span style={{ color: "var(--text-muted)" }}>{sessionStatus?.session_status || "NOT_STARTED"}</span>
                   )}
                 </div>
               </div>
-            )}
 
-            <div className="flex flex-wrap gap-4">
-              {/* Assign invigilator */}
-              <div className="flex-1" style={{ minWidth: "250px" }}>
-                <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>
-                  Invigilator Email
-                </label>
-                <div className="flex gap-2">
+              {demoMessage && !confirmDelete && (
+                <p className="text-xs mb-3" style={{ color: "var(--success)" }}>{demoMessage}</p>
+              )}
+
+              <div className="flex items-center gap-3">
+                <button onClick={handleRefreshStatus} disabled={demoLoading} className="eg-btn text-xs px-3 py-1.5">
+                  {demoLoading ? "Refreshing..." : "Refresh Status"}
+                </button>
+                {!confirmDelete ? (
+                  <button onClick={() => setConfirmDelete(true)} className="eg-btn eg-btn-danger text-xs px-3 py-1.5">
+                    Delete Demo Data
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-[var(--text-muted)]">Delete Demo Data?</span>
+                    <button onClick={handleResetDemo} disabled={deleteLoading} className="eg-btn text-xs px-3 py-1.5" style={{ background: "var(--danger)", color: "#fff" }}>
+                      {deleteLoading ? "Deleting..." : "Confirm Delete"}
+                    </button>
+                    <button onClick={() => setConfirmDelete(false)} className="eg-btn text-xs px-3 py-1.5">
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ── Section 2: Student Face Enrollment ── */}
+            <div className="glass-surface p-4 mb-4" style={{ borderColor: "var(--border)" }}>
+              <h2 className="text-base font-semibold mb-1" style={{ fontFamily: "var(--font-display)" }}>
+                Student Face Enrollment
+              </h2>
+              <p className="text-xs text-[var(--text-muted)] mb-4">
+                Upload one clear face photo for each demo candidate. Each photo becomes that student&apos;s reference face for live verification.
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "1rem" }}>
+                {demoStudents.map((student) => (
+                  <div
+                    key={student.attempt_id}
+                    className="p-4 rounded-lg"
+                    style={{ border: `1px solid ${student.reference_face_url ? "rgba(45,159,111,0.3)" : "var(--border)"}`, background: "rgba(255,255,255,0.02)" }}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <span className="font-mono text-sm font-semibold">{student.student_usn}</span>
+                        <span className="text-xs text-[var(--text-muted)] ml-2">{student.student_name}</span>
+                      </div>
+                      {student.reference_face_url ? (
+                        <span className="text-xs px-2 py-0.5 rounded" style={{ background: "rgba(45,159,111,0.2)", color: "var(--success)" }}>
+                          ENROLLED
+                        </span>
+                      ) : (
+                        <span className="text-xs px-2 py-0.5 rounded" style={{ background: "rgba(255,255,255,0.05)", color: "var(--text-muted)" }}>
+                          PENDING
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex gap-4">
+                      <div style={{ width: "120px", height: "120px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", border: "1px solid var(--border)", aspectRatio: "1 / 1" }}>
+                        {student.reference_face_url ? (
+                          <img src={student.reference_face_url} alt={student.student_usn} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        ) : student.preview ? (
+                          <img src={student.preview} alt={student.student_usn} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        ) : (
+                          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "0.75rem", textAlign: "center", padding: "0.5rem" }}>
+                            No photo
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex-1 flex flex-col justify-between">
+                        <div>
+                          <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>
+                            Face Photo
+                          </label>
+                          <label className="eg-btn text-xs w-full" style={{ cursor: "pointer", textAlign: "center", display: "block" }}>
+                            {student.file ? student.file.name : student.reference_face_url ? "Change Photo" : "Choose Photo"}
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png"
+                              style={{ display: "none" }}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleFileSelect(student.attempt_id, file);
+                              }}
+                            />
+                          </label>
+                        </div>
+                        {student.file && !student.reference_face_url && (
+                          <button
+                            onClick={() => handleUploadFace(student.attempt_id)}
+                            disabled={student.uploading}
+                            className="eg-btn eg-btn-primary text-xs mt-2"
+                          >
+                            {student.uploading ? "Saving..." : "Save Reference Face"}
+                          </button>
+                        )}
+                        {student.uploadMessage && (
+                          <p className="text-xs mt-1" style={{ color: student.uploadMessage.includes("saved") || student.uploadMessage.includes("Saved") ? "var(--success)" : "var(--danger)" }}>
+                            {student.uploadMessage.includes("saved") || student.uploadMessage.includes("Saved") ? `✓ ${student.uploadMessage}` : student.uploadMessage}
+                          </p>
+                        )}
+                        {student.reference_face_url && (
+                          <p className="text-xs mt-1" style={{ color: "var(--success)" }}>✓ Reference saved</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Section 3: Invigilator Assignment ── */}
+            <div className="glass-surface p-4 mb-4" style={{ borderColor: "var(--border)" }}>
+              <h2 className="text-base font-semibold mb-3" style={{ fontFamily: "var(--font-display)" }}>
+                Invigilator Assignment
+              </h2>
+              <div className="flex flex-wrap items-end gap-3">
+                <div style={{ minWidth: "250px", flex: 1 }}>
+                  <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>
+                    Invigilator Email
+                  </label>
                   <input
                     type="email"
                     placeholder="invigilator@example.com"
                     value={invigilatorEmail}
                     onChange={(e) => setInvigilatorEmail(e.target.value)}
-                    className="eg-input text-sm flex-1"
+                    className="eg-input text-sm w-full"
                   />
-                  <button
-                    onClick={handleAssignInvigilator}
-                    disabled={!invigilatorEmail || assignLoading}
-                    className="eg-btn text-sm"
-                  >
-                    {assignLoading ? "..." : "Assign"}
-                  </button>
                 </div>
-                {assignMessage && (
-                  <p className="text-xs mt-1" style={{ color: assignMessage.startsWith("Assigned") ? "var(--success)" : "var(--danger)" }}>
-                    {assignMessage}
-                  </p>
+                <button
+                  onClick={handleAssignInvigilator}
+                  disabled={!invigilatorEmail || assignLoading}
+                  className="eg-btn text-sm"
+                >
+                  {assignLoading ? "Assigning..." : "Assign Invigilator"}
+                </button>
+              </div>
+              {assignMessage && (
+                <p className="text-xs mt-2" style={{ color: assignMessage.startsWith("Assigned") ? "var(--success)" : "var(--danger)" }}>
+                  {assignMessage.startsWith("Assigned") ? `✓ ${assignMessage}` : assignMessage}
+                </p>
+              )}
+              {sessionStatus?.invigilator_email && !assignMessage && (
+                <p className="text-xs mt-2" style={{ color: "var(--success)" }}>
+                  ✓ Assigned to: {sessionStatus.invigilator_email}
+                </p>
+              )}
+            </div>
+
+            {/* ── Section 4: Session Management ── */}
+            <div className="glass-surface p-4 mb-4" style={{ borderColor: "var(--border)" }}>
+              <h2 className="text-base font-semibold mb-3" style={{ fontFamily: "var(--font-display)" }}>
+                Session Management
+              </h2>
+              <div className="flex flex-wrap gap-x-6 gap-y-1 mb-4 text-sm">
+                <div>
+                  <span className="text-[var(--text-muted)]">Exam: </span>
+                  <span className="text-[var(--text-secondary)]">{examName}</span>
+                </div>
+                <div>
+                  <span className="text-[var(--text-muted)]">Hall: </span>
+                  <span className="text-[var(--text-secondary)]">{hallName}</span>
+                </div>
+                <div>
+                  <span className="text-[var(--text-muted)]">Status: </span>
+                  {sessionActive ? (
+                    <span style={{ color: "var(--success)" }}>IN_PROGRESS</span>
+                  ) : (
+                    <span style={{ color: "var(--text-muted)" }}>{sessionStatus?.session_status || "NOT_STARTED"}</span>
+                  )}
+                </div>
+                {sessionStatus?.invigilator_email && (
+                  <div>
+                    <span className="text-[var(--text-muted)]">Invigilator: </span>
+                    <span className="text-[var(--text-secondary)]">{sessionStatus.invigilator_email}</span>
+                  </div>
                 )}
               </div>
-
-              {/* Start session */}
-              <div style={{ minWidth: "180px" }}>
-                <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>
-                  &nbsp;
-                </label>
+              <div className="flex items-center gap-3">
                 <button
                   onClick={handleStartSession}
                   disabled={sessionStartLoading || sessionActive}
-                  className="eg-btn eg-btn-primary text-sm w-full"
+                  className="eg-btn eg-btn-primary text-sm"
                 >
-                  {sessionStartLoading ? "Starting..." : sessionActive ? "Session Active" : "Start Session"}
+                  {sessionStartLoading ? "Starting..." : sessionActive ? "Session Active" : "Start Demo Session"}
                 </button>
                 {sessionMessage && !sessionActive && (
-                  <p className="text-xs mt-1" style={{ color: sessionMessage.includes("active") ? "var(--success)" : "var(--danger)" }}>
+                  <p className="text-xs" style={{ color: sessionMessage.includes("started") || sessionMessage.includes("active") ? "var(--success)" : "var(--danger)" }}>
                     {sessionMessage}
                   </p>
+                )}
+                {sessionActive && (
+                  <p className="text-xs" style={{ color: "var(--success)" }}>✓ Examination Session Active</p>
                 )}
               </div>
             </div>
 
-            <div className="mt-4 flex gap-3">
-              <Link href="/examination-sessions" className="eg-btn text-xs">Sessions →</Link>
-              <Link href="/invigilator" className="eg-btn text-xs">Invigilator →</Link>
-            </div>
+            {/* ── Section 5: Open Invigilator ── */}
+            {sessionActive && (
+              <div className="glass-surface p-4 mb-4" style={{ borderColor: "rgba(45,159,111,0.2)" }}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-base font-semibold" style={{ fontFamily: "var(--font-display)" }}>
+                      Ready for Verification
+                    </h2>
+                    <p className="text-xs text-[var(--text-muted)] mt-1">
+                      The session is active. Open the invigilator console on the second computer.
+                    </p>
+                  </div>
+                  <Link href="/invigilator" className="eg-btn eg-btn-primary px-4 py-2 text-sm">
+                    Open Invigilator Console →
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

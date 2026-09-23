@@ -70,8 +70,10 @@ class DemoStatusResponse(BaseModel):
     demo_hall_id: int | None = None
     demo_student_ids: list[int] | None = None
     demo_student_usns: list[str] | None = None
+    demo_student_names: list[str] | None = None
     demo_session_id: int | None = None
     demo_attempt_ids: list[int] | None = None
+    reference_face_urls: list[str | None] | None = None
 
 
 # ── Helpers ───────────────────────────────────────────────────────
@@ -141,14 +143,21 @@ def demo_status(
             ))
         ).scalars().all()
 
+    ref_urls = []
+    if attempts:
+        for att in attempts:
+            ref_urls.append(att.reference_face_url)
+
     return DemoStatusResponse(
         loaded=True,
         demo_exam_id=exam.id if exam else None,
         demo_hall_id=session.exam_hall_id if session else None,
         demo_student_ids=[s.id for s in students] if students else None,
         demo_student_usns=[s.usn for s in students] if students else None,
+        demo_student_names=[s.name for s in students] if students else None,
         demo_session_id=session.id if session else None,
         demo_attempt_ids=[a.id for a in attempts] if attempts else None,
+        reference_face_urls=ref_urls if ref_urls else None,
     )
 
 
@@ -353,12 +362,13 @@ def demo_load(
 @router.post("/reset")
 def demo_reset(
     db: Session = Depends(get_db),
-    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+    _user: dict = Depends(get_current_user),
 ):
     """Reset demo data by soft-deleting demo records.
 
     Only deletes records with deterministic demo identifiers.
     Never touches real examination data.
+    Any authenticated user may reset demo data.
     """
     deleted = 0
 
@@ -375,6 +385,14 @@ def demo_reset(
     ).scalars().all()
 
     for exam in exams:
+        # Delete invigilator assignments for this exam first
+        ias = db.execute(
+            select(InvigilatorAssignment).filter_by(exam_id=exam.id)
+        ).scalars().all()
+        for ia in ias:
+            db.delete(ia)
+            deleted += 1
+
         # Delete identity verification attempts for demo registrations
         regs = db.execute(
             select(ExamRegistration).filter_by(exam_id=exam.id)
@@ -667,6 +685,19 @@ def demo_session_status(
         select(ExamHall).filter_by(id=session.exam_hall_id)
     ).scalar_one_or_none()
 
+    invigilator_email = None
+    ia = db.execute(
+        select(InvigilatorAssignment).filter_by(
+            exam_id=session.exam_id,
+            exam_hall_id=session.exam_hall_id,
+            is_active=True,
+        )
+    ).scalar_one_or_none()
+    if ia:
+        inv_user = db.execute(select(User).filter_by(id=ia.user_id)).scalar_one_or_none()
+        if inv_user:
+            invigilator_email = inv_user.email
+
     return {
         "loaded": True,
         "session_id": session.id,
@@ -675,5 +706,6 @@ def demo_session_status(
         "exam_name": exam.exam_name if exam else None,
         "exam_date": str(exam.exam_date) if exam else None,
         "hall_name": hall.name if hall else None,
+        "invigilator_email": invigilator_email,
         "started_at": str(session.started_at) if session.started_at else None,
     }
