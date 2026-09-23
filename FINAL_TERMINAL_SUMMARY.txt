@@ -2,15 +2,28 @@ EXAMGUARD PRODUCTION STATUS
 ============================
 
 STATUS: DEPLOYED & FUNCTIONAL
-GIT COMMIT: de344c4 (origin/main)
+GIT COMMIT: 0e79782 (origin/main)
 
 ADMIN ROLE FIX: INITIAL_ADMIN_EMAILS checked on every login, target email promoted to ADMIN
 
+DEMO PRESENTATION CONTROL CENTER:
+- Dashboard shows 5-section control center after loading demo data
+- Section 1: Data Status (exam, hall, candidates, session, refresh, delete)
+- Section 2: Student Face Enrollment (3 independent cards with preview/upload/save)
+- Section 3: Invigilator Assignment (email input, assign button)
+- Section 4: Session Management (status display, start button)
+- Section 5: Open Invigilator (link when session IN_PROGRESS)
+- Delete Demo Data: confirmation dialog, clears all UI state, removes only demo records
+- Reference face URLs included in /demo/status response (no per-attempt API calls)
+- Session status includes invigilator email
+- Reset allows any authenticated user (was ADMIN/OPERATOR only)
+- State set directly from loadResponse (no silent failure from status API)
+
 COMPLETE TWO-COMPUTER PRESENTATION WORKFLOW:
-- Computer A (Presenter): Load Demo Data -> 3 Students -> Upload Faces -> Assign Invigilator -> Start Session
-- Computer B (Invigilator): Login -> See Assigned Exam -> Select Candidate -> Webcam -> Capture -> Verify -> Result
+- Computer A (Presenter): Load Demo → 3 Students → Upload Faces → Assign Invigilator → Start Session → Open Invigilator
+- Computer B (Invigilator): Login → See Assigned Exam → Select Candidate → Webcam → Capture → Verify → Result
 - RBAC: Normal production endpoints retain ADMIN/OPERATOR. Demo endpoints use get_current_user scoped to demo records only.
-- Demo endpoints: /demo/load, /demo/upload-reference-face, /demo/assign-invigilator, /demo/start-session, /demo/session-status
+- Demo endpoints: /demo/load, /demo/status, /demo/upload-reference-face, /demo/assign-invigilator, /demo/start-session, /demo/session-status, /demo/reset
 - Each student (DEMO001/002/003) has independent reference face
 - Invigilator verifies against THAT candidate's stored reference, not a global demo face
 - Camera: Real browser webcam via CameraCapture component

@@ -1,8 +1,8 @@
 EXAMGUARD FINAL PRODUCTION REPORT
 ============================================================
 
-DATE: 2026-09-22
-GIT COMMIT: de344c4
+DATE: 2026-09-23
+GIT COMMIT: 0e79782
 GIT PUSH: COMPLETE (origin/main)
 
 ==================================================
@@ -10,6 +10,7 @@ EXAMGUARD PRODUCTION STATUS: DEPLOYED & FUNCTIONAL
 ==================================================
 
 COMPLETE TWO-COMPUTER PRESENTATION WORKFLOW IMPLEMENTED.
+DEMO PRESENTATION CONTROL CENTER fully functional on Dashboard.
 
 RBAC MODEL:
 - Normal production endpoints retain ADMIN/OPERATOR role requirements
@@ -17,17 +18,58 @@ RBAC MODEL:
   but are scoped to deterministic demo records ONLY
 - Cannot modify arbitrary real exams, students, or assignments
 - Only DEMO001/002/003 students and the demo session are affected
+- Reset endpoint now allows any authenticated user (demo records only)
 
 DEMO-SPECIFIC ENDPOINTS (any authenticated user, demo records only):
 1. POST /demo/load - Create/load 3 demo students with exam, hall, session
-2. POST /demo/upload-reference-face - Upload face photo to Cloudinary for demo student
-3. POST /demo/assign-invigilator - Assign invigilator by email to demo session
-4. POST /demo/start-session - Start demo session (NOT_STARTED -> IN_PROGRESS)
-5. GET /demo/session-status - Get demo session lifecycle state
-6. POST /demo/reset - Reset all demo records
+2. GET /demo/status - Get demo status with reference_face_urls inline
+3. POST /demo/upload-reference-face - Upload face photo to Cloudinary for demo student
+4. POST /demo/assign-invigilator - Assign invigilator by email to demo session
+5. POST /demo/start-session - Start demo session (NOT_STARTED -> IN_PROGRESS)
+6. GET /demo/session-status - Get session status with invigilator_email
+7. POST /demo/reset - Reset all demo records (any authenticated user)
+
+DASHBOARD CONTROL CENTER SECTIONS:
+1. Demo Data Status - exam, hall, candidates, session, refresh/delete buttons
+2. Student Face Enrollment - 3 cards with preview, upload, save per candidate
+3. Invigilator Assignment - email input, assign button, assigned email display
+4. Session Management - exam, hall, status, start button, active indicator
+5. Open Invigilator - link to /invigilator when session is IN_PROGRESS
 
 WORKFLOW:
 COMPUTER A (Presenter):
+1. Login as any authenticated user
+2. Dashboard → Load Demo Data → 3 students created
+3. Section 1 shows status: exam, hall, 3 candidates, NOT_STARTED
+4. Upload face photo for DEMO001 → Saved to Cloudinary → ENROLLED badge
+5. Upload face photo for DEMO002 → Saved to Cloudinary → ENROLLED badge
+6. Upload face photo for DEMO003 → Saved to Cloudinary → ENROLLED badge
+7. Enter invigilator email → Assign → "Assigned to email@example.com"
+8. Start Session → NOT_STARTED → IN_PROGRESS → "Session Active" badge
+9. "Open Invigilator Console →" link appears
+
+COMPUTER B (Invigilator):
+10. Login with assigned invigilator Google account
+11. See assigned active exam/session
+12. Select DEMO001 → Camera opens → Capture face
+13. Backend compares captured face against DEMO001's stored reference
+14. Result: MATCH / NO_MATCH / INCONCLUSIVE
+15. Select DEMO002 → Verify with DEMO002's own reference
+16. Select DEMO003 → Verify with DEMO003's own reference
+
+DELETE DEMO DATA:
+- Click "Delete Demo Data" → confirmation dialog appears
+- "Delete Demo Data? This will permanently remove only the ExamGuard demonstration records."
+- [Cancel] [Confirm Delete] [Cancel]
+- After deletion: UI returns to "Load Demo Data" state
+- All demo records removed, real data untouched
+
+FRONTEND STATE MANAGEMENT:
+- handleLoadDemo: sets state directly from loadResponse (no second API call)
+- refreshDemoState: fetches /demo/status with reference_face_urls inline
+- No silent failures: if status API fails, state is cleared gracefully
+- Each student card maintains independent upload state
+- Delete clears all state: demoLoaded, demoStatus, demoStudents, sessionStatus, selectedExamId
 1. Login as any authenticated user
 2. Dashboard -> Load Demo Data -> 3 students created
 3. Upload face photo for DEMO001 -> Saved to Cloudinary
