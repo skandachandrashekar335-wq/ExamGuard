@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   getInvigilatorDashboard,
   startExam,
@@ -9,14 +9,14 @@ import {
 } from "@/lib/invigilator-api";
 import { apiRequest } from "@/lib/api";
 import { ApiError } from "@/lib/api";
-import { listAttempts, getAttemptContext, verifyFace, evaluateEvidence, ApiError as IvApiError } from "@/lib/iv-api";
+import { getAttemptContext, verifyFace, evaluateEvidence, ApiError as IvApiError } from "@/lib/iv-api";
 import type { VerificationContext } from "@/lib/types";
-import CameraCapture from "@/components/CameraCapture";
+import CameraCapture, { type CameraCaptureHandle, type CameraState } from "@/components/CameraCapture";
 import EvidenceDisplay from "@/components/EvidenceDisplay";
 import DecisionDisplay from "@/components/DecisionDisplay";
 import AppShell from "@/components/AppShell";
 
-function fileToBase64(file: Blob): Promise<string> {
+function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -26,9 +26,48 @@ function fileToBase64(file: Blob): Promise<string> {
       else reject(new Error("Failed to encode image"));
     };
     reader.onerror = reject;
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(blob);
   });
 }
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(t);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    const t = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+function isAbortError(e: unknown): boolean {
+  return e instanceof DOMException && e.name === "AbortError";
+}
+
+function isRecoverableFaceMessage(msg: string): boolean {
+  const m = msg.toLowerCase();
+  return (
+    m.includes("no usable face") ||
+    m.includes("no face detected") ||
+    m.includes("multiple faces")
+  );
+}
+
+type VerifyPhase =
+  | "idle"
+  | "starting"
+  | "live"
+  | "verifying"
+  | "done"
+  | "error";
 
 export default function InvigilatorPage() {
   const [data, setData] = useState<InvigilatorDashboard | null>(null);
@@ -37,7 +76,6 @@ export default function InvigilatorPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
 
-  // Registered students state
   interface RegisteredStudent {
     registration_id: number;
     student_id: number;
@@ -50,14 +88,31 @@ export default function InvigilatorPage() {
   }
   const [students, setStudents] = useState<RegisteredStudent[]>([]);
 
-  // Face verification state
   const [verifyStudentId, setVerifyStudentId] = useState<number | null>(null);
   const [verifyAttemptId, setVerifyAttemptId] = useState<number | null>(null);
   const [verifyCtx, setVerifyCtx] = useState<VerificationContext | null>(null);
-  const [probeImage, setProbeImage] = useState<Blob | null>(null);
-  const [verifyState, setVerifyState] = useState<"idle" | "capturing" | "verifying" | "done" | "error">("idle");
-  const [verifyResult, setVerifyResult] = useState<{ decision: string; evidence: unknown[] } | null>(null);
+  const [verifyState, setVerifyState] = useState<VerifyPhase>("idle");
+  const [verifyResult, setVerifyResult] = useState<{
+    decision: string;
+    evidence: unknown[];
+    verifiedAt: string;
+    provider: string | null;
+    evidenceId: number | null;
+  } | null>(null);
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [cameraState, setCameraState] = useState<CameraState>("idle");
+  const [cameraMessage, setCameraMessage] = useState<string>("");
+  const [loopStatus, setLoopStatus] = useState<string>("");
+  const [cameraKey, setCameraKey] = useState(0);
+
+  const cameraRef = useRef<CameraCaptureHandle>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const loopRunningRef = useRef(false);
+  const verifyStateRef = useRef<VerifyPhase>("idle");
+
+  useEffect(() => {
+    verifyStateRef.current = verifyState;
+  }, [verifyState]);
 
   const load = useCallback(async () => {
     try {
@@ -65,7 +120,6 @@ export default function InvigilatorPage() {
       setError(null);
       const dash = await getInvigilatorDashboard();
       setData(dash);
-      // Fetch registered students for this invigilator's exam
       try {
         const studentsRes = await apiRequest<{ items: RegisteredStudent[]; total: number }>(
           `/api/v1/invigilator/registered-students`
@@ -114,68 +168,255 @@ export default function InvigilatorPage() {
     }
   };
 
-  // Face verification flow
+  const stopVerificationLoop = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    loopRunningRef.current = false;
+  }, []);
+
+  const runVerificationLoop = useCallback(
+    async (attemptId: number) => {
+      if (loopRunningRef.current) return;
+      loopRunningRef.current = true;
+      const ac = new AbortController();
+      abortRef.current = ac;
+      setVerifyState("live");
+      setVerifyError(null);
+      setLoopStatus("Position your face inside the frame");
+
+      try {
+        while (
+          !ac.signal.aborted &&
+          cameraRef.current?.getState() !== "active"
+        ) {
+          await sleep(250, ac.signal);
+        }
+        if (ac.signal.aborted) return;
+
+        setLoopStatus("Look directly at the camera — keep your face visible");
+        await sleep(1500, ac.signal);
+
+        while (!ac.signal.aborted) {
+          const blob = await cameraRef.current?.grabFrame();
+          if (!blob) {
+            setLoopStatus("Waiting for camera frame...");
+            await sleep(800, ac.signal);
+            continue;
+          }
+
+          setVerifyState("verifying");
+          setLoopStatus("Verification in progress");
+
+          try {
+            const probeB64 = await blobToBase64(blob);
+            await verifyFace(
+              attemptId,
+              {
+                probe_image: probeB64,
+                probe_image_format: "image/jpeg",
+              },
+              ac.signal,
+            );
+            await evaluateEvidence(attemptId, ac.signal);
+            const updated = await getAttemptContext(attemptId);
+            if (ac.signal.aborted) return;
+            setVerifyCtx(updated);
+
+            const evidence = updated.evidence || [];
+            const similarity = evidence.find(
+              (e) => e.signal_type === "similarity_score",
+            );
+            const providerEv = evidence.find((e) => e.provider_name);
+            setVerifyResult({
+              decision: updated.attempt.decision,
+              evidence,
+              verifiedAt: new Date().toISOString(),
+              provider: providerEv?.provider_name || null,
+              evidenceId: similarity?.id ?? null,
+            });
+            setVerifyState("done");
+            setLoopStatus("Verification complete");
+            await load();
+            return;
+          } catch (e: unknown) {
+            if (isAbortError(e)) return;
+            const msg = e instanceof IvApiError ? e.message : "Verification failed";
+
+            if (isRecoverableFaceMessage(msg)) {
+              setVerifyState("live");
+              setLoopStatus(msg);
+              await sleep(1600, ac.signal);
+              continue;
+            }
+
+            if (msg.toLowerCase().includes("rate limit")) {
+              setVerifyError(msg);
+              setVerifyState("error");
+              return;
+            }
+
+            const lower = msg.toLowerCase();
+            if (
+              lower.includes("status '") &&
+              (lower.includes("completed") ||
+                lower.includes("failed") ||
+                lower.includes("cancelled"))
+            ) {
+              try {
+                const updated = await getAttemptContext(attemptId);
+                setVerifyCtx(updated);
+                if (
+                  updated.attempt.decision &&
+                  updated.attempt.decision !== "PENDING"
+                ) {
+                  setVerifyResult({
+                    decision: updated.attempt.decision,
+                    evidence: updated.evidence || [],
+                    verifiedAt:
+                      updated.attempt.completed_at || new Date().toISOString(),
+                    provider:
+                      (updated.evidence || []).find((e) => e.provider_name)
+                        ?.provider_name || null,
+                    evidenceId: null,
+                  });
+                  setVerifyState("done");
+                  return;
+                }
+              } catch {
+                /* fall through */
+              }
+            }
+
+            setVerifyError(msg);
+            setVerifyState("error");
+            return;
+          }
+        }
+      } catch (e: unknown) {
+        if (!isAbortError(e)) {
+          setVerifyError(e instanceof Error ? e.message : "Verification failed");
+          setVerifyState("error");
+        }
+      } finally {
+        loopRunningRef.current = false;
+      }
+    },
+    [load],
+  );
+
   const handleStartVerify = async (studentId: number, attemptId: number) => {
+    stopVerificationLoop();
     setVerifyStudentId(studentId);
     setVerifyAttemptId(attemptId);
-    setVerifyState("capturing");
+    setVerifyState("starting");
     setVerifyResult(null);
     setVerifyError(null);
-    setProbeImage(null);
+    setVerifyCtx(null);
+    setCameraState("idle");
+    setCameraMessage("");
+    setLoopStatus("Starting camera...");
+    setCameraKey((k) => k + 1);
+
     try {
       const ctx = await getAttemptContext(attemptId);
       setVerifyCtx(ctx);
+
+      if (
+        ctx.attempt.decision &&
+        ctx.attempt.decision !== "PENDING" &&
+        (ctx.attempt.status === "COMPLETED" || ctx.attempt.status === "FAILED")
+      ) {
+        setVerifyResult({
+          decision: ctx.attempt.decision,
+          evidence: ctx.evidence || [],
+          verifiedAt: ctx.attempt.completed_at || new Date().toISOString(),
+          provider:
+            (ctx.evidence || []).find((e) => e.provider_name)?.provider_name ||
+            null,
+          evidenceId: null,
+        });
+        setVerifyState("done");
+        setLoopStatus("Verification complete");
+        return;
+      }
     } catch {
       setVerifyError("Failed to load attempt context");
       setVerifyState("error");
     }
   };
 
-  const handleCapture = (blob: Blob) => {
-    setProbeImage(blob);
-  };
-
-  const handleVerifyNow = async () => {
-    if (!probeImage || !verifyAttemptId) return;
-    setVerifyState("verifying");
-    setVerifyError(null);
-    try {
-      const probeBase64 = await fileToBase64(probeImage);
-      await verifyFace(verifyAttemptId, {
-        probe_image: probeBase64,
-        probe_image_format: probeImage.type || "image/jpeg",
-      });
-      await evaluateEvidence(verifyAttemptId);
-      const updated = await getAttemptContext(verifyAttemptId);
-      setVerifyCtx(updated);
-      setVerifyResult({
-        decision: updated.attempt.decision,
-        evidence: updated.evidence,
-      });
-      setVerifyState("done");
-      await load();
-    } catch (e: unknown) {
-      const msg = e instanceof IvApiError ? e.message : "Verification failed";
-      setVerifyError(msg);
-      setVerifyState("error");
-    }
-  };
+  const handleCameraState = useCallback(
+    (state: CameraState, message?: string) => {
+      setCameraState(state);
+      if (message) setCameraMessage(message);
+      if (state === "active" && verifyAttemptId && !loopRunningRef.current) {
+        const phase = verifyStateRef.current;
+        if (phase === "starting" || phase === "live") {
+          void runVerificationLoop(verifyAttemptId);
+        }
+      }
+      if (state === "requesting") setLoopStatus("Starting camera...");
+      if (state === "error") setLoopStatus(message || "Camera unavailable");
+      if (state === "unsupported") setLoopStatus("Camera unavailable");
+    },
+    [verifyAttemptId, runVerificationLoop],
+  );
 
   const handleCloseVerify = () => {
+    stopVerificationLoop();
+    cameraRef.current?.stop();
     setVerifyStudentId(null);
     setVerifyAttemptId(null);
     setVerifyCtx(null);
-    setProbeImage(null);
     setVerifyState("idle");
     setVerifyResult(null);
     setVerifyError(null);
+    setCameraState("idle");
+    setCameraMessage("");
+    setLoopStatus("");
   };
+
+  const handleRetry = () => {
+    if (!verifyAttemptId) return;
+    stopVerificationLoop();
+    cameraRef.current?.stop();
+    setVerifyError(null);
+    setVerifyResult(null);
+    setVerifyState("starting");
+    setLoopStatus("Starting camera...");
+    setCameraState("idle");
+    setCameraKey((k) => k + 1);
+  };
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   if (loading) return <AppShell><div className="p-8 text-center text-lg">Loading invigilator dashboard...</div></AppShell>;
   if (error) return <AppShell><div className="p-8 text-center text-red-600">Error: {error}</div></AppShell>;
   if (!data) return <AppShell><div className="p-8 text-center">No data</div></AppShell>;
 
   const { profile: p } = data;
+
+  const refUrl = verifyCtx?.attempt?.reference_face_url;
+  const safeRefUrl = refUrl && /^https?:\/\//i.test(refUrl) ? refUrl : null;
+
+  const cameraStatusLabel = (() => {
+    if (verifyState === "done") return "Verification complete";
+    if (verifyState === "verifying") return "Verification in progress";
+    if (cameraState === "requesting") return "Camera starting";
+    if (cameraState === "active") return "Camera ready";
+    if (cameraState === "error") {
+      if (cameraMessage.toLowerCase().includes("permission")) {
+        return "Camera permission denied";
+      }
+      return "Camera unavailable";
+    }
+    if (cameraState === "unsupported") return "Camera unavailable";
+    return "Camera starting";
+  })();
 
   return (
     <AppShell>
@@ -332,7 +573,7 @@ export default function InvigilatorPage() {
         )}
       </div>
 
-      {/* Face Verification Modal */}
+      {/* Face Verification Modal — opens camera immediately */}
       {verifyAttemptId && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="glass-surface max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 space-y-4">
@@ -347,59 +588,87 @@ export default function InvigilatorPage() {
               </div>
             )}
 
-            {/* Reference face display */}
-            {verifyCtx?.attempt?.reference_face_url && (
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <span className="eg-mono-sm text-[var(--text-muted)]">Stored Reference</span>
-                <img
-                  src={verifyCtx.attempt.reference_face_url}
-                  alt="Reference face"
-                  className="w-48 h-36 object-cover rounded border border-[var(--border)]"
-                />
+                {safeRefUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={safeRefUrl}
+                    alt="Reference face"
+                    className="w-full h-32 object-cover rounded border border-[var(--border)]"
+                  />
+                ) : (
+                  <div className="w-full h-32 rounded border border-[var(--border)] flex items-center justify-center text-xs opacity-50">
+                    No reference
+                  </div>
+                )}
               </div>
-            )}
+              <div className="space-y-2 text-sm">
+                <div>
+                  <span className="eg-mono-sm text-[var(--text-muted)] block">Camera</span>
+                  <span>{cameraStatusLabel}</span>
+                </div>
+                {verifyState !== "done" && verifyState !== "error" && (
+                  <div>
+                    <span className="eg-mono-sm text-[var(--text-muted)] block">Guidance</span>
+                    <span className="text-xs">
+                      {loopStatus || "Position your face inside the frame"}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
 
-            {/* Camera capture */}
-            {verifyState === "capturing" && (
-              <div className="space-y-3">
-                <span className="eg-mono-sm text-[var(--text-muted)]">CAPTURE PROBE IMAGE</span>
+            {(verifyState === "starting" || verifyState === "live" || verifyState === "verifying") && (
+              <div className="space-y-2">
                 <CameraCapture
-                  onCapture={(blob) => handleCapture(blob)}
-                  onRetake={() => setProbeImage(null)}
+                  key={cameraKey}
+                  ref={cameraRef}
+                  onCapture={() => undefined}
+                  onRetake={() => undefined}
+                  autoStart
+                  liveMode
+                  onStateChange={handleCameraState}
                 />
-                {probeImage && (
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handleVerifyNow}
-                      className="eg-btn eg-btn-primary px-6 py-2"
-                    >
-                      Verify Now
-                    </button>
-                    <button
-                      onClick={() => setProbeImage(null)}
-                      className="eg-btn px-4 py-2"
-                    >
-                      Retake
-                    </button>
+                {verifyState === "verifying" && (
+                  <div className="text-center text-sm animate-pulse">
+                    Verification in progress...
                   </div>
                 )}
               </div>
             )}
 
-            {/* Verifying state */}
-            {verifyState === "verifying" && (
-              <div className="text-center py-8">
-                <div className="text-lg animate-pulse">Verifying identity...</div>
-              </div>
-            )}
-
-            {/* Result */}
             {verifyState === "done" && verifyResult && (
               <div className="space-y-3">
                 <DecisionDisplay
                   decision={verifyResult.decision}
                   failureReason={verifyCtx?.attempt?.failure_reason || null}
                 />
+                <div className="text-xs space-y-1 opacity-80">
+                  <div>
+                    Student:{" "}
+                    {verifyCtx?.student
+                      ? `${verifyCtx.student.name} (${verifyCtx.student.usn})`
+                      : `#${verifyStudentId}`}
+                  </div>
+                  <div>
+                    Verification time:{" "}
+                    {new Date(verifyResult.verifiedAt).toLocaleString()}
+                  </div>
+                  <div>Result: {verifyResult.decision}</div>
+                  <div>
+                    Provider:{" "}
+                    {verifyResult.provider
+                      ? verifyResult.provider === "uniface"
+                        ? "UniFace"
+                        : verifyResult.provider
+                      : "—"}
+                  </div>
+                  {verifyResult.evidenceId != null && (
+                    <div>Evidence ID: #{verifyResult.evidenceId}</div>
+                  )}
+                </div>
                 {verifyResult.evidence.length > 0 && (
                   <EvidenceDisplay evidence={verifyResult.evidence as VerificationContext["evidence"]} />
                 )}
@@ -409,14 +678,13 @@ export default function InvigilatorPage() {
               </div>
             )}
 
-            {/* Error */}
             {verifyState === "error" && (
               <div className="space-y-3">
                 <div className="text-sm" style={{ color: "var(--danger)" }}>
-                  {verifyError || "Verification failed"}
+                  {verifyError || cameraMessage || "Verification failed"}
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={handleVerifyNow} className="eg-btn eg-btn-primary px-6 py-2">
+                  <button onClick={handleRetry} className="eg-btn eg-btn-primary px-6 py-2">
                     Retry
                   </button>
                   <button onClick={handleCloseVerify} className="eg-btn px-4 py-2">

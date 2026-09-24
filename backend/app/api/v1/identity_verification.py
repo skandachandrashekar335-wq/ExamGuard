@@ -2,6 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
+import threading
+import time
+import urllib.request
+
 from app.auth import Role, get_invigilator_scope, check_invigilator_scope, require_role
 from app.core.database import get_db
 from app.schemas.identity_verification import (
@@ -20,6 +24,38 @@ from app.services import identity_verification as iv_service
 from app.services import identity_verification_decision as iv_decision
 
 router = APIRouter(prefix="/identity-verifications", tags=["Identity Verifications"])
+
+# Short-lived cache so live multi-frame verification does not re-download
+# the Cloudinary reference on every probe.
+_REFERENCE_CACHE_TTL_SECONDS = 120.0
+_REFERENCE_CACHE_MAX_ENTRIES = 64
+_reference_cache: dict[str, tuple[float, bytes]] = {}
+_reference_cache_lock = threading.Lock()
+
+
+def _download_reference_image(url: str) -> bytes:
+    """Download attempt.reference_face_url with a small in-process TTL cache."""
+    now = time.time()
+    with _reference_cache_lock:
+        hit = _reference_cache.get(url)
+        if hit is not None and (now - hit[0]) < _REFERENCE_CACHE_TTL_SECONDS:
+            return hit[1]
+
+    try:
+        with urllib.request.urlopen(url, timeout=30) as resp:
+            data = resp.read()
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to download stored reference face: {e}",
+        )
+
+    with _reference_cache_lock:
+        if len(_reference_cache) >= _REFERENCE_CACHE_MAX_ENTRIES:
+            oldest = min(_reference_cache, key=lambda k: _reference_cache[k][0])
+            _reference_cache.pop(oldest, None)
+        _reference_cache[url] = (now, data)
+    return data
 
 
 def _enforce_attempt_scope(db: Session, user: dict, attempt) -> None:
@@ -463,7 +499,6 @@ def verify_face(
     and downloaded for comparison.
     """
     import base64
-    import urllib.request
 
     from app.core.config import get_settings
     from app.services.face_verification.validation import (
@@ -490,21 +525,14 @@ def verify_face(
                 detail="Invalid base64 encoding in reference_image",
             )
     else:
-        # Fetch stored reference from attempt
+        # Fetch stored reference from attempt (short TTL cache for live capture)
         if not attempt.reference_face_url:
             raise HTTPException(
                 status_code=422,
                 detail="No reference_image provided and no stored reference face for this attempt. "
                        "Upload a reference face first via /reference-face endpoint.",
             )
-        try:
-            with urllib.request.urlopen(attempt.reference_face_url, timeout=30) as resp:
-                ref_bytes = resp.read()
-        except Exception as e:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Failed to download stored reference face: {e}",
-            )
+        ref_bytes = _download_reference_image(attempt.reference_face_url)
 
     try:
         probe_bytes = base64.b64decode(body.probe_image, validate=True)

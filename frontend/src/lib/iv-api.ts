@@ -40,10 +40,12 @@ export async function verifyFace(
     reference_image_format?: string;
     probe_image_format?: string;
   },
+  signal?: AbortSignal,
 ): Promise<VerifyFaceResponse> {
   return apiRequest(`/api/v1/identity-verifications/${id}/verify-face`, {
     method: "POST",
     body: JSON.stringify(payload),
+    signal,
   });
 }
 
@@ -66,8 +68,14 @@ export async function getReferenceFace(
   return apiRequest(`/api/v1/identity-verifications/${id}/reference-face`);
 }
 
-export async function evaluateEvidence(id: number): Promise<IdentityVerificationAttempt> {
-  return apiRequest(`/api/v1/identity-verifications/${id}/evaluate`, { method: "POST" });
+export async function evaluateEvidence(
+  id: number,
+  signal?: AbortSignal,
+): Promise<IdentityVerificationAttempt> {
+  return apiRequest(`/api/v1/identity-verifications/${id}/evaluate`, {
+    method: "POST",
+    signal,
+  });
 }
 
 export async function reviewAttempt(

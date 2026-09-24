@@ -430,9 +430,9 @@ def verify_face(
     # existing retry/re-verification workflows. Status checks above prevent
     # calls on completed/failed/cancelled attempts.
 
-    # Record this call for rate limiting
-    limiter.record_attempt_call(attempt_id)
-    limiter.record_global_call()
+    # Attempt-budget recording happens after the provider returns so
+    # recoverable frame-quality errors (no face / multiple faces) do not
+    # permanently consume the per-attempt call budget during live capture.
 
     # 2. Validate input presence
     if not reference_image:
@@ -480,6 +480,9 @@ def verify_face(
         },
     )
 
+    # Global budget counts every provider invocation (success or failure).
+    limiter.record_global_call()
+
     try:
         result = provider.verify(request)
     except ProviderUnavailableError as e:
@@ -488,21 +491,41 @@ def verify_face(
             categorize_provider_error,
         )
         category = categorize_provider_error(e.error.error_type.value)
-        fail_attempt(
-            db, attempt_id,
-            reason=f"Provider error [{category.value}]: {e.error.message}",
+        error_type_value = e.error.error_type.value
+        message_lower = e.error.message.lower()
+        # Probe frame-quality issues are recoverable during live capture:
+        # do not permanently fail the attempt or burn the attempt budget.
+        # Reference-image detection failures are permanent for this attempt.
+        recoverable_frame_issue = (
+            error_type_value in ("NO_FACE_DETECTED", "MULTIPLE_FACES_DETECTED")
+            and "reference" not in message_lower
         )
+        if not recoverable_frame_issue:
+            fail_attempt(
+                db, attempt_id,
+                reason=f"Provider error [{category.value}]: {e.error.message}",
+            )
+            limiter.record_attempt_call(attempt_id)
         log_verification_event(
             attempt_id=attempt_id,
             event_type="provider_error",
             category=category.value,
-            detail=f"error_type={e.error.error_type.value}",
+            detail=f"error_type={error_type_value}",
         )
+        if recoverable_frame_issue:
+            if error_type_value == "NO_FACE_DETECTED":
+                user_message = "No usable face detected. Please reposition yourself."
+            else:
+                user_message = (
+                    "Multiple faces detected. "
+                    "Please reposition so only your face is visible."
+                )
+            raise ValueError(user_message) from e
         user_message = e.error.message
-        if e.error.error_type.value == "NO_FACE_DETECTED":
-            user_message = "No face detected. Upload an image containing one clear face."
-        elif e.error.error_type.value == "MULTIPLE_FACES_DETECTED":
-            user_message = "Multiple faces detected. Please upload a single-person image."
+        if error_type_value == "NO_FACE_DETECTED":
+            user_message = "No face detected in the stored reference image."
+        elif error_type_value == "MULTIPLE_FACES_DETECTED":
+            user_message = "Multiple faces detected in the stored reference image."
         raise ValueError(user_message) from e
     except Exception as e:
         from app.services.face_verification.audit import log_verification_event
@@ -510,6 +533,7 @@ def verify_face(
             db, attempt_id,
             reason=f"Unexpected provider error: {type(e).__name__}",
         )
+        limiter.record_attempt_call(attempt_id)
         log_verification_event(
             attempt_id=attempt_id,
             event_type="provider_unexpected_error",
@@ -517,6 +541,9 @@ def verify_face(
             detail=f"error_type={type(e).__name__}",
         )
         raise ValueError("Face verification service encountered an error. Please try again.") from e
+
+    # Successful provider run consumes one attempt-budget call.
+    limiter.record_attempt_call(attempt_id)
 
     # 6. Convert result → evidence records
     evidence_records = []
