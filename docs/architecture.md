@@ -24,7 +24,7 @@ ExamGuard/
 │   ├── alembic.ini
 │   ├── tests/
 │   ├── pyproject.toml
-│   └── Dockerfile (future)
+│   └── Dockerfile
 ├── frontend/                 # Next.js application
 │   ├── src/
 │   │   ├── app/              # Next.js App Router pages
@@ -35,9 +35,11 @@ ExamGuard/
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── tailwind.config.ts
-├── docs/                     # Architecture docs, API docs
+├── docs/                     # Product, architecture, flow, deployment docs
 ├── .env.example
 ├── .gitignore
+├── CONTRIBUTING.md
+├── SECURITY.md
 └── README.md
 ```
 

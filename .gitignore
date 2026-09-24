@@ -20,8 +20,11 @@ out/
 
 # Environment
 .env
+.env.*
 .env.local
 .env.*.local
+!.env.example
+!.env.*.example
 
 # IDE
 .vscode/
@@ -69,4 +72,10 @@ test_hall_ticket.png
 frontend/test-results/
 
 .vercel
-.env*
+
+# Local QA scratch (do not commit)
+FINAL_REPORT.txt
+FINAL_TERMINAL_SUMMARY.txt
+DEPLOYMENT_PROGRESS.txt
+PRODUCTION_QA_REPORT.md
+*.tsbuildinfo

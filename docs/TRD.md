@@ -274,7 +274,7 @@ See BACKEND_SCHEMA.md for complete table/listing.
 - `CORS_ORIGINS`: list[str] = ["http://localhost:3000", "https://exam-guardian-management.vercel.app", ...] (production domains also hardcoded in `main.py`)
 - `NEXT_PUBLIC_API_URL`: str = "http://localhost:8000"
 - `FIREBASE_PROJECT_ID`: str | None = None (env-driven)
-- `FIREBASE_WEB_API_KEY`: str | None = "AIzaSyCRoOlMP-VO6dgg_TeXhwAkRsE94rZG7GQ" (for Identity Toolkit token exchange)
+- `FIREBASE_WEB_API_KEY`: str | None = None (env-driven; for Identity Toolkit token exchange)
 - `INITIAL_ADMIN_EMAILS`: list[str] = [] (initial provisioning only)
 - `FACE_VERIFICATION_PROVIDER`: str = "deterministic"
 - `FACE_VERIFICATION_MAX_IMAGE_SIZE_MB`: int = 5
