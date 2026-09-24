@@ -128,28 +128,62 @@ class TestDemoDataLoader:
         assert "demo_invigilator_assignment_id" in data
 
     def test_demo_upload_reference_face(self, client):
-        """Upload a reference face for a demo attempt and persist URL."""
+        """Upload a reference face for a demo attempt and persist public URL."""
+        from unittest.mock import patch
+
         load = client.post(DEMO_LOAD_URL).json()
         attempt_id = load["demo_attempt_ids"][0]
 
-        resp = client.post(
-            DEMO_UPLOAD_URL,
-            json={
-                "attempt_id": attempt_id,
-                "reference_image": PNG_1PX,
-                "image_format": "image/png",
-            },
-        )
+        public_url = "https://res.cloudinary.com/demo/image/upload/face-references/attempt.jpg"
+
+        with patch(
+            "app.storage.cloudinary.CloudinaryStorage.save",
+            return_value=public_url,
+        ):
+            resp = client.post(
+                DEMO_UPLOAD_URL,
+                json={
+                    "attempt_id": attempt_id,
+                    "reference_image": PNG_1PX,
+                    "image_format": "image/png",
+                },
+            )
         assert resp.status_code == 200, resp.text
         body = resp.json()
         assert body["status"] == "saved"
-        assert body["reference_face_url"]
+        assert body["reference_face_url"] == public_url
+        assert body["reference_face_url"].startswith("https://")
         assert body["attempt_id"] == attempt_id
 
         # Status must reflect the stored reference
         status = client.get(DEMO_STATUS_URL).json()
         assert status["reference_face_urls"] is not None
         assert status["reference_face_urls"][0] == body["reference_face_url"]
+
+    def test_demo_upload_rejects_non_http_storage_key(self, client):
+        """Relative storage keys must not be persisted as reference_face_url."""
+        from unittest.mock import patch
+
+        load = client.post(DEMO_LOAD_URL).json()
+        attempt_id = load["demo_attempt_ids"][0]
+
+        with patch(
+            "app.storage.cloudinary.CloudinaryStorage.save",
+            return_value="face-references/attempt-1.jpg",
+        ):
+            resp = client.post(
+                DEMO_UPLOAD_URL,
+                json={
+                    "attempt_id": attempt_id,
+                    "reference_image": PNG_1PX,
+                    "image_format": "image/png",
+                },
+            )
+        assert resp.status_code == 502, resp.text
+
+        status = client.get(DEMO_STATUS_URL).json()
+        stored = (status.get("reference_face_urls") or [None])[0]
+        assert not stored or stored.startswith(("http://", "https://"))
 
     def test_demo_upload_rejects_non_demo_attempt(self, client):
         """Upload for a non-existent/non-demo attempt is rejected."""

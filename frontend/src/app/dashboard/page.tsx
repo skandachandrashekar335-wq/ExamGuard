@@ -43,6 +43,21 @@ interface DemoStudent {
   uploadMessage: string;
 }
 
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const comma = result.indexOf(",");
+      const b64 = comma >= 0 ? result.slice(comma + 1) : "";
+      if (b64) resolve(b64);
+      else reject(new Error("Failed to encode image"));
+    };
+    reader.onerror = () => reject(new Error("Failed to read image file"));
+    reader.readAsDataURL(blob);
+  });
+}
+
 export default function DashboardPage() {
   const [exams, setExams] = useState<ExamListItem[]>([]);
   const [selectedExamId, setSelectedExamId] = useState<number | null>(null);
@@ -207,32 +222,52 @@ export default function DashboardPage() {
     );
 
     try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          const b64 = result.split(",")[1];
-          if (b64) resolve(b64);
-          else reject(new Error("Failed to encode image"));
-        };
-        reader.onerror = (event: unknown) => {
-          const err = event as Error;
-          reject(new Error("File read error: " + err.message));
-        };
-        reader.readAsDataURL(student.file!);
-      });
+      const file = student.file!;
+      if (file.size > 5 * 1024 * 1024) {
+        throw new Error("Photo is larger than 5MB. Choose a smaller image.");
+      }
 
-      const result = await uploadDemoReferenceFace(attemptId, base64, student.file!.type || "image/jpeg");
+      let base64: string;
+      let imageFormat = file.type || "image/jpeg";
+      if (file.size > 3.5 * 1024 * 1024) {
+        // Downscale/re-encode large photos so the JSON+base64 body stays under limits.
+        const bitmap = await createImageBitmap(file);
+        const maxDim = 1600;
+        const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+        canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Failed to process image");
+        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        bitmap.close();
+        const jpegBlob = await new Promise<Blob>((resolve, reject) => {
+          canvas.toBlob(
+            (b) => (b ? resolve(b) : reject(new Error("Failed to compress image"))),
+            "image/jpeg",
+            0.9
+          );
+        });
+        base64 = await blobToBase64(jpegBlob);
+        imageFormat = "image/jpeg";
+      } else {
+        base64 = await blobToBase64(file);
+      }
+
+      const result = await uploadDemoReferenceFace(attemptId, base64, imageFormat);
+      const savedUrl = result.reference_face_url;
+      if (!savedUrl || !/^https?:\/\//i.test(savedUrl)) {
+        throw new Error("Upload did not return a public image URL");
+      }
 
       setDemoStudents((prev) =>
         prev.map((s) =>
           s.attempt_id === attemptId
-            ? { ...s, reference_face_url: result.reference_face_url, uploading: false, uploadMessage: "Reference saved" }
+            ? { ...s, reference_face_url: savedUrl, uploading: false, uploadMessage: "Reference saved" }
             : s
         )
       );
     } catch (e: any) {
-      // Distinguish between fetch errors, API errors, and encoding errors
       const errorMsg = e.message || "Upload failed";
       setDemoStudents((prev) =>
         prev.map((s) =>
@@ -457,13 +492,17 @@ export default function DashboardPage() {
                             />
                           </label>
                         </div>
-                        {student.file && !student.reference_face_url && (
+                        {student.file && (
                           <button
                             onClick={() => handleUploadFace(student.attempt_id)}
                             disabled={student.uploading}
                             className="eg-btn eg-btn-primary text-xs mt-2"
                           >
-                            {student.uploading ? "Saving..." : "Save Reference Face"}
+                            {student.uploading
+                              ? "Saving..."
+                              : student.reference_face_url
+                                ? "Replace Reference Face"
+                                : "Save Reference Face"}
                           </button>
                         )}
                         {student.uploadMessage && (

@@ -167,7 +167,12 @@ def demo_status(
     ref_urls = []
     if attempts:
         for att in attempts:
-            ref_urls.append(att.reference_face_url)
+            url = att.reference_face_url
+            if isinstance(url, str) and url.lower().startswith(("http://", "https://")):
+                ref_urls.append(url)
+            else:
+                # Ignore legacy relative storage keys that are not public URLs.
+                ref_urls.append(None)
 
     return DemoStatusResponse(
         loaded=True,
@@ -653,7 +658,9 @@ def demo_upload_reference_face(
         raise HTTPException(status_code=404, detail="Attempt not found")
 
     try:
-        ref_bytes = base64.b64decode(body.reference_image, validate=True)
+        ref_bytes = base64.b64decode(
+            "".join(body.reference_image.split()), validate=True
+        )
     except Exception:
         raise HTTPException(status_code=422, detail="Invalid base64 encoding")
 
@@ -671,13 +678,22 @@ def demo_upload_reference_face(
 
     from app.storage.cloudinary import CloudinaryStorage
     storage = CloudinaryStorage()
-    ext = ".png" if body.image_format == "image/png" else ".jpg"
+    image_format = (body.image_format or "image/jpeg").lower()
+    ext = ".png" if "png" in image_format else ".jpg"
     key = f"face-references/attempt-{body.attempt_id}{ext}"
 
     try:
         url = storage.save(key, ref_bytes)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save image: {e}")
+        raise HTTPException(status_code=502, detail=f"Failed to save image: {e}")
+
+    # Persist only absolute http(s) URLs — a relative storage key is not a valid
+    # reference face URL and would break the dashboard <img> and invigilator flow.
+    if not isinstance(url, str) or not url.lower().startswith(("http://", "https://")):
+        raise HTTPException(
+            status_code=502,
+            detail="Image storage did not return a public URL",
+        )
 
     attempt.reference_face_url = url
     db.commit()

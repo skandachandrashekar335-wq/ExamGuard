@@ -2,7 +2,37 @@ EXAMGUARD FINAL PRODUCTION REPORT
 ============================================================
 
 DATE: 2026-09-24
-TEST SUITE: 2512 passed / 0 failed / 0 errors (backend full suite)
+TEST SUITE: 2513 passed / 0 failed / 0 errors (backend full suite)
+
+=================================================
+DEMO FACE UPLOAD — ROOT CAUSE & FIX (2026-09-24)
+=================================================
+ROOT CAUSE:
+1. Cloudinary API key lacks upload/create permission → upload 403
+2. CloudinaryStorage.save silently fell back to LocalStorage and returned
+   a relative key (not a URL) that was stored as reference_face_url
+3. cloudinary package was missing from backend/pyproject.toml dependencies
+   (Railway nixpacks only runs: pip install '.[uniface]')
+4. Frontend hid the Save button once any reference_face_url existed, so a
+   bad relative path could not be re-uploaded; ENROLLED showed for broken URLs
+
+FIX:
+- Add cloudinary>=1.41.0 to backend/pyproject.toml dependencies
+- CloudinaryStorage.save: hard-fail when Cloudinary is configured (no
+  non-URL fallback); only local fallback when Cloudinary is unconfigured
+- Demo + identity reference-face endpoints: persist only absolute http(s)
+  URLs (502 otherwise); strip base64 whitespace before decode
+- Demo status / invigilator list / reference GET: hide or 404 legacy
+  relative reference_face_url values
+- Dashboard: Save always available when a file is selected (replace);
+  reject non-http response URLs; downscale large photos; clear 5MB error
+- Tests mock storage to return an absolute URL; new test rejects relative keys
+
+PRODUCTION DEPLOY STATUS:
+- Frontend: Vercel deploy of this fix required (run from repo root)
+- Backend: requires Railway login/redeploy (cloudinary dep + storage fix)
+- Cloudinary: API key still needs upload/create permission in dashboard
+  (code now returns a clear 502 instead of a fake success)
 
 =================================================
 EXAMGUARD PRODUCTION STATUS: DEPLOYED & FUNCTIONAL

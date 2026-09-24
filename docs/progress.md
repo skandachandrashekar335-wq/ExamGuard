@@ -3,7 +3,7 @@
 ## Current State
 
 - **Phase:** 8–16 COMPLETE (Phase 17+ PLANNED)
-- **Tests:** 2512 passing, 0 failures, 0 errors (full suite, 2026-09-24)
+- **Tests:** 2513 passing, 0 failures, 0 errors (full suite, 2026-09-24)
 - **Frontend:** 33 routes building successfully
 - **Design system:** Glassmorphism (cream/sage/lavender/purple accent `#6B4EFF`, Playfair Display / Source Serif 4 / JetBrains Mono)
 
@@ -16,6 +16,15 @@
 - Seat-assignment test cleanup: stale registration seats under SQLite PK reuse
 - Face-provider error tests: match `timed out` (service raises user message, not `Provider error` prefix)
 - LATE_ENTRY tests: future `exam_date` instead of fixed past date
+
+### Production demo face-upload fix (2026-09-24)
+
+- `cloudinary` added to `backend/pyproject.toml` dependencies (Railway `pip install '.[uniface]'` previously omitted it → import failure risk)
+- `CloudinaryStorage.save`: when Cloudinary creds are set, upload failure is a hard error (no silent LocalStorage fallback that returns a non-URL key)
+- Demo + identity reference-face endpoints persist only absolute `http(s)` URLs (502 otherwise); base64 whitespace stripped before decode
+- Demo status / invigilator list / reference-face GET ignore or 404 legacy relative `reference_face_url` rows
+- Frontend dashboard: Save button always shown when a file is selected (replace allowed); rejects non-http response URLs; client-side downscale for large photos; 5MB clear error
+- Tests mock storage to return an absolute Cloudinary URL; new test rejects relative storage keys
 
 ---
 

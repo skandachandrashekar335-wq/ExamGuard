@@ -173,7 +173,9 @@ def save_reference_face(
     max_size_bytes = settings.FACE_VERIFICATION_MAX_IMAGE_SIZE_MB * 1024 * 1024
 
     try:
-        ref_bytes = base64.b64decode(body.reference_image, validate=True)
+        ref_bytes = base64.b64decode(
+            "".join(body.reference_image.split()), validate=True
+        )
     except Exception:
         raise HTTPException(
             status_code=422,
@@ -213,8 +215,14 @@ def save_reference_face(
         url = storage.save(key, ref_bytes)
     except Exception as e:
         raise HTTPException(
-            status_code=500,
+            status_code=502,
             detail=f"Failed to save reference face: {e}",
+        )
+
+    if not isinstance(url, str) or not url.lower().startswith(("http://", "https://")):
+        raise HTTPException(
+            status_code=502,
+            detail="Image storage did not return a public URL",
         )
 
     # Persist URL on the attempt
@@ -246,6 +254,13 @@ def get_reference_face(
         raise HTTPException(
             status_code=404,
             detail="No reference face saved for this attempt",
+        )
+    if not str(attempt.reference_face_url).lower().startswith(
+        ("http://", "https://")
+    ):
+        raise HTTPException(
+            status_code=404,
+            detail="Stored reference face is not a public URL; re-upload required",
         )
     return {
         "attempt_id": attempt_id,

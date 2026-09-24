@@ -97,8 +97,11 @@ class CloudinaryStorage(StorageBackend):
 
         Uploads the file to Cloudinary using the official SDK.
         Returns the Cloudinary secure URL on success.
-        Falls back to LocalStorage if Cloudinary credentials are unavailable
-        or if the upload fails.
+
+        When Cloudinary credentials are configured, a failed upload is a hard
+        error - never silently fall back to a local filesystem key (that is not
+        a public URL and breaks reference_face_url consumers).
+        Local fallback is only used when Cloudinary is not configured (dev).
         """
         cloud_key = self._cloudinary_key(key)
 
@@ -110,35 +113,26 @@ class CloudinaryStorage(StorageBackend):
                     resource="raw",
                     folder="examguard",
                 )
-                # Return the secure URL from Cloudinary
-                return result["secure_url"]
+                secure_url = result.get("secure_url")
+                if not secure_url:
+                    raise RuntimeError("Cloudinary upload returned no secure_url")
+                return secure_url
             except Exception as e:
-                # If Cloudinary upload fails, fall back to local storage
                 import logging
                 logger = logging.getLogger(__name__)
-                logger.warning(
-                    "Cloudinary upload failed, falling back to local storage: %s",
-                    str(e),
-                )
-                # Switch to local fallback mode
-                self._using_cloudinary = False
-                # Re-initialize local backend
-                fallback_base_dir = (
-                    os.environ.get("CLOUDINARY_BASE_DIR", "local_storage")
-                )
-                from app.storage.local import LocalStorage
-                self._local_backend = LocalStorage(fallback_base_dir)
+                logger.error("Cloudinary upload failed for key %s: %s", cloud_key, e)
+                raise RuntimeError(
+                    "Cloudinary upload failed. Check CLOUDINARY_API_KEY permissions "
+                    "(upload/create) and credentials."
+                ) from e
 
-        # Fallback to local storage
+        # No Cloudinary credentials - local development fallback.
         local_backend = self.local
         if local_backend is not None:
             return local_backend.save(cloud_key, data)
-        else:
-            # Last resort: save locally using Cloudinary-style key
-            # This should not happen in normal operation
-            raise RuntimeError(
-                "Neither Cloudinary nor LocalStorage is available for save operation"
-            )
+        raise RuntimeError(
+            "Neither Cloudinary nor LocalStorage is available for save operation"
+        )
 
     def get_path(self, key: str) -> str:
         """Return the URL/path for a stored key.

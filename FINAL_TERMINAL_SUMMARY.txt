@@ -2,8 +2,19 @@ EXAMGUARD PRODUCTION STATUS
 ============================
 
 STATUS: DEPLOYED & FUNCTIONAL
-TEST SUITE: 2512 passed, 0 failed, 0 errors (2026-09-24)
+TEST SUITE: 2513 passed, 0 failed, 0 errors (2026-09-24)
 GIT COMMIT: see `git log -1` (this file updated with latest push)
+
+DEMO FACE UPLOAD FIX (2026-09-24):
+- ROOT CAUSE: Cloudinary create-permission 403 + silent LocalStorage fallback
+  returned a non-URL key stored as reference_face_url; cloudinary missing
+  from pyproject.toml; Save button hidden after any reference URL existed
+- FIX: cloudinary dependency; hard-fail on configured upload error; only
+  persist absolute http(s) URLs; hide/404 legacy relative URLs on read;
+  dashboard always allows replace + validates response URL + compresses
+  large photos; tests mock storage and reject relative keys
+- REMAINING: Cloudinary API key needs upload/create permission; Railway
+  redeploy required for backend; Vercel redeploy required for frontend
 
 ENGINEERING FIXES (2026-09-24):
 - Models: server_default=true() (SQLite boolean default was TEXT 'true')

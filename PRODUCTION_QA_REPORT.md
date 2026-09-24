@@ -10,13 +10,35 @@ Firebase:  exam-guard-75675 (Google Auth)
 
 LOCAL VERIFICATION (2026-09-24)
 -------------------------------
-[PASS] Full backend suite: 2512 passed, 0 failed, 0 errors
+[PASS] Full backend suite: 2513 passed, 0 failed, 0 errors
 [PASS] Frontend production build: 33 routes, exit 0
 [PASS] Backend py_compile: 186 modules
 [PASS] Production /health: healthy, database connected, face_provider deterministic
 [PASS] Production frontend: HTTP 200
 [PASS] Demo status endpoint: 401 without token (auth required — correct)
 [PASS] No secrets in committed diff (.env gitignored; local_storage/ gitignored)
+
+DEMO FACE UPLOAD FIX (2026-09-24)
+---------------------------------
+ROOT CAUSE:
+- Cloudinary key lacks create/upload permission (403 NotAllowed)
+- Silent LocalStorage fallback returned a relative key, stored as
+  reference_face_url → broken <img> / false ENROLLED
+- cloudinary missing from pyproject.toml dependencies (Railway install path)
+- Save button hidden when any reference_face_url already set
+
+FIX (code):
+- pyproject.toml: cloudinary>=1.41.0
+- CloudinaryStorage.save: hard error on configured upload failure
+- endpoints: only persist absolute http(s) URLs (502 otherwise)
+- demo status / invigilator / reference GET: ignore or 404 legacy relative URLs
+- dashboard: always show Save when file selected; validate response URL;
+  compress large photos; 5MB error message
+
+STILL REQUIRED (outside code):
+- Cloudinary dashboard: enable upload/create on the API key used by Railway
+- railway login + redeploy backend (installs cloudinary + new save logic)
+- Vercel deploy frontend from repo root
 
 DEPLOYED COMMITS (latest session)
 -------------------------------

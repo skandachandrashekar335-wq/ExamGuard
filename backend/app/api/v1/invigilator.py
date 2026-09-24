@@ -331,15 +331,20 @@ def get_registered_students(
             .order_by(IdentityVerificationAttempt.id.desc())
             .first()
         )
+        ref_url = attempt.reference_face_url if attempt else None
+        if isinstance(ref_url, str) and not ref_url.lower().startswith(
+            ("http://", "https://")
+        ):
+            ref_url = None
         items.append(RegisteredStudentResponse(
             registration_id=reg.id,
-            student_id=reg.student_id,
+            student_id=student.id if student else None,
             student_usn=student.usn if student else "UNKNOWN",
             student_name=student.name if student else "Unknown",
             attempt_id=attempt.id if attempt else None,
             attempt_status=attempt.status if attempt else None,
             attempt_decision=attempt.decision if attempt else None,
-            reference_face_url=attempt.reference_face_url if attempt else None,
+            reference_face_url=ref_url,
         ))
 
     return RegisteredStudentsResponse(items=items, total=len(items))
