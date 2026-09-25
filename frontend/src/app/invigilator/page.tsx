@@ -64,10 +64,59 @@ function isRecoverableFaceMessage(msg: string): boolean {
 type VerifyPhase =
   | "idle"
   | "starting"
-  | "live"
+  | "ready"
   | "verifying"
   | "done"
   | "error";
+
+type ErrorKind =
+  | "reference_mismatch"
+  | "not_enrolled"
+  | "rate_limit"
+  | "camera"
+  | "server";
+
+function classifyVerifyError(msg: string): ErrorKind {
+  if (msg.includes("REFERENCE_MISMATCH")) return "reference_mismatch";
+  if (msg.includes("CANDIDATE_NOT_ENROLLED")) return "not_enrolled";
+  if (msg.toLowerCase().includes("rate limit")) return "rate_limit";
+  const m = msg.toLowerCase();
+  if (m.includes("camera")) return "camera";
+  return "server";
+}
+
+function stripErrorPrefix(msg: string): string {
+  const idx = msg.indexOf(":");
+  if (idx > 0 && msg.slice(0, idx) === msg.slice(0, idx).toUpperCase()) {
+    return msg.slice(idx + 1).trim();
+  }
+  return msg;
+}
+
+interface RegisteredStudent {
+  registration_id: number;
+  student_id: number;
+  student_usn: string;
+  student_name: string;
+  attempt_id: number | null;
+  attempt_status: string | null;
+  attempt_decision: string | null;
+  reference_face_url: string | null;
+}
+
+const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
+  starting: { label: "Initializing", cls: "eg-badge eg-badge-info" },
+  ready: { label: "Camera Ready", cls: "eg-badge eg-badge-success" },
+  verifying: { label: "Verification in Progress", cls: "eg-badge eg-badge-warning" },
+  verified: { label: "Verified", cls: "eg-badge eg-badge-success" },
+  not_verified: { label: "Not Verified", cls: "eg-badge eg-badge-danger" },
+  inconclusive: { label: "Inconclusive", cls: "eg-badge eg-badge-warning" },
+  reference_mismatch: { label: "Reference Mismatch", cls: "eg-badge eg-badge-danger" },
+  not_enrolled: { label: "Not Enrolled", cls: "eg-badge eg-badge-danger" },
+  rate_limit: { label: "Rate Limited", cls: "eg-badge eg-badge-warning" },
+  camera: { label: "Camera Error", cls: "eg-badge eg-badge-danger" },
+  server: { label: "Verification Error", cls: "eg-badge eg-badge-danger" },
+};
 
 export default function InvigilatorPage() {
   const [data, setData] = useState<InvigilatorDashboard | null>(null);
@@ -75,20 +124,11 @@ export default function InvigilatorPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [actionMsgKind, setActionMsgKind] = useState<"success" | "danger">("success");
 
-  interface RegisteredStudent {
-    registration_id: number;
-    student_id: number;
-    student_usn: string;
-    student_name: string;
-    attempt_id: number | null;
-    attempt_status: string | null;
-    attempt_decision: string | null;
-    reference_face_url: string | null;
-  }
   const [students, setStudents] = useState<RegisteredStudent[]>([]);
 
-  const [verifyStudentId, setVerifyStudentId] = useState<number | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<RegisteredStudent | null>(null);
   const [verifyAttemptId, setVerifyAttemptId] = useState<number | null>(null);
   const [verifyCtx, setVerifyCtx] = useState<VerificationContext | null>(null);
   const [verifyState, setVerifyState] = useState<VerifyPhase>("idle");
@@ -100,6 +140,7 @@ export default function InvigilatorPage() {
     evidenceId: number | null;
   } | null>(null);
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [verifyErrorKind, setVerifyErrorKind] = useState<ErrorKind>("server");
   const [cameraState, setCameraState] = useState<CameraState>("idle");
   const [cameraMessage, setCameraMessage] = useState<string>("");
   const [loopStatus, setLoopStatus] = useState<string>("");
@@ -143,10 +184,12 @@ export default function InvigilatorPage() {
       setActionLoading(true);
       setActionMsg(null);
       const res = await startExam();
+      setActionMsgKind("success");
       setActionMsg(`Exam started. Session ${res.session_id}`);
       await load();
     } catch (e: unknown) {
       const msg = e instanceof ApiError ? e.message : "Failed to start exam";
+      setActionMsgKind("danger");
       setActionMsg(msg);
     } finally {
       setActionLoading(false);
@@ -158,10 +201,12 @@ export default function InvigilatorPage() {
       setActionLoading(true);
       setActionMsg(null);
       const res = await endExam();
+      setActionMsgKind("success");
       setActionMsg(`Exam ended. Session ${res.session_id}`);
       await load();
     } catch (e: unknown) {
       const msg = e instanceof ApiError ? e.message : "Failed to end exam";
+      setActionMsgKind("danger");
       setActionMsg(msg);
     } finally {
       setActionLoading(false);
@@ -180,7 +225,7 @@ export default function InvigilatorPage() {
       loopRunningRef.current = true;
       const ac = new AbortController();
       abortRef.current = ac;
-      setVerifyState("live");
+      setVerifyState("verifying");
       setVerifyError(null);
       setLoopStatus("Position your face inside the frame");
 
@@ -243,14 +288,22 @@ export default function InvigilatorPage() {
             const msg = e instanceof IvApiError ? e.message : "Verification failed";
 
             if (isRecoverableFaceMessage(msg)) {
-              setVerifyState("live");
+              setVerifyState("verifying");
               setLoopStatus(msg);
               await sleep(1600, ac.signal);
               continue;
             }
 
-            if (msg.toLowerCase().includes("rate limit")) {
-              setVerifyError(msg);
+            const kind = classifyVerifyError(msg);
+            if (kind === "rate_limit") {
+              setVerifyErrorKind("rate_limit");
+              setVerifyError(stripErrorPrefix(msg));
+              setVerifyState("error");
+              return;
+            }
+            if (kind === "reference_mismatch" || kind === "not_enrolled") {
+              setVerifyErrorKind(kind);
+              setVerifyError(stripErrorPrefix(msg));
               setVerifyState("error");
               return;
             }
@@ -287,13 +340,15 @@ export default function InvigilatorPage() {
               }
             }
 
-            setVerifyError(msg);
+            setVerifyErrorKind("server");
+            setVerifyError(stripErrorPrefix(msg));
             setVerifyState("error");
             return;
           }
         }
       } catch (e: unknown) {
         if (!isAbortError(e)) {
+          setVerifyErrorKind("server");
           setVerifyError(e instanceof Error ? e.message : "Verification failed");
           setVerifyState("error");
         }
@@ -304,9 +359,11 @@ export default function InvigilatorPage() {
     [load],
   );
 
-  const handleStartVerify = async (studentId: number, attemptId: number) => {
+  const handleStartVerify = async (student: RegisteredStudent) => {
+    const attemptId = student.attempt_id;
+    if (!attemptId) return;
     stopVerificationLoop();
-    setVerifyStudentId(studentId);
+    setSelectedStudent(student);
     setVerifyAttemptId(attemptId);
     setVerifyState("starting");
     setVerifyResult(null);
@@ -340,6 +397,7 @@ export default function InvigilatorPage() {
         return;
       }
     } catch {
+      setVerifyErrorKind("server");
       setVerifyError("Failed to load attempt context");
       setVerifyState("error");
     }
@@ -349,24 +407,41 @@ export default function InvigilatorPage() {
     (state: CameraState, message?: string) => {
       setCameraState(state);
       if (message) setCameraMessage(message);
-      if (state === "active" && verifyAttemptId && !loopRunningRef.current) {
-        const phase = verifyStateRef.current;
-        if (phase === "starting" || phase === "live") {
-          void runVerificationLoop(verifyAttemptId);
-        }
+      const phase = verifyStateRef.current;
+      if (state === "active" && phase === "starting") {
+        setVerifyState("ready");
+        setLoopStatus("Position your face inside the frame");
       }
-      if (state === "requesting") setLoopStatus("Starting camera...");
-      if (state === "error") setLoopStatus(message || "Camera unavailable");
-      if (state === "unsupported") setLoopStatus("Camera unavailable");
+      if (state === "requesting" && (phase === "starting" || phase === "ready")) {
+        setLoopStatus("Starting camera...");
+      }
+      if ((state === "error" || state === "unsupported") && phase !== "done") {
+        stopVerificationLoop();
+        setLoopStatus(
+          state === "unsupported" ? "Camera unavailable" : message || "Camera unavailable",
+        );
+        setVerifyErrorKind("camera");
+        setVerifyError(
+          state === "unsupported"
+            ? "Camera is not available in this browser"
+            : message || "Camera unavailable",
+        );
+        setVerifyState("error");
+      }
     },
-    [verifyAttemptId, runVerificationLoop],
+    [stopVerificationLoop],
   );
+
+  const handleVerifyNow = () => {
+    if (!verifyAttemptId) return;
+    void runVerificationLoop(verifyAttemptId);
+  };
 
   const handleCloseVerify = () => {
     stopVerificationLoop();
     cameraRef.current?.stop();
-    setVerifyStudentId(null);
     setVerifyAttemptId(null);
+    setSelectedStudent(null);
     setVerifyCtx(null);
     setVerifyState("idle");
     setVerifyResult(null);
@@ -391,312 +466,511 @@ export default function InvigilatorPage() {
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
+      // CameraCapture stops its own tracks on unmount (its internal cleanup).
     };
   }, []);
 
-  if (loading) return <AppShell><div className="p-8 text-center text-lg">Loading invigilator dashboard...</div></AppShell>;
-  if (error) return <AppShell><div className="p-8 text-center text-red-600">Error: {error}</div></AppShell>;
-  if (!data) return <AppShell><div className="p-8 text-center">No data</div></AppShell>;
+  const statusKey = (() => {
+    if (verifyState === "starting") return "starting";
+    if (verifyState === "ready") return "ready";
+    if (verifyState === "verifying") return "verifying";
+    if (verifyState === "error") return verifyErrorKind;
+    if (verifyState === "done" && verifyResult) {
+      if (verifyResult.decision === "MATCH") return "verified";
+      if (verifyResult.decision === "NO_MATCH") return "not_verified";
+      return "inconclusive";
+    }
+    return "starting";
+  })();
+  const statusBadge = STATUS_BADGE[statusKey] || STATUS_BADGE.server;
+
+  if (loading) {
+    return (
+      <AppShell>
+        <div className="eg-page">
+          <div className="eg-empty">
+            <p className="eg-empty-title">Loading invigilator dashboard...</p>
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+  if (error) {
+    return (
+      <AppShell>
+        <div className="eg-page">
+          <div className="eg-alert eg-alert-danger">Error: {error}</div>
+        </div>
+      </AppShell>
+    );
+  }
+  if (!data) {
+    return (
+      <AppShell>
+        <div className="eg-page">
+          <div className="eg-empty">
+            <p className="eg-empty-title">No data</p>
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
 
   const { profile: p } = data;
 
-  const refUrl = verifyCtx?.attempt?.reference_face_url;
+  const refUrl =
+    verifyCtx?.attempt?.reference_face_url || selectedStudent?.reference_face_url;
   const safeRefUrl = refUrl && /^https?:\/\//i.test(refUrl) ? refUrl : null;
 
-  const cameraStatusLabel = (() => {
-    if (verifyState === "done") return "Verification complete";
-    if (verifyState === "verifying") return "Verification in progress";
-    if (cameraState === "requesting") return "Camera starting";
-    if (cameraState === "active") return "Camera ready";
-    if (cameraState === "error") {
-      if (cameraMessage.toLowerCase().includes("permission")) {
-        return "Camera permission denied";
-      }
-      return "Camera unavailable";
-    }
-    if (cameraState === "unsupported") return "Camera unavailable";
-    return "Camera starting";
-  })();
+  const canRetryError =
+    verifyErrorKind === "rate_limit" ||
+    verifyErrorKind === "camera" ||
+    verifyErrorKind === "server";
 
   return (
     <AppShell>
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Invigilator Control Center</h1>
-
-      {/* Profile card */}
-      <div className="eg-panel p-4 space-y-2">
-        <div className="text-sm opacity-60">Logged in as</div>
-        <div className="font-medium">{p.full_name || p.email}</div>
-        <div className="text-sm opacity-60">{p.email}</div>
-      </div>
-
-      {/* Exam info */}
-      <div className="eg-panel p-4 space-y-3">
-        <h2 className="text-lg font-semibold">Assigned Examination</h2>
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div><span className="opacity-60">Exam:</span> {p.exam_name}</div>
-          <div><span className="opacity-60">Subject:</span> {p.subject_code} — {p.subject_name}</div>
-          <div><span className="opacity-60">Date:</span> {p.exam_date}</div>
-          <div><span className="opacity-60">Time:</span> {p.exam_start_time} — {p.exam_end_time}</div>
-          <div><span className="opacity-60">Hall:</span> {p.hall_name} ({p.hall_building} {p.hall_room})</div>
-          <div><span className="opacity-60">Entry Point:</span> {p.entry_point_name || "Not assigned"} ({p.entry_point_code || "N/A"})</div>
-          <div><span className="opacity-60">Camera:</span> {p.camera_name || "Not assigned"} ({p.camera_status || "N/A"})</div>
-          <div><span className="opacity-60">Session Status:</span> {p.session_status || "No session"}</div>
-          <div><span className="opacity-60">Gate Status:</span> {p.gate_status || "N/A"}</div>
+      <div className="eg-page">
+        <div className="eg-page-header">
+          <p className="eg-breadcrumb">HOME / INVIGILATOR</p>
+          <h1 className="eg-page-title">Invigilator Control Center</h1>
+          <p className="eg-page-desc">
+            Supervise your assigned examination and verify candidate identity live.
+          </p>
         </div>
-      </div>
 
-      {/* Controls */}
-      <div className="eg-panel p-4 space-y-3">
-        <h2 className="text-lg font-semibold">Session Controls</h2>
-        <div className="flex gap-3">
-          <button
-            onClick={handleStart}
-            disabled={!data.can_start || actionLoading}
-            className="px-4 py-2 rounded bg-green-600 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+        {actionMsg && (
+          <div
+            className={`eg-alert mb-6 ${actionMsgKind === "danger" ? "eg-alert-danger" : "eg-alert-success"}`}
           >
-            {actionLoading ? "Starting..." : "Start Exam"}
-          </button>
-          <button
-            onClick={handleEnd}
-            disabled={!data.can_end || actionLoading}
-            className="px-4 py-2 rounded bg-red-600 text-white disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {actionLoading ? "Ending..." : "End Exam"}
-          </button>
-          <button
-            onClick={load}
-            disabled={actionLoading}
-            className="px-4 py-2 rounded border border-[var(--border)]"
-          >
-            Refresh
-          </button>
-        </div>
-        {actionMsg && <div className="text-sm mt-2 p-2 rounded bg-black/20">{actionMsg}</div>}
-        {!data.can_start && !data.can_end && p.session_status !== "IN_PROGRESS" && (
-          <div className="text-sm opacity-60">
-            Exam is not within the permitted start window. Start is allowed 15 minutes before the scheduled time.
+            {actionMsg}
           </div>
         )}
-      </div>
 
-      {/* Live stats */}
-      <div className="eg-panel p-4 space-y-3">
-        <h2 className="text-lg font-semibold">Live Statistics</h2>
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div className="p-3 rounded bg-green-500/10">
-            <div className="text-2xl font-bold text-green-400">{data.granted_count}</div>
-            <div className="text-xs opacity-60">Verified</div>
+        <div className="eg-grid-2 mb-6">
+          <div className="glass-surface" style={{ padding: "1.5rem", borderRadius: "var(--radius-lg)" }}>
+            <div className="eg-metric-label">Invigilator</div>
+            <div className="eg-page-title" style={{ fontSize: "1.125rem", marginBottom: "0.75rem" }}>
+              {p.full_name || p.email}
+            </div>
+            <p className="eg-page-desc" style={{ fontSize: "0.8125rem" }}>{p.email}</p>
           </div>
-          <div className="p-3 rounded bg-red-500/10">
-            <div className="text-2xl font-bold text-red-400">{data.denied_count}</div>
-            <div className="text-xs opacity-60">Denied</div>
-          </div>
-          <div className="p-3 rounded bg-yellow-500/10">
-            <div className="text-2xl font-bold text-yellow-400">{data.escalated_count}</div>
-            <div className="text-xs opacity-60">Review</div>
-          </div>
-          <div className="p-3 rounded bg-blue-500/10">
-            <div className="text-2xl font-bold text-blue-400">{data.attendance_count}</div>
-            <div className="text-xs opacity-60">Attendance</div>
-          </div>
-          <div className="p-3 rounded bg-orange-500/10">
-            <div className="text-2xl font-bold text-orange-400">{data.security_event_count}</div>
-            <div className="text-xs opacity-60">Security Events</div>
-          </div>
-          <div className="p-3 rounded bg-white/5">
-            <div className="text-2xl font-bold">{data.verification_count}</div>
-            <div className="text-xs opacity-60">Total Verifications</div>
+
+          <div className="glass-surface" style={{ padding: "1.5rem", borderRadius: "var(--radius-lg)" }}>
+            <div className="eg-metric-label">Assigned Examination</div>
+            <div className="eg-page-title" style={{ fontSize: "1.125rem", marginBottom: "0.75rem" }}>
+              {p.exam_name}
+            </div>
+            <div className="eg-grid-2" style={{ gap: "0.5rem 1rem", fontSize: "0.8125rem" }}>
+              <span style={{ color: "var(--text-muted)" }}>
+                Subject: <span style={{ color: "var(--text-secondary)" }}>{p.subject_code} — {p.subject_name}</span>
+              </span>
+              <span style={{ color: "var(--text-muted)" }}>
+                Date: <span style={{ color: "var(--text-secondary)" }}>{p.exam_date}</span>
+              </span>
+              <span style={{ color: "var(--text-muted)" }}>
+                Time: <span style={{ color: "var(--text-secondary)" }}>{p.exam_start_time} — {p.exam_end_time}</span>
+              </span>
+              <span style={{ color: "var(--text-muted)" }}>
+                Hall: <span style={{ color: "var(--text-secondary)" }}>{p.hall_name} ({p.hall_building} {p.hall_room})</span>
+              </span>
+              <span style={{ color: "var(--text-muted)" }}>
+                Entry: <span style={{ color: "var(--text-secondary)" }}>{p.entry_point_name || "Not assigned"}</span>
+              </span>
+              <span style={{ color: "var(--text-muted)" }}>
+                Session: <span style={{ color: "var(--text-secondary)" }}>{p.session_status || "No session"}</span>
+              </span>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Recent verifications */}
-      {data.recent_verifications.length > 0 && (
-        <div className="eg-panel p-4 space-y-3">
-          <h2 className="text-lg font-semibold">Recent Verifications</h2>
-          <div className="space-y-2">
-            {data.recent_verifications.map((v: Record<string, unknown>) => (
-              <div key={v.id as number} className="flex items-center gap-3 text-sm p-2 rounded bg-black/10">
-                <span className="font-mono text-xs opacity-50">#{v.id as number}</span>
-                <span className="opacity-60">Student {v.student_id as number}</span>
-                <span className={`px-2 py-0.5 rounded text-xs ${
-                  v.status === "GRANTED" ? "bg-green-500/20 text-green-300" :
-                  v.status === "DENIED" ? "bg-red-500/20 text-red-300" :
-                  "bg-yellow-500/20 text-yellow-300"
-                }`}>
-                  {v.status as string}
-                </span>
-                <span className="text-xs opacity-40">{v.created_at as string}</span>
-              </div>
-            ))}
+        <div className="glass-surface mb-6" style={{ padding: "1.5rem", borderRadius: "var(--radius-lg)" }}>
+          <div className="eg-metric-label" style={{ marginBottom: "1rem" }}>Session Controls</div>
+          <div className="flex gap-3" style={{ flexWrap: "wrap" }}>
+            <button
+              onClick={handleStart}
+              disabled={!data.can_start || actionLoading}
+              className="eg-btn eg-btn-primary"
+            >
+              {actionLoading ? "Starting..." : "Start Exam"}
+            </button>
+            <button
+              onClick={handleEnd}
+              disabled={!data.can_end || actionLoading}
+              className="eg-btn eg-btn-danger"
+            >
+              {actionLoading ? "Ending..." : "End Exam"}
+            </button>
+            <button onClick={load} disabled={actionLoading} className="eg-btn">
+              Refresh
+            </button>
+          </div>
+          {!data.can_start && !data.can_end && p.session_status !== "IN_PROGRESS" && (
+            <p className="eg-page-desc" style={{ marginTop: "0.75rem", fontSize: "0.8125rem" }}>
+              Exam is not within the permitted start window. Start is allowed 15 minutes before the scheduled time.
+            </p>
+          )}
+        </div>
+
+        <div className="eg-grid-3 mb-6">
+          <div className="eg-metric">
+            <div className="eg-metric-label">Verified</div>
+            <div className="eg-metric-value">{data.granted_count}</div>
+          </div>
+          <div className="eg-metric">
+            <div className="eg-metric-label">Denied</div>
+            <div className="eg-metric-value">{data.denied_count}</div>
+          </div>
+          <div className="eg-metric">
+            <div className="eg-metric-label">Review</div>
+            <div className="eg-metric-value">{data.escalated_count}</div>
+          </div>
+          <div className="eg-metric">
+            <div className="eg-metric-label">Attendance</div>
+            <div className="eg-metric-value">{data.attendance_count}</div>
+          </div>
+          <div className="eg-metric">
+            <div className="eg-metric-label">Security Events</div>
+            <div className="eg-metric-value">{data.security_event_count}</div>
+          </div>
+          <div className="eg-metric">
+            <div className="eg-metric-label">Total Verifications</div>
+            <div className="eg-metric-value">{data.verification_count}</div>
           </div>
         </div>
-      )}
 
-      {/* Registered Students */}
-      <div className="eg-panel p-4 space-y-3">
-        <h2 className="text-lg font-semibold">Registered Students</h2>
-        {students.length === 0 ? (
-          <div className="text-sm opacity-60">No registered students found.</div>
-        ) : (
-          <div className="space-y-2">
-            {students.map((s) => (
-              <div key={s.registration_id} className="flex items-center justify-between text-sm p-3 rounded bg-black/10">
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-xs opacity-50">{s.student_usn}</span>
-                  <span className="font-medium">{s.student_name}</span>
-                  {s.attempt_status && (
-                    <span className={`px-2 py-0.5 rounded text-xs ${
-                      s.attempt_decision === "MATCH" ? "bg-green-500/20 text-green-300" :
-                      s.attempt_decision === "NO_MATCH" ? "bg-red-500/20 text-red-300" :
-                      "bg-yellow-500/20 text-yellow-300"
-                    }`}>
-                      {s.attempt_status} / {s.attempt_decision || "PENDING"}
+        <div className="glass-surface mb-6" style={{ padding: "1.5rem", borderRadius: "var(--radius-lg)" }}>
+          <div className="eg-metric-label" style={{ marginBottom: "1rem" }}>Registered Candidates</div>
+          {students.length === 0 ? (
+            <p className="eg-page-desc" style={{ fontSize: "0.875rem" }}>
+              No registered students found.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {students.map((s) => (
+                <div
+                  key={s.registration_id}
+                  className="flex items-center justify-between"
+                  style={{
+                    gap: "0.75rem",
+                    padding: "0.75rem 1rem",
+                    borderRadius: "var(--radius-sm)",
+                    background: "var(--bg-glass-light)",
+                    border: "1px solid var(--border)",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div className="flex items-center" style={{ gap: "0.75rem", flexWrap: "wrap" }}>
+                    <span className="eg-mono-sm" style={{ color: "var(--text-muted)" }}>{s.student_usn}</span>
+                    <span style={{ fontWeight: 500, fontSize: "0.875rem", color: "var(--text-primary)" }}>
+                      {s.student_name}
                     </span>
-                  )}
-                  {s.reference_face_url && (
-                    <span className="text-xs text-[var(--accent)]">Reference enrolled</span>
+                    {s.attempt_status && (
+                      <span
+                        className={`eg-badge ${
+                          s.attempt_decision === "MATCH"
+                            ? "eg-badge-success"
+                            : s.attempt_decision === "NO_MATCH"
+                              ? "eg-badge-danger"
+                              : "eg-badge-warning"
+                        }`}
+                      >
+                        {s.attempt_status} / {s.attempt_decision || "PENDING"}
+                      </span>
+                    )}
+                    {s.reference_face_url && (
+                      <span className="eg-badge eg-badge-info">Reference Enrolled</span>
+                    )}
+                  </div>
+                  {s.attempt_id && (
+                    <button
+                      onClick={() => handleStartVerify(s)}
+                      className="eg-btn eg-btn-primary"
+                      style={{ fontSize: "0.75rem", height: "32px", padding: "0 0.875rem" }}
+                    >
+                      Verify Face
+                    </button>
                   )}
                 </div>
-                {s.attempt_id && (
-                  <button
-                    onClick={() => handleStartVerify(s.student_id, s.attempt_id!)}
-                    className="eg-btn eg-btn-primary text-xs px-3 py-1"
+              ))}
+            </div>
+          )}
+        </div>
+
+        {data.recent_verifications.length > 0 && (
+          <div className="glass-surface" style={{ padding: "1.5rem", borderRadius: "var(--radius-lg)" }}>
+            <div className="eg-metric-label" style={{ marginBottom: "1rem" }}>Verification History</div>
+            <div className="space-y-2">
+              {data.recent_verifications.map((v: Record<string, unknown>) => (
+                <div
+                  key={v.id as number}
+                  className="flex items-center"
+                  style={{
+                    gap: "0.75rem",
+                    padding: "0.625rem 1rem",
+                    borderRadius: "var(--radius-sm)",
+                    background: "var(--bg-glass-light)",
+                    border: "1px solid var(--border)",
+                    fontSize: "0.8125rem",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <span className="eg-mono-sm" style={{ color: "var(--text-faint)" }}>
+                    #{v.id as number}
+                  </span>
+                  <span style={{ color: "var(--text-secondary)" }}>
+                    Student {v.student_id as number}
+                  </span>
+                  <span
+                    className={`eg-badge ${
+                      v.status === "GRANTED"
+                        ? "eg-badge-success"
+                        : v.status === "DENIED"
+                          ? "eg-badge-danger"
+                          : "eg-badge-warning"
+                    }`}
                   >
-                    Verify Face
-                  </button>
-                )}
-              </div>
-            ))}
+                    {v.status as string}
+                  </span>
+                  <span className="eg-mono-sm" style={{ color: "var(--text-faint)", marginLeft: "auto" }}>
+                    {v.created_at as string}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
-      </div>
 
-      {/* Face Verification Modal — opens camera immediately */}
-      {verifyAttemptId && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="glass-surface max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Face Verification</h3>
-              <button onClick={handleCloseVerify} className="text-[var(--text-muted)] hover:text-white text-xl">&times;</button>
-            </div>
-
-            {verifyCtx?.student && (
-              <div className="text-sm opacity-60">
-                Student: {verifyCtx.student.name} ({verifyCtx.student.usn})
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <span className="eg-mono-sm text-[var(--text-muted)]">Stored Reference</span>
-                {safeRefUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={safeRefUrl}
-                    alt="Reference face"
-                    className="w-full h-32 object-cover rounded border border-[var(--border)]"
-                  />
-                ) : (
-                  <div className="w-full h-32 rounded border border-[var(--border)] flex items-center justify-center text-xs opacity-50">
-                    No reference
-                  </div>
-                )}
-              </div>
-              <div className="space-y-2 text-sm">
+        {verifyAttemptId && (
+          <div
+            className="eg-modal-backdrop"
+            onClick={() => {
+              if (verifyState !== "verifying") handleCloseVerify();
+            }}
+          >
+            <div
+              className="eg-modal glass-surface glass"
+              style={{ maxWidth: "640px" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="eg-modal-header">
                 <div>
-                  <span className="eg-mono-sm text-[var(--text-muted)] block">Camera</span>
-                  <span>{cameraStatusLabel}</span>
-                </div>
-                {verifyState !== "done" && verifyState !== "error" && (
-                  <div>
-                    <span className="eg-mono-sm text-[var(--text-muted)] block">Guidance</span>
-                    <span className="text-xs">
-                      {loopStatus || "Position your face inside the frame"}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {(verifyState === "starting" || verifyState === "live" || verifyState === "verifying") && (
-              <div className="space-y-2">
-                <CameraCapture
-                  key={cameraKey}
-                  ref={cameraRef}
-                  onCapture={() => undefined}
-                  onRetake={() => undefined}
-                  autoStart
-                  liveMode
-                  onStateChange={handleCameraState}
-                />
-                {verifyState === "verifying" && (
-                  <div className="text-center text-sm animate-pulse">
-                    Verification in progress...
-                  </div>
-                )}
-              </div>
-            )}
-
-            {verifyState === "done" && verifyResult && (
-              <div className="space-y-3">
-                <DecisionDisplay
-                  decision={verifyResult.decision}
-                  failureReason={verifyCtx?.attempt?.failure_reason || null}
-                />
-                <div className="text-xs space-y-1 opacity-80">
-                  <div>
-                    Student:{" "}
+                  <h2 className="eg-page-title" style={{ fontSize: "1.125rem", marginBottom: "0.25rem" }}>
+                    Face Verification
+                  </h2>
+                  <p className="eg-page-desc" style={{ fontSize: "0.8125rem" }}>
                     {verifyCtx?.student
                       ? `${verifyCtx.student.name} (${verifyCtx.student.usn})`
-                      : `#${verifyStudentId}`}
-                  </div>
-                  <div>
-                    Verification time:{" "}
-                    {new Date(verifyResult.verifiedAt).toLocaleString()}
-                  </div>
-                  <div>Result: {verifyResult.decision}</div>
-                  <div>
-                    Provider:{" "}
-                    {verifyResult.provider
-                      ? verifyResult.provider === "uniface"
-                        ? "UniFace"
-                        : verifyResult.provider
-                      : "—"}
-                  </div>
-                  {verifyResult.evidenceId != null && (
-                    <div>Evidence ID: #{verifyResult.evidenceId}</div>
-                  )}
+                      : selectedStudent
+                        ? `${selectedStudent.student_name} (${selectedStudent.student_usn})`
+                        : `Attempt #${verifyAttemptId}`}
+                  </p>
                 </div>
-                {verifyResult.evidence.length > 0 && (
-                  <EvidenceDisplay evidence={verifyResult.evidence as VerificationContext["evidence"]} />
-                )}
-                <button onClick={handleCloseVerify} className="eg-btn w-full py-2">
-                  Close
-                </button>
+                <div className="flex items-center" style={{ gap: "0.75rem" }}>
+                  <span className={statusBadge.cls}>{statusBadge.label}</span>
+                  <button
+                    onClick={handleCloseVerify}
+                    className="eg-modal-close"
+                    aria-label="Close verification"
+                  >
+                    &times;
+                  </button>
+                </div>
               </div>
-            )}
 
-            {verifyState === "error" && (
-              <div className="space-y-3">
-                <div className="text-sm" style={{ color: "var(--danger)" }}>
-                  {verifyError || cameraMessage || "Verification failed"}
+              <div className="eg-modal-body" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                <div className="eg-grid-2">
+                  <div>
+                    <span className="eg-mono-sm" style={{ color: "var(--text-muted)", display: "block", marginBottom: "0.5rem" }}>
+                      Stored Reference
+                    </span>
+                    {safeRefUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={safeRefUrl}
+                        alt="Reference face"
+                        style={{
+                          width: "100%",
+                          height: "128px",
+                          objectFit: "cover",
+                          borderRadius: "var(--radius-sm)",
+                          border: "1px solid var(--border)",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "128px",
+                          borderRadius: "var(--radius-sm)",
+                          border: "1px dashed var(--border-strong)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "0.75rem",
+                          color: "var(--text-muted)",
+                        }}
+                      >
+                        No reference enrolled
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem", fontSize: "0.8125rem" }}>
+                    <div>
+                      <span className="eg-mono-sm" style={{ color: "var(--text-muted)", display: "block" }}>
+                        Candidate
+                      </span>
+                      <span style={{ color: "var(--text-primary)" }}>
+                        {verifyCtx?.student?.name || selectedStudent?.student_name || "—"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="eg-mono-sm" style={{ color: "var(--text-muted)", display: "block" }}>
+                        USN
+                      </span>
+                      <span className="eg-mono" style={{ color: "var(--text-primary)" }}>
+                        {verifyCtx?.student?.usn || selectedStudent?.student_usn || "—"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="eg-mono-sm" style={{ color: "var(--text-muted)", display: "block" }}>
+                        Camera
+                      </span>
+                      <span style={{ color: "var(--text-secondary)" }}>
+                        {cameraState === "active"
+                          ? "Camera ready"
+                          : cameraState === "requesting"
+                            ? "Starting camera..."
+                            : cameraState === "error"
+                              ? "Camera unavailable"
+                              : "Initializing"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="eg-mono-sm" style={{ color: "var(--text-muted)", display: "block" }}>
+                        Guidance
+                      </span>
+                      <span style={{ color: "var(--text-secondary)" }}>
+                        {loopStatus || "Position your face inside the frame"}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex gap-3">
-                  <button onClick={handleRetry} className="eg-btn eg-btn-primary px-6 py-2">
-                    Retry
-                  </button>
-                  <button onClick={handleCloseVerify} className="eg-btn px-4 py-2">
-                    Close
-                  </button>
-                </div>
+
+                {(verifyState === "starting" || verifyState === "ready" || verifyState === "verifying") && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                    <CameraCapture
+                      key={cameraKey}
+                      ref={cameraRef}
+                      onCapture={() => undefined}
+                      onRetake={() => undefined}
+                      autoStart
+                      liveMode
+                      onStateChange={handleCameraState}
+                    />
+                    {verifyState === "ready" && cameraState === "active" && (
+                      <button
+                        onClick={handleVerifyNow}
+                        className="eg-btn eg-btn-primary"
+                        style={{ width: "100%", height: "44px", fontSize: "0.875rem" }}
+                      >
+                        Verify Live Face
+                      </button>
+                    )}
+                    {verifyState === "verifying" && (
+                      <div
+                        className="eg-alert eg-alert-success"
+                        style={{ textAlign: "center", animation: "eg-pulse 1.5s ease-in-out infinite" }}
+                      >
+                        Verification in progress — hold still...
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {verifyState === "done" && verifyResult && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                    <DecisionDisplay
+                      decision={verifyResult.decision}
+                      failureReason={verifyCtx?.attempt?.failure_reason || null}
+                    />
+                    <div style={{ fontSize: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", color: "var(--text-muted)" }}>
+                      <span>
+                        Candidate:{" "}
+                        {verifyCtx?.student
+                          ? `${verifyCtx.student.name} (${verifyCtx.student.usn})`
+                          : selectedStudent
+                            ? `${selectedStudent.student_name} (${selectedStudent.student_usn})`
+                            : `Attempt #${verifyAttemptId}`}
+                      </span>
+                      <span>Verification time: {new Date(verifyResult.verifiedAt).toLocaleString()}</span>
+                      <span>
+                        Provider:{" "}
+                        {verifyResult.provider
+                          ? verifyResult.provider === "uniface"
+                            ? "UniFace"
+                            : verifyResult.provider
+                          : "—"}
+                      </span>
+                      {verifyResult.evidenceId != null && (
+                        <span>Evidence ID: #{verifyResult.evidenceId}</span>
+                      )}
+                    </div>
+                    {verifyResult.evidence.length > 0 && (
+                      <EvidenceDisplay evidence={verifyResult.evidence as VerificationContext["evidence"]} />
+                    )}
+                    <button onClick={handleCloseVerify} className="eg-btn" style={{ width: "100%" }}>
+                      Close
+                    </button>
+                  </div>
+                )}
+
+                {verifyState === "error" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                    <div className="eg-alert eg-alert-danger">
+                      <strong style={{ display: "block", marginBottom: "0.25rem" }}>
+                        {verifyErrorKind === "reference_mismatch"
+                          ? "Reference mismatch"
+                          : verifyErrorKind === "not_enrolled"
+                            ? "Candidate not enrolled"
+                            : verifyErrorKind === "camera"
+                              ? "Camera error"
+                              : verifyErrorKind === "rate_limit"
+                                ? "Rate limit reached"
+                                : "Verification failed"}
+                      </strong>
+                      {verifyError || cameraMessage || "Verification failed"}
+                      {verifyErrorKind === "reference_mismatch" && (
+                        <span style={{ display: "block", marginTop: "0.375rem", fontSize: "0.75rem" }}>
+                          The stored reference does not belong to this candidate. Contact the operator to correct the selection.
+                        </span>
+                      )}
+                      {verifyErrorKind === "not_enrolled" && (
+                        <span style={{ display: "block", marginTop: "0.375rem", fontSize: "0.75rem" }}>
+                          This candidate is not registered for the current examination.
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-3">
+                      {canRetryError && (
+                        <button onClick={handleRetry} className="eg-btn eg-btn-primary" style={{ flex: 1 }}>
+                          Retry
+                        </button>
+                      )}
+                      <button
+                        onClick={handleCloseVerify}
+                        className="eg-btn"
+                        style={{ flex: canRetryError ? 1 : undefined, width: canRetryError ? undefined : "100%" }}
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
     </AppShell>
   );
 }

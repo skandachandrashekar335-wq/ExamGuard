@@ -50,17 +50,21 @@ export default function EvidenceDisplay({ evidence }: Props) {
         const bar = signalBar(e.signal_type, e.signal_value);
         const label = SIGNAL_LABELS[e.signal_type] || e.signal_type;
         return (
-          <div key={e.id} className="border border-[var(--border)] bg-black p-3 rounded">
+          <div
+            key={e.id}
+            className="border p-3 rounded"
+            style={{ borderColor: "var(--border)", background: "var(--bg-glass-light)" }}
+          >
             <div className="flex items-center justify-between mb-1">
               <span className="eg-mono-sm text-[var(--text-secondary)]">
                 {label}
               </span>
-              <span className="font-mono text-xs text-white">
+              <span className="font-mono text-xs" style={{ color: "var(--text-primary)" }}>
                 {formatValue(e.signal_type, e.signal_value)}
               </span>
             </div>
             {bar !== null && (
-              <div className="h-1 bg-white/5 w-full mt-1 rounded">
+              <div className="h-1 w-full mt-1 rounded" style={{ background: "var(--border)" }}>
                 <div
                   className="h-full bg-[var(--accent)] transition-all duration-300 rounded"
                   style={{ width: `${bar}%` }}

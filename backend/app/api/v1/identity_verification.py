@@ -72,6 +72,14 @@ def _enforce_attempt_scope(db: Session, user: dict, attempt) -> None:
         ).first()
         if reg:
             exam_id = reg.exam_id
+    if exam_id is None:
+        # Do not silently skip the exam check when the registration cannot
+        # be resolved — that would grant an invigilator access to an
+        # orphaned attempt outside their assignment.
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: attempt is not linked to an assigned exam",
+        )
     check_invigilator_scope(scope, resource_exam_id=exam_id, resource_hall_id=None)
 
 
@@ -515,6 +523,13 @@ def verify_face(
         raise HTTPException(status_code=404, detail="Attempt not found")
     _enforce_attempt_scope(db, _user, attempt)
 
+    # Authoritative candidate / reference-ownership / enrollment checks
+    # BEFORE downloading any reference image or invoking the provider.
+    try:
+        iv_service.validate_attempt_authorization(db, attempt)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
     # Resolve reference image bytes
     if body.reference_image is not None:
         try:
@@ -629,6 +644,11 @@ def evaluate_and_complete(
             status_code=422,
             detail=f"Cannot evaluate attempt in status '{attempt.status}'",
         )
+    # Enrollment/reference checks gate accepting a MATCH decision.
+    try:
+        iv_service.validate_attempt_authorization(db, attempt)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     evidence = (
         db.query(iv_service.IdentityVerificationEvidence)
         .filter(iv_service.IdentityVerificationEvidence.attempt_id == attempt_id)

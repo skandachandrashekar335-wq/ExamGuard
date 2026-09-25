@@ -112,6 +112,60 @@ def _check_duplicate_active(
         )
 
 
+def validate_attempt_authorization(
+    db: Session, attempt: IdentityVerificationAttempt
+) -> None:
+    """Validate reference ownership and exam enrollment for an attempt.
+
+    Called before face verification and before a decision is accepted.
+    Raises ValueError with a structured code prefix the API can surface:
+
+    - REFERENCE_MISMATCH — attempt is not linked to a registration that
+      belongs to this student (wrong reference / wrong candidate binding)
+    - CANDIDATE_NOT_ENROLLED — registration missing, cancelled, or student
+      inactive (not enrolled in the current examination)
+    """
+    if not attempt.exam_registration_id:
+        raise ValueError(
+            "REFERENCE_MISMATCH: attempt is not linked to an exam registration"
+        )
+
+    reg = (
+        db.query(ExamRegistration)
+        .filter(ExamRegistration.id == attempt.exam_registration_id)
+        .first()
+    )
+    if not reg:
+        raise ValueError(
+            "REFERENCE_MISMATCH: exam registration for this attempt not found"
+        )
+    if reg.student_id != attempt.student_id:
+        raise ValueError(
+            "REFERENCE_MISMATCH: registered reference belongs to a different "
+            "student than this attempt"
+        )
+
+    if reg.status == RegistrationStatus.CANCELLED.value:
+        raise ValueError(
+            "CANDIDATE_NOT_ENROLLED: candidate registration is cancelled"
+        )
+    if reg.status != RegistrationStatus.REGISTERED.value:
+        raise ValueError(
+            "CANDIDATE_NOT_ENROLLED: candidate is not registered for this "
+            "examination"
+        )
+
+    student = db.query(Student).filter(Student.id == attempt.student_id).first()
+    if not student:
+        raise ValueError(
+            "REFERENCE_MISMATCH: student for this attempt not found"
+        )
+    if not student.is_active:
+        raise ValueError(
+            "CANDIDATE_NOT_ENROLLED: candidate is not active"
+        )
+
+
 def create_attempt(
     db: Session, data: IdentityVerificationCreate
 ) -> IdentityVerificationAttempt:
@@ -404,6 +458,10 @@ def verify_face(
             f"Attempt verification_method is '{attempt.verification_method}', "
             f"not 'FACE'. Face verification requires FACE method."
         )
+
+    # 1a. Authoritative candidate/reference/enrollment checks (before any
+    # rate-limit budget is consumed and before any provider call).
+    validate_attempt_authorization(db, attempt)
 
     # 1b. Rate limiting
     from app.core.config import get_settings as _get_settings

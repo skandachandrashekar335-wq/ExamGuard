@@ -181,22 +181,29 @@ const CameraCapture = forwardRef<CameraCaptureHandle, CameraCaptureProps>(
     const showIdleControls = !autoStart && !liveMode && state === "idle";
 
     return (
-      <div className="border border-[var(--border)] bg-[#0a0a0a] rounded">
-        <div className="px-4 py-2 border-b border-[var(--border)] flex items-center justify-between">
-          <span className="eg-mono-sm text-[var(--text-secondary)]">
+      <div
+        className="glass-surface"
+        style={{ borderRadius: "var(--radius-md)", overflow: "hidden" }}
+      >
+        <div
+          className="px-4 py-2 flex items-center justify-between"
+          style={{ borderBottom: "1px solid var(--border)" }}
+        >
+          <span className="eg-mono-sm" style={{ color: "var(--text-secondary)" }}>
             Camera
           </span>
-          {state === "active" && (
-            <span className="eg-mono-sm text-[var(--text-tertiary)]">Live</span>
+          {state === "active" && liveMode && (
+            <span className="eg-badge eg-badge-success">Live</span>
           )}
           {state === "captured" && (
-            <span className="eg-mono-sm text-[var(--text-tertiary)]">
-              Captured
-            </span>
+            <span className="eg-badge eg-badge-info">Captured</span>
+          )}
+          {state === "requesting" && (
+            <span className="eg-badge eg-badge-warning">Starting</span>
           )}
         </div>
 
-        <div className="relative aspect-[4/3] bg-black">
+        <div className="relative aspect-[4/3]" style={{ background: "#101713" }}>
           <canvas ref={canvasRef} className="hidden" />
 
           {showIdleControls && (
@@ -213,7 +220,7 @@ const CameraCapture = forwardRef<CameraCaptureHandle, CameraCaptureProps>(
 
           {state === "requesting" && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="eg-mono text-[var(--text-tertiary)]">
+              <span className="eg-mono" style={{ color: "rgba(255,255,255,0.75)" }}>
                 Starting camera...
               </span>
             </div>
@@ -230,7 +237,33 @@ const CameraCapture = forwardRef<CameraCaptureHandle, CameraCaptureProps>(
           )}
 
           {state === "active" && liveMode && (
-            <div className="absolute inset-0 pointer-events-none border-2 border-[var(--accent)]/40 m-6 rounded-full" />
+            <>
+              <div
+                className="absolute inset-0 pointer-events-none flex items-center justify-center"
+                aria-hidden="true"
+              >
+                <div
+                  style={{
+                    width: "58%",
+                    height: "78%",
+                    borderRadius: "50%",
+                    border: "2px solid rgba(107, 78, 255, 0.75)",
+                    boxShadow: "0 0 0 9999px rgba(16, 23, 19, 0.35)",
+                  }}
+                />
+              </div>
+              <div
+                className="absolute left-0 right-0 px-4 py-2 text-center"
+                style={{
+                  bottom: 0,
+                  background: "linear-gradient(transparent, rgba(16, 23, 19, 0.75))",
+                }}
+              >
+                <span className="eg-mono-sm" style={{ color: "rgba(255,255,255,0.85)" }}>
+                  Center your face inside the oval
+                </span>
+              </div>
+            </>
           )}
 
           {state === "captured" && capturedUrl && (
@@ -244,7 +277,7 @@ const CameraCapture = forwardRef<CameraCaptureHandle, CameraCaptureProps>(
 
           {state === "error" && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6">
-              <span className="eg-mono text-[var(--danger)] text-center">
+              <span className="eg-mono text-center" style={{ color: "#FF8A94" }}>
                 {errorMessage}
               </span>
               <button onClick={startCamera} className="eg-btn px-4 py-2">
@@ -255,7 +288,7 @@ const CameraCapture = forwardRef<CameraCaptureHandle, CameraCaptureProps>(
 
           {state === "unsupported" && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="eg-mono text-[var(--text-tertiary)] text-center px-6">
+              <span className="eg-mono text-center px-6" style={{ color: "rgba(255,255,255,0.75)" }}>
                 Camera is not available in this browser
               </span>
             </div>
@@ -263,11 +296,14 @@ const CameraCapture = forwardRef<CameraCaptureHandle, CameraCaptureProps>(
         </div>
 
         {state === "active" && !liveMode && (
-          <div className="px-4 py-3 border-t border-[var(--border)] flex justify-center">
+          <div
+            className="px-4 py-3 flex justify-center"
+            style={{ borderTop: "1px solid var(--border)" }}
+          >
             <button
               onClick={captureFrame}
               disabled={disabled}
-              className="eg-btn-primary eg-btn px-8 py-2 disabled:opacity-30"
+              className="eg-btn eg-btn-primary px-8 py-2 disabled:opacity-30"
             >
               Capture
             </button>
@@ -275,7 +311,10 @@ const CameraCapture = forwardRef<CameraCaptureHandle, CameraCaptureProps>(
         )}
 
         {state === "captured" && (
-          <div className="px-4 py-3 border-t border-[var(--border)] flex justify-center">
+          <div
+            className="px-4 py-3 flex justify-center"
+            style={{ borderTop: "1px solid var(--border)" }}
+          >
             <button
               onClick={retake}
               disabled={disabled}

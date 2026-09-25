@@ -84,6 +84,8 @@ class FailureCategory(str, enum.Enum):
     DUPLICATE_EVIDENCE = "DUPLICATE_EVIDENCE"
     RATE_LIMITED = "RATE_LIMITED"
     PROVIDER_ERROR = "PROVIDER_ERROR"
+    REFERENCE_MISMATCH = "REFERENCE_MISMATCH"
+    CANDIDATE_NOT_ENROLLED = "CANDIDATE_NOT_ENROLLED"
 
 
 # Mapping: failure category → whether the provider could not produce evidence
