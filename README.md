@@ -1,34 +1,109 @@
 # ExamGuard
 
-> AI-powered examination management and face-verification platform
-> designed for secure, role-based examination workflows.
+[![Backend Tests](https://github.com/skandachandrashekar335-wq/ExamGuard/actions/workflows/backend.yml/badge.svg)](https://github.com/skandachandrashekar335-wq/ExamGuard/actions/workflows/backend.yml)
+[![Frontend Checks](https://github.com/skandachandrashekar335-wq/ExamGuard/actions/workflows/frontend.yml/badge.svg)](https://github.com/skandachandrashekar335-wq/ExamGuard/actions/workflows/frontend.yml)
 
-[Live Demo](https://exam-guardian-management.vercel.app) · [Architecture](docs/architecture.md) · [App Flow](docs/APP_FLOW.md) · [Roadmap](docs/roadmap.md)
+> AI-powered examination management and identity-verification platform for
+> secure, role-based examination operations.
 
-ExamGuard supports examination operations end to end: student and exam data,
-hall-ticket workflows, invigilator assignments, reference-face enrollment,
-webcam-based identity verification, attendance, and audit-oriented security
-signals.
+**[Live Demo](https://exam-guardian-management.vercel.app)** ·
+[Documentation](docs/README.md) ·
+[Architecture](docs/architecture/architecture.md) ·
+[App Flow](docs/product/APP_FLOW.md) ·
+[Roadmap](docs/product/roadmap.md)
 
-## Key capabilities
+---
 
-- Firebase authentication with ExamGuard JWT sessions and role-based access control (Admin / Operator / Invigilator / Reviewer)
-- Examination, registration, seating, and hall-ticket management
-- Reference-face enrollment with Cloudinary-backed storage
-- Webcam capture and server-side face verification via UniFace
-- Invigilator verification workflow with evidence review and decision audit trail
-- Attendance, monitoring, and anti-proxy security signals
-- PostgreSQL persistence (Neon in the current deployment)
+## Overview
 
-## Demo
+Examination operations involve more than scheduling: every candidate at the
+gate must be matched to a registration, a hall ticket, and ultimately a real
+person. ExamGuard covers the operational chain — students, registrations,
+seating, hall tickets, invigilator assignments, attendance — and adds a live
+identity-verification layer so an invigilator can confirm, from a browser
+webcam, that the person in front of the camera is the enrolled candidate.
 
-| Service | URL |
-|---|---|
-| Frontend (Vercel) | https://exam-guardian-management.vercel.app |
-| Backend API (Railway) | https://examguard-production-ef78.up.railway.app |
-| API docs (local) | http://localhost:8000/docs |
+**Who uses it**
 
-> Demo data uses fixed demo students/exams. Do not treat the public demo as a production exam system.
+- **Administrators / operators** — manage exam data, enrollments, and demo scenarios
+- **Invigilators** — supervise assigned sessions and verify candidate identity live
+- **Reviewers** — inspect evidence and decisions
+
+**Why identity verification exists:** reference faces are enrolled per
+candidate, stored server-side, and compared on attempt with a real face
+provider (UniFace). Every decision is backed by persisted evidence, and the
+backend rejects attempts whose candidate linkage or enrollment is invalid
+*before* any provider call runs.
+
+---
+
+## Product Preview
+
+```text
+docs/screenshots/
+  dashboard.png            # Admin dashboard
+  invigilator.png          # Invigilator supervision view
+  verification-modal.png   # Live verification modal (camera + result)
+  face-enrollment.png      # Reference-face enrollment flow
+  demo-control-center.png  # Demo presentation control center
+```
+
+> **TODO:** screenshots are intentionally not included yet — captures must be
+> taken from the deployed UI with demo data only (no real student faces, PII,
+> tokens, or keys). This directory documents the intended structure until
+> then.
+
+---
+
+## Key Features
+
+**Authentication**
+- Firebase Authentication (Google) exchanged server-side for an ExamGuard JWT (HS256)
+- Short-lived bearer sessions; no credentials stored client-side
+
+**Authorization**
+- Role-based access control: Admin / Operator / Invigilator / Reviewer
+- Server-side `require_role` route guards
+- Invigilator scope enforcement — attempts outside an assigned exam return 403
+- Candidate enrollment validation — cancelled/ inactive candidates rejected (`CANDIDATE_NOT_ENROLLED`)
+- Reference identity validation — attempts bound to another student's registration rejected (`REFERENCE_MISMATCH`)
+
+**Examination Management**
+- Students, subjects, exams, registrations, exam halls, seat assignments
+- Hall tickets and hall-ticket mappings
+- Examination sessions with gate status
+
+**Identity Verification**
+- Reference-face enrollment with validation (size, format, corruption) and Cloudinary-backed storage
+- Webcam probe capture from the invigilator UI
+- UniFace provider pipeline: detection, alignment, embedding, liveness, match
+- Threshold policy on evaluation (match threshold `0.85` by default)
+- Typed failure categories — failures are never flattened into one generic error
+
+**Invigilation**
+- Invigilator dashboard with assigned exam, entry point, and session control
+- Live verification modal: reference identity panel, camera viewport, explicit *Verify Live Face* action, result and coded-error cards
+- Recoverable probe errors (no face / multiple faces) keep the attempt alive and the capture loop running
+
+**Evidence / Audit**
+- Evidence rows (similarity, liveness, provider) persisted per attempt
+- Decisions (`MATCH` / `NO_MATCH` / `INCONCLUSIVE`) recorded on the attempt with an audit-oriented trail
+- Evidence is written only when attempt authorization has succeeded
+
+**Demo Environment**
+- Deterministic demo scenario loader (demo students, exams, attempts, invigilator assignment)
+- Reference-face re-upload for presentation flows
+- Demo presentation control center
+
+**Storage**
+- Cloudinary for reference-face images (server-side credentials)
+- PostgreSQL (Neon in the current deployment) as source of truth
+
+**Deployment**
+- Frontend on Vercel, backend on Railway, database on Neon
+- Docker image for the backend with OCR/PDF system dependencies
+
+---
 
 ## Architecture
 
@@ -55,9 +130,107 @@ Browser
        -> Exam / verification / attendance / audit services
 ```
 
-Detailed structure: [docs/architecture.md](docs/architecture.md)
+Detailed structure: [docs/architecture/architecture.md](docs/architecture/architecture.md)
 
-## Technology stack
+---
+
+## Verification Workflow
+
+1. A student is registered for an exam (`REGISTERED` registration).
+2. A reference face is enrolled for the candidate.
+3. The reference image is validated and stored through Cloudinary — the attempt persists an absolute `https://` URL.
+4. The candidate is associated with the exam via the registration; the verification attempt links student + registration.
+5. The invigilator selects the candidate on **Invigilator → Verify Face**.
+6. The webcam captures a live probe frame (JPEG) from the browser.
+7. The backend validates attempt scope and status.
+8. `validate_attempt_authorization` checks reference ownership and exam enrollment — **before** any provider call.
+9. UniFace compares probe against the stored reference (detection, embedding, liveness).
+10. `evaluate` applies threshold policy and produces a real decision.
+11. Evidence is persisted only when authorization succeeded; the attempt completes with an auditable decision.
+
+### Failure cases
+
+| Case | HTTP | Behavior |
+|---|---|---|
+| `REFERENCE_MISMATCH` | 422 | Attempt is not linked to a registration that belongs to this student (missing linkage, unknown registration, or another student's registration). Terminal error card in the UI. No provider call, no evidence row. **Production-accepted (C).** |
+| `CANDIDATE_NOT_ENROLLED` | 422 | Registration cancelled, or candidate inactive. Terminal error card. No provider call, no evidence row. **Production-accepted (D).** |
+| `NO_FACE_DETECTED` (e.g. *"No usable face detected"*) | 422 | Recoverable probe error — the attempt is **not** failed; the capture loop continues. Verified in the production chain. |
+| `MULTIPLE_FACES` | 422 | Same recoverable class — reposition and retry. |
+| `INCONCLUSIVE` | — | Decision engine: evidence insufficient for a confident verdict; routed to review. |
+| Identity mismatch / `NO_MATCH` | — | Provider evidence indicates a different person. **Cross-person behavior is NOT yet acceptance-verified (issue #2).** |
+| Rate limited | 422 | Retryable; the UI shows a retry action. |
+| `CAMERA_ERROR` | — | Browser camera failure (e.g. permission denied). Error state with retry; camera cleanup verified in an automated browser run (permission-denied path still manual — issue #1). |
+| Provider/verification errors | 422/502 | `PROVIDER_*` categories surface as a server error card with retry; attempts fail only where the pipeline contract requires it. |
+| Invalid input | 422 | Image validation (format, size, corruption) rejects before any processing. |
+
+---
+
+## Security
+
+Actual controls implemented today:
+
+- **Authentication** — Firebase token exchange server-side; ExamGuard JWT (HS256, server-side secret)
+- **Authorization** — RBAC route guards (Admin / Operator / Invigilator / Reviewer)
+- **Scope enforcement** — invigilator exam-scope checks return 403 for out-of-scope attempts
+- **Enrollment validation** — `CANDIDATE_NOT_ENROLLED` / `REFERENCE_MISMATCH` gates run before provider calls
+- **Input validation** — image size/format/corruption checks before face processing
+- **Rate limiting** — typed, per-endpoint verification rate limits
+- **Secret management** — secrets are environment-only; `.env` files are gitignored; examples contain names, not values
+- **Storage** — Cloudinary credentials stay server-side; reference URLs are public-by-design CDN links
+- **Audit** — persisted evidence rows and decisions for review workflows
+- **Policy** — [SECURITY.md](SECURITY.md) defines reporting and supported versions
+
+No compliance certifications or security standards are claimed.
+
+---
+
+## Production Status
+
+Verified state of the deployed system (as of 2026-09-25):
+
+| Check | Status |
+|---|---|
+| Backend test suite | **2536 passed** |
+| TypeScript | **clean** (`tsc --noEmit`) |
+| Frontend build | **33 routes** |
+| CI | backend pytest + frontend tsc/build on every push |
+| Production health | `200` — `{"status":"healthy","database":"connected","face_provider":"uniface"}` |
+| Acceptance **A** — same-person live verification chain | **PASS** (Cloudinary → UniFace → `MATCH`) |
+| Acceptance **B** — cross-person `NO_MATCH` | **NOT ACCEPTANCE-VERIFIED** — no consented second-person image available (issue #2) |
+| Acceptance **C** — `REFERENCE_MISMATCH` | **PASS** |
+| Acceptance **D** — `CANDIDATE_NOT_ENROLLED` | **PASS** |
+| C + D acceptance script | **17/17 checks passed**, production data restored |
+| Acceptance **E** — browser camera cleanup / live modal | **PASS** — automated browser run (Playwright, fake camera device, production API): modal lifecycle, recoverable probe loop, camera-track cleanup verified (issue #1 tracks the remaining real-human pass) |
+
+Unverified items are marked as such and are not counted as passing.
+
+---
+
+## Engineering Incident
+
+**2026-09-25 — Production API crash after redeploy (`ModuleNotFoundError: No module named 'psycopg'`).**
+SQLAlchemy 2.1.0 changed the default driver for `postgresql://` URLs to
+psycopg 3 while the image installed only `psycopg2-binary`. Reproduced
+locally and fixed by pinning `sqlalchemy>=2.0.0,<2.1` (commit `087f726`);
+redeployed with health restored to `200` and acceptance re-run green.
+
+Full report: [docs/engineering/INCIDENTS.md](docs/engineering/INCIDENTS.md)
+
+---
+
+## Demo
+
+| Service | URL |
+|---|---|
+| Frontend (Vercel) | https://exam-guardian-management.vercel.app |
+| Backend API (Railway) | https://examguard-production-ef78.up.railway.app |
+| API docs (local) | http://localhost:8000/docs |
+
+> Demo data uses fixed demo students/exams. Do not treat the public demo as a production exam system.
+
+---
+
+## Technology Stack
 
 | Layer | Technologies |
 |---|---|
@@ -69,6 +242,8 @@ Detailed structure: [docs/architecture.md](docs/architecture.md)
 | Media storage | Cloudinary |
 | Deploy | Vercel (frontend), Railway (backend) |
 
+---
+
 ## Authentication and RBAC
 
 1. User signs in with Firebase (Google).
@@ -79,27 +254,9 @@ Detailed structure: [docs/architecture.md](docs/architecture.md)
 
 Never commit service-account JSON, Cloudinary secrets, database URLs with credentials, or JWT signing keys.
 
-## Face verification architecture
+---
 
-1. **Enrollment** — admin/demo flow uploads a reference face; backend validates the image and persists an absolute `https://` URL (Cloudinary).
-2. **Capture** — invigilator/admin UI starts the browser camera and captures a probe frame (JPEG).
-3. **Verify** — `POST /api/v1/identity-verifications/{attempt_id}/verify-face` downloads the stored reference (with a short TTL cache), runs UniFace, and records evidence.
-4. **Decision** — `POST .../evaluate` applies threshold policy (match threshold `0.85` by default) and completes the attempt with an auditable decision.
-
-Recoverable probe issues (for example, no face / multiple faces in the live frame) return a clear client error and do **not** permanently fail the attempt.
-
-See [docs/APP_FLOW.md](docs/APP_FLOW.md) and `backend/app/services/face_verification/`.
-
-## Demo workflow
-
-1. Sign in on the live demo.
-2. Load demo scenario data (demo students/exams/attempts).
-3. Enroll or re-upload a reference face for a demo candidate.
-4. Open **Invigilator → Verify Face**.
-5. Allow camera access; verification runs against the stored reference.
-6. Review evidence and decision on the attempt.
-
-## Local development
+## Local Development
 
 ### Prerequisites
 
@@ -132,9 +289,9 @@ npm run dev
 
 Frontend: http://localhost:3000
 
-### Environment variables
+### Environment Variables
 
-Copy `.env.example` → `.env` (and `frontend/.env.example` → `frontend/.env.local`).  
+Copy `.env.example` → `.env` (and `frontend/.env.example` → `frontend/.env.local`).
 Variable **names** only in examples — never commit real values.
 
 | Variable | Purpose |
@@ -150,6 +307,8 @@ Variable **names** only in examples — never commit real values.
 | `CLOUDINARY_API_KEY` | Cloudinary API key |
 | `CLOUDINARY_API_SECRET` | Cloudinary API secret |
 
+---
+
 ## Testing
 
 ```bash
@@ -157,68 +316,81 @@ cd backend
 pytest -q
 ```
 
-Last verified full backend suite: **2518 passed**.
+Last verified full backend suite: **2536 passed** (2026-09-25).
 
-Frontend unit/E2E tooling: Playwright configs live under `frontend/tests/` (run when browsers are installed).
+```bash
+cd frontend
+npx tsc --noEmit   # TypeScript check
+npm run build      # production build
+npm run lint       # ESLint (pre-existing error baseline, not yet CI-gated)
+```
+
+CI runs the backend suite plus frontend TypeScript check and build on every
+push to `main` (`.github/workflows/`). Playwright specs live under
+`frontend/tests/` (run when browsers are installed).
+
+See [docs/development/TESTING.md](docs/development/TESTING.md).
+
+---
 
 ## Deployment
 
 | Service | Platform | Notes |
 |---|---|---|
 | Frontend | Vercel project `exam-guard` | Deploy from repo with `frontend` as root |
-| Backend | Railway service `ExamGuard` | Dockerfile / Nixpacks; `pip install ".[uniface]"` |
+| Backend | Railway service `ExamGuard` | Dockerfile; `pip install ".[uniface]"` |
 | Database | Neon PostgreSQL | Migrations via Alembic |
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+See [docs/development/DEPLOYMENT.md](docs/development/DEPLOYMENT.md).
 
-## Project structure
+---
+
+## Project Structure
 
 ```text
 ExamGuard/
-├── backend/          # FastAPI, SQLAlchemy, Alembic, tests
-├── frontend/         # Next.js App Router UI
-├── docs/             # Product, architecture, flow, roadmap docs
-├── .env.example      # Root env template (names only)
+├── backend/            # FastAPI, SQLAlchemy, Alembic, tests
+├── frontend/           # Next.js App Router UI
+├── docs/               # Product, architecture, development, design, engineering docs
+├── .github/workflows/  # CI (backend tests, frontend checks)
+├── .env.example        # Root env template (names only)
 ├── vercel.json
 └── README.md
 ```
 
-## Security considerations
+---
 
-- Firebase service accounts and Cloudinary secrets stay server-side / env-only
-- JWT auth with short expiry; role-based route guards
-- Image validation (size, format, corruption) before face processing
-- Rate limits and typed failure categories on verification endpoints
-- Audit-oriented evidence storage for review workflows
+## Known Limitations
 
-See [SECURITY.md](SECURITY.md).
-
-## Known limitations
-
-- Human-in-the-browser camera UX and cross-person negative face tests still need manual acceptance on the live demo
-- No CI workflow is configured in this repository yet
+- Cross-person negative verification (`NO_MATCH`) and the live human browser camera pass still need manual acceptance on the live demo (issues #2 and #1)
+- ESLint reports a pre-existing baseline of errors (69) across many pages; it is not yet CI-gated
 - Public demo is not a hardened multi-tenant production exam service
 - OCR / hall-ticket extraction quality depends on document scan quality
 
-## Roadmap
-
-See [docs/roadmap.md](docs/roadmap.md) and [docs/progress.md](docs/progress.md).
+---
 
 ## Documentation
 
+Full index: [docs/README.md](docs/README.md)
+
 | Doc | Contents |
 |---|---|
-| [docs/APP_FLOW.md](docs/APP_FLOW.md) | Role workflows and UI flows |
-| [docs/architecture.md](docs/architecture.md) | Structure and principles |
-| [docs/TRD.md](docs/TRD.md) | Technical requirements |
-| [docs/PRD.md](docs/PRD.md) | Product requirements |
-| [docs/BACKEND_SCHEMA.md](docs/BACKEND_SCHEMA.md) | Data model overview |
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Deploy notes |
-| [docs/TESTING.md](docs/TESTING.md) | Test commands and scope |
-| [docs/FACE_VERIFICATION.md](docs/FACE_VERIFICATION.md) | Face pipeline overview |
+| [docs/product/PRD.md](docs/product/PRD.md) | Product requirements |
+| [docs/product/APP_FLOW.md](docs/product/APP_FLOW.md) | Role workflows and UI flows |
+| [docs/product/roadmap.md](docs/product/roadmap.md) | Roadmap |
+| [docs/architecture/architecture.md](docs/architecture/architecture.md) | Structure and principles |
+| [docs/architecture/BACKEND_SCHEMA.md](docs/architecture/BACKEND_SCHEMA.md) | Data model overview |
+| [docs/architecture/FACE_VERIFICATION.md](docs/architecture/FACE_VERIFICATION.md) | Face pipeline overview |
+| [docs/development/TRD.md](docs/development/TRD.md) | Technical requirements |
+| [docs/development/TESTING.md](docs/development/TESTING.md) | Test commands and scope |
+| [docs/development/DEPLOYMENT.md](docs/development/DEPLOYMENT.md) | Deploy notes |
+| [docs/engineering/INCIDENTS.md](docs/engineering/INCIDENTS.md) | Incident reports |
 | [SECURITY.md](SECURITY.md) | Security policy |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
 
+---
+
 ## License
 
-No license file has been selected yet. Licensing should be chosen intentionally by the repository owner before external contribution or reuse.
+No license file has been selected yet. Licensing should be chosen intentionally
+by the repository owner before external contribution or reuse.
