@@ -22,6 +22,11 @@ _test_engine = create_engine(
 
 db_module.engine = _test_engine
 db_module.SessionLocal = sessionmaker(bind=_test_engine)
+# app.main binds `engine` at import time; re-point it so /health checks the
+# test database instead of whatever DATABASE_URL the environment provides.
+import app.main as _main_module  # noqa: E402
+
+_main_module.engine = _test_engine
 # Hold a connection BEFORE create_all so the shared in-memory DB is not
 # dropped when create_all's temporary connection closes.
 _keepalive = _test_engine.connect()
