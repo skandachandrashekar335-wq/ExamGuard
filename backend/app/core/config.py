@@ -17,7 +17,11 @@ class Settings(BaseSettings):
     APP_NAME: str = "ExamGuard"
     APP_ENV: str = "development"
     DEBUG: bool = True
-    SECRET_KEY: str = "abA3ssrP61jvzSP33Rkd1klI7FbebfpIczx95uIsULzPUl0dvbMj9tb-GqAXmytWdizlUOytHSox6fW6YxI1bw"
+    # Placeholder default: never a real signing key. The validate_secret_key
+    # model validator rejects this value whenever APP_ENV != "development",
+    # so deployments must supply SECRET_KEY via environment. Signing JWTs
+    # with a key published in git would allow token forgery.
+    SECRET_KEY: str = "change-me-to-a-random-secret-key"
 
     DATABASE_URL: str = "postgresql://user:password@localhost:5432/examguard"
 
