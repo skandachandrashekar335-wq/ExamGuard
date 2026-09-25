@@ -32,8 +32,11 @@ jobs:
       - name: TypeScript check
         run: npx tsc --noEmit
 
+      # next/font/google fetches .woff2 files from fonts.gstatic.com at build
+      # time; a transient fetch failure is misreported as a module-resolution
+      # error (vercel/next.js#97376). One retry absorbs the flake.
       - name: Production build
-        run: npm run build
+        run: npm run build || npm run build
 
       # ESLint currently reports a pre-existing baseline of errors across many
       # pages (React Compiler rules + no-explicit-any). Reported for visibility
