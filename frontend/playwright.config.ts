@@ -5,7 +5,7 @@ export default defineConfig({
   timeout: 60000,
   expect: { timeout: 10000 },
   use: {
-    baseURL: "https://exam-guardian-management.vercel.app",
+    baseURL: process.env.EG_BASE_URL || "https://exam-guardian-management.vercel.app",
     headless: false,
     screenshot: "only-on-failure",
     trace: "on-first-retry",
