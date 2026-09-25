@@ -1,0 +1,43 @@
+name: Frontend Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: tsc + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Production build
+        run: npm run build
+
+      # ESLint currently reports a pre-existing baseline of errors across many
+      # pages (React Compiler rules + no-explicit-any). Reported for visibility
+      # but not gating until the baseline is cleared.
+      - name: ESLint (informational, non-gating)
+        run: npm run lint
+        continue-on-error: true
