@@ -29,6 +29,6 @@ class TestConfig:
             env_path = reloaded_settings.model_config["env_file"]
             assert env_path.is_absolute()
             assert env_path.name == ".env"
-            assert str(env_path).endswith("ExamGuard\\.env")
+            assert env_path == cfg.PROJECT_ROOT / ".env"
         finally:
             os.chdir(original_cwd)
