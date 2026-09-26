@@ -186,7 +186,7 @@ No compliance certifications or security standards are claimed.
 
 ## Production Status
 
-Verified state of the deployed system (as of 2026-09-25):
+Verified state of the deployed system (as of 2026-09-26):
 
 | Check | Status |
 |---|---|
@@ -200,7 +200,7 @@ Verified state of the deployed system (as of 2026-09-25):
 | Acceptance **C** — `REFERENCE_MISMATCH` | **PASS** |
 | Acceptance **D** — `CANDIDATE_NOT_ENROLLED` | **PASS** |
 | C + D acceptance script | **17/17 checks passed**, production data restored |
-| Acceptance **E** — browser camera cleanup / live modal | **PASS** — automated browser run (Playwright, fake camera device, production API): modal lifecycle, recoverable probe loop, camera-track cleanup verified (issue #1 tracks the remaining real-human pass) |
+| Acceptance **E** — deployed-bundle browser pass | **BROWSER-UNVERIFIED** — the deployed bundle authenticates only through the real Google sign-in popup (no automation-safe flow; dev-token is compiled out). Automated evidence exists for the *local dev bundle + production API*: modal lifecycle, recoverable probe loop, camera-track cleanup, and camera-permission-denied handling (16/16 checks). Real-human pass: issue #1 |
 
 Unverified items are marked as such and are not counted as passing.
 

@@ -63,8 +63,8 @@ Install Playwright browsers before running E2E if not already present.
 | Face provider pipeline (mocked / unit) | Yes | — |
 | Enrollment / reference authorization (C, D) | Yes (regression tests + production acceptance, 17/17) | — |
 | Production HTTP chain (API) | Scripted checks (A verified against live UniFace) | — |
-| Invigilator camera modal, recoverable probe errors, capture-loop cleanup | Yes (Playwright, fake camera device, production API) | Real human pass on deployed bundle (issue #1) |
-| Camera permission-denied path | Not fully | Manual browser check (issue #1) |
+| Invigilator camera modal, recoverable probe errors, capture-loop cleanup | Yes (Playwright, local dev bundle + production API) | Real human pass on deployed bundle (issue #1); deployed bundle = BROWSER-UNVERIFIED |
+| Camera permission-denied path | Yes (dev bundle, simulated denial: in-app error + Retry, no `alert()`, no uncaught errors, no leaked MediaStream, no fake result) | Real human on deployed bundle (issue #1) |
 | Cross-person NO_MATCH with real identities | Not fully | Manual with consented images (issue #2) |
 
 Do not claim full biometric acceptance without a real human camera test on the deployed UI.
