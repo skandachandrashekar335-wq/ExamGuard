@@ -2,6 +2,7 @@
 
 [![Backend Tests](https://github.com/skandachandrashekar335-wq/ExamGuard/actions/workflows/backend.yml/badge.svg)](https://github.com/skandachandrashekar335-wq/ExamGuard/actions/workflows/backend.yml)
 [![Frontend Checks](https://github.com/skandachandrashekar335-wq/ExamGuard/actions/workflows/frontend.yml/badge.svg)](https://github.com/skandachandrashekar335-wq/ExamGuard/actions/workflows/frontend.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > AI-powered examination management and identity-verification platform for
 > secure, role-based examination operations.
@@ -392,5 +393,8 @@ Full index: [docs/README.md](docs/README.md)
 
 ## License
 
-No license file has been selected yet. Licensing should be chosen intentionally
-by the repository owner before external contribution or reuse.
+ExamGuard is released under the **MIT License**. See [LICENSE](LICENSE) for
+the full license text.
+
+You are free to use, modify, and distribute the software under the terms of
+the MIT License.
