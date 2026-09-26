@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="ExamGuard">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B1230"/>
+      <stop offset="1" stop-color="#05070F"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.44" r="0.58">
+      <stop offset="0" stop-color="#5B6BFF" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#5B6BFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#C9AEFF"/>
+      <stop offset="0.5" stop-color="#8A6BFF"/>
+      <stop offset="1" stop-color="#3F8CFF"/>
+    </linearGradient>
+    <linearGradient id="shieldFill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#151C4C"/>
+      <stop offset="1" stop-color="#0A0F2E"/>
+    </linearGradient>
+    <linearGradient id="letter" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#D9E5FF"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="#7C6BFF" flood-opacity="0.75"/>
+    </filter>
+  </defs>
+
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#halo)"/>
+
+  <path d="M256 66 C322 92 384 104 418 108 C430 176 432 254 418 322 C404 398 342 440 256 478 C170 440 108 398 94 322 C80 254 82 176 94 108 C128 104 190 92 256 66 Z"
+        fill="url(#shieldFill)" stroke="url(#rim)" stroke-width="26" stroke-linejoin="round" filter="url(#glow)"/>
+
+  <path d="M144 226 L256 154 L368 226 L368 258 L256 186 L144 258 Z" fill="url(#letter)"/>
+
+  <path d="M178 240 H236 V272 H324 L306 312 H236 V336 H348 L324 386 H178 Z" fill="url(#letter)"/>
+
+  <path d="M366 254 C374 278 376 290 376 302" stroke="#FFFFFF" stroke-width="9" fill="none" stroke-linecap="round"/>
+  <circle cx="376" cy="312" r="11" fill="#FFFFFF"/>
+  <path d="M376 324 C391 324 399 342 399 358 C399 374 389 386 376 386 C363 386 353 374 353 358 C353 342 361 324 376 324 Z" fill="#FFFFFF"/>
+</svg>

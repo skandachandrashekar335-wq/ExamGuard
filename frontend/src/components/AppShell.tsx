@@ -202,7 +202,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className="eg-app-nav-inner">
           <div className="eg-app-nav-left">
             <Link href="/" className="eg-app-nav-brand">
-              <span className="w-6 h-6 rounded-[6px] bg-[var(--accent)] flex items-center justify-center text-white text-xs font-bold" style={{ fontFamily: "var(--font-display)" }}>E</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/icon.svg" alt="ExamGuard" className="w-6 h-6" />
               <span className="hidden sm:inline">ExamGuard</span>
             </Link>
             <nav className="eg-app-nav-links eg-hide-mobile">

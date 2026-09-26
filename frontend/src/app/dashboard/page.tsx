@@ -132,41 +132,18 @@ export default function DashboardPage() {
   const handleLoadDemo = async () => {
     setDemoLoading(true);
     setDemoMessage("");
+    setSessionMessage("");
+    setAssignMessage("");
     try {
       const result = await loadDemoData();
       setDemoMessage(result.message);
       setSelectedExamId(result.demo_exam_id);
       setDemoLoaded(true);
-      const students: DemoStudent[] = result.demo_attempt_ids.map((aid, i) => ({
-        attempt_id: aid,
-        student_id: result.demo_student_ids[i],
-        student_usn: result.demo_student_usns[i],
-        student_name: `Demo Candidate ${i + 1}`,
-        reference_face_url: null,
-        file: null,
-        preview: null,
-        uploading: false,
-        uploadMessage: "",
-      }));
-      setDemoStudents(students);
-      setDemoStatus({
-        loaded: true,
-        demo_exam_id: result.demo_exam_id,
-        demo_hall_id: result.demo_hall_id,
-        demo_student_ids: result.demo_student_ids,
-        demo_student_usns: result.demo_student_usns,
-        demo_student_names: students.map((s) => s.student_name),
-        demo_session_id: result.demo_session_id,
-        demo_attempt_ids: result.demo_attempt_ids,
-        reference_face_urls: null,
-      });
+      // Invalidate stale local state: files/previews/messages belong to the
+      // previous demo. Refetch authoritative status so the fresh demo shows
+      // no previous reference photos and a NOT_STARTED session.
       setSessionStatus(null);
-      try {
-        const sess = await getDemoSessionStatus();
-        setSessionStatus(sess);
-      } catch {
-        setSessionStatus(null);
-      }
+      await refreshDemoState();
     } catch (e: any) {
       setDemoMessage(e.message || "Failed to load demo data");
     } finally {
@@ -456,7 +433,7 @@ export default function DashboardPage() {
                         </span>
                       ) : (
                         <span className="text-xs px-2 py-0.5 rounded" style={{ background: "rgba(255,255,255,0.05)", color: "var(--text-muted)" }}>
-                          PENDING
+                          REFERENCE NOT ENROLLED
                         </span>
                       )}
                     </div>
@@ -468,8 +445,8 @@ export default function DashboardPage() {
                         ) : student.preview ? (
                           <img src={student.preview} alt={student.student_usn} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                         ) : (
-                          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "0.75rem", textAlign: "center", padding: "0.5rem" }}>
-                            No photo
+                          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "0.6875rem", textAlign: "center", padding: "0.5rem", lineHeight: 1.3 }}>
+                            REFERENCE NOT ENROLLED
                           </div>
                         )}
                       </div>

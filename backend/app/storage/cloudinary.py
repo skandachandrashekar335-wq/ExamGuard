@@ -161,30 +161,38 @@ class CloudinaryStorage(StorageBackend):
                 return str(resolved)
             raise FileNotFoundError(f"File not found: {key}")
 
-    def delete(self, key: str) -> None:
+    def delete(self, key: str) -> bool:
         """Delete a stored object.
 
-        If using Cloudinary, calls the Cloudinary API to delete the asset.
-        If using LocalStorage, deletes the local file.
-        Raises if not found.
+        Returns True only when the deletion is confirmed. The same asset
+        can be stored as an image or a raw resource, so both resource
+        types are attempted. Failures are logged and reported as False
+        (never raised) so callers can retry with a variant key or skip.
         """
+        cloud_key = self._cloudinary_key(key)
         if self._using_cloudinary:
-            cloud_key = self._cloudinary_key(key)
+            import logging
+            logger = logging.getLogger(__name__)
             try:
-                cloudinary.uploader.destroy(cloud_key, resource="raw")
-            except Exception as e:
-                logger = __import__("logging").getLogger(__name__)
+                for resource_type in ("image", "raw"):
+                    result = cloudinary.uploader.destroy(
+                        cloud_key, resource_type=resource_type
+                    )
+                    if isinstance(result, dict) and result.get("result") == "ok":
+                        return True
                 logger.warning(
-                    "Cloudinary delete failed: %s", str(e)
+                    "Cloudinary delete not confirmed for key %s", cloud_key
                 )
-                # Continue - file may not exist in Cloudinary, which is OK
-        else:
-            cloud_key = self._cloudinary_key(key)
-            try:
-                self.local.delete(cloud_key)
-            except FileNotFoundError:
-                # If not found locally, that's OK too
-                pass
+                return False
+            except Exception as e:
+                logger.warning("Cloudinary delete failed: %s", str(e))
+                return False
+        # Local filesystem fallback (Cloudinary not configured - dev).
+        try:
+            self.local.delete(cloud_key)
+            return True
+        except FileNotFoundError:
+            return False
 
     def generate_key(self, original_filename: str) -> str:
         """Generate a storage key for a file with the given original filename.

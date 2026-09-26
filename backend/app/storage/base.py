@@ -11,5 +11,5 @@ class StorageBackend(ABC):
         """Return the filesystem path for a stored key. Raises if not found."""
 
     @abstractmethod
-    def delete(self, key: str) -> None:
-        """Delete a stored object. Raises if not found."""
+    def delete(self, key: str) -> bool:
+        """Delete a stored object. Return True when deletion is confirmed."""

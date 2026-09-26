@@ -12,13 +12,14 @@ This feature requires ADMIN or OPERATOR authentication.
 It does NOT bypass face verification or any security checks.
 """
 
-from datetime import date, time, timedelta, datetime, timezone
-from typing import Optional
+import logging
+import re
+from datetime import time, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.auth import Role, require_role, get_current_user
@@ -34,9 +35,19 @@ from app.models import (
     ExaminationSession,
     EntryPoint,
     IdentityVerificationAttempt,
+    IdentityVerificationEvidence,
     InvigilatorAssignment,
     User,
+    AttendanceEvent,
+    AttendanceRecord,
+    EntryVerification,
+    GateEvent,
+    SecurityAlert,
+    SecurityEvent,
 )
+from app.models.proxy_risk import ProxyRiskAssessment, SecuritySignal
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/demo", tags=["Demo Data"])
 settings = get_settings()
@@ -117,6 +128,237 @@ def _get_demo_user(db: Session, claims: dict) -> User:
         select(User).filter_by(email=email)
     ).scalar_one_or_none()
     return user
+
+
+_REFERENCE_MARKER = "face-references/attempt-"
+
+
+def _reference_public_id(url: str) -> str | None:
+    """Extract the Cloudinary public_id from a stored reference-face URL.
+
+    Returns None unless the URL clearly points at one of our
+    ``face-references/attempt-*`` assets, so no other Cloudinary object
+    can ever be selected for deletion.
+    """
+    if not isinstance(url, str) or not url.lower().startswith(("http://", "https://")):
+        return None
+    idx = url.find("/upload/")
+    if idx < 0:
+        return None
+    path = url[idx + len("/upload/"):]
+    path = path.split("?", 1)[0].split("#", 1)[0]
+    segments = path.split("/", 1)
+    if len(segments) == 2 and re.fullmatch(r"v\d+", segments[0]):
+        path = segments[1]
+    if _REFERENCE_MARKER not in path:
+        return None
+    return path or None
+
+
+def _delete_reference_assets(urls: list[str]) -> int:
+    """Best-effort deletion of demo-owned reference-face assets.
+
+    Only URLs that were collected from demo attempt rows AND parse as
+    ``face-references/attempt-*`` assets are deleted, so non-demo
+    Cloudinary objects are never touched. Deletion happens after the DB
+    commit; failures are logged and never break the demo flow because the
+    database association has already been cleared (safe detach).
+
+    Cloudinary appends the inferred format to image delivery URLs, so a
+    URL-derived public_id can carry one extension more than the id the
+    asset was uploaded with; when the exact id is not confirmed the
+    variant without the trailing image extension is tried as well.
+    """
+    removed = 0
+    storage = None
+    for url in urls:
+        public_id = _reference_public_id(url)
+        if not public_id:
+            continue
+        candidates = [public_id]
+        m = re.search(r"\.(?:png|jpe?g|webp)$", public_id, re.IGNORECASE)
+        if m:
+            candidates.append(public_id[: m.start()])
+        try:
+            if storage is None:
+                from app.storage.cloudinary import CloudinaryStorage
+                storage = CloudinaryStorage()
+            if any(storage.delete(candidate) for candidate in candidates):
+                removed += 1
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Could not delete demo reference asset %s: %s", public_id, exc)
+    return removed
+
+
+def _clear_demo_runtime_state(db: Session, subject: Subject) -> tuple[list[str], int]:
+    """Reset all demo verification state to a pristine baseline.
+
+    Strictly scoped to exams of the deterministic demo subject (DEMO-CA);
+    real examination data is never touched.
+
+    Clears, in FK-safe order: security alerts/events, proxy-risk signals
+    and assessments, attendance events/records, entry verifications, gate
+    events, and identity-verification evidence. Every demo verification
+    attempt is reset to CREATED/PENDING with no reference face attached,
+    and every demo session returns to NOT_STARTED/GATES_CLOSED.
+
+    Returns ``(detached_reference_urls, cleared_row_count)`` so the caller
+    can delete the corresponding storage assets after commit and report
+    how many runtime rows were cleared.
+    """
+    demo_exam_ids = list(db.execute(
+        select(Exam.id).filter_by(subject_id=subject.id)
+    ).scalars().all())
+    if not demo_exam_ids:
+        return [], 0
+
+    hall = db.execute(
+        select(ExamHall).filter_by(
+            building=DEMO_HALL_BUILDING,
+            room_number=DEMO_HALL_ROOM,
+        )
+    ).scalar_one_or_none()
+
+    session_ids = list(db.execute(
+        select(ExaminationSession.id).filter(
+            ExaminationSession.exam_id.in_(demo_exam_ids)
+        )
+    ).scalars().all())
+    reg_ids = list(db.execute(
+        select(ExamRegistration.id).filter(
+            ExamRegistration.exam_id.in_(demo_exam_ids)
+        )
+    ).scalars().all())
+
+    attempts = []
+    if reg_ids:
+        attempts = list(db.execute(
+            select(IdentityVerificationAttempt).filter(
+                IdentityVerificationAttempt.exam_registration_id.in_(reg_ids)
+            )
+        ).scalars().all())
+    attempt_ids = [a.id for a in attempts]
+
+    ev_id_conds = []
+    if reg_ids:
+        ev_id_conds.append(EntryVerification.exam_registration_id.in_(reg_ids))
+    if attempt_ids:
+        ev_id_conds.append(
+            EntryVerification.identity_verification_attempt_id.in_(attempt_ids)
+        )
+    ev_ids = list(db.execute(
+        select(EntryVerification.id).filter(or_(*ev_id_conds))
+    ).scalars().all()) if ev_id_conds else []
+
+    cleared = 0
+
+    def _remove(row) -> None:
+        nonlocal cleared
+        db.delete(row)
+        cleared += 1
+
+    # ── 1. Security alerts → security events (children first) ──
+    sev_conds = [SecurityEvent.exam_id.in_(demo_exam_ids)]
+    if ev_ids:
+        sev_conds.append(SecurityEvent.entry_verification_id.in_(ev_ids))
+    if hall:
+        sev_conds.append(
+            (SecurityEvent.exam_id.is_(None)) & (SecurityEvent.hall_id == hall.id)
+        )
+    security_event_ids = list(db.execute(
+        select(SecurityEvent.id).filter(or_(*sev_conds))
+    ).scalars().all())
+    if security_event_ids:
+        for alert in db.execute(
+            select(SecurityAlert).filter(
+                SecurityAlert.security_event_id.in_(security_event_ids)
+            )
+        ).scalars().all():
+            _remove(alert)
+        for event in db.execute(
+            select(SecurityEvent).filter(SecurityEvent.id.in_(security_event_ids))
+        ).scalars().all():
+            _remove(event)
+
+    # ── 2. Proxy-risk rows attached to demo entry verifications ──
+    if ev_ids:
+        for model in (SecuritySignal, ProxyRiskAssessment):
+            for row in db.execute(
+                select(model).filter(model.entry_verification_id.in_(ev_ids))
+            ).scalars().all():
+                _remove(row)
+
+    # ── 3. Attendance events and records ──
+    att_ev_conds = [AttendanceEvent.exam_id.in_(demo_exam_ids)]
+    if ev_ids:
+        att_ev_conds.append(AttendanceEvent.entry_verification_id.in_(ev_ids))
+    for row in db.execute(
+        select(AttendanceEvent).filter(or_(*att_ev_conds))
+    ).scalars().all():
+        _remove(row)
+
+    att_conds = [AttendanceRecord.exam_id.in_(demo_exam_ids)]
+    if session_ids:
+        att_conds.append(AttendanceRecord.session_id.in_(session_ids))
+    if reg_ids:
+        att_conds.append(AttendanceRecord.exam_registration_id.in_(reg_ids))
+    if ev_ids:
+        att_conds.append(AttendanceRecord.entry_verification_id.in_(ev_ids))
+    for row in db.execute(
+        select(AttendanceRecord).filter(or_(*att_conds))
+    ).scalars().all():
+        _remove(row)
+
+    # ── 4. Entry verifications ──
+    if ev_ids:
+        for row in db.execute(
+            select(EntryVerification).filter(EntryVerification.id.in_(ev_ids))
+        ).scalars().all():
+            _remove(row)
+
+    # ── 5. Gate events ──
+    if session_ids:
+        for row in db.execute(
+            select(GateEvent).filter(GateEvent.session_id.in_(session_ids))
+        ).scalars().all():
+            _remove(row)
+
+    # ── 6. Evidence rows + fresh attempt state ──
+    stale_reference_urls: list[str] = []
+    if attempt_ids:
+        for row in db.execute(
+            select(IdentityVerificationEvidence).filter(
+                IdentityVerificationEvidence.attempt_id.in_(attempt_ids)
+            )
+        ).scalars().all():
+            _remove(row)
+    for attempt in attempts:
+        url = attempt.reference_face_url
+        if isinstance(url, str) and url.lower().startswith(("http://", "https://")):
+            stale_reference_urls.append(url)
+        attempt.status = "CREATED"
+        attempt.decision = "PENDING"
+        attempt.failure_reason = None
+        attempt.reference_face_url = None
+        attempt.started_at = None
+        attempt.completed_at = None
+        attempt.hall_ticket_id = None
+        attempt.verification_method = "FACE"
+
+    # ── 7. Sessions return to NOT_STARTED ──
+    for session in db.execute(
+        select(ExaminationSession).filter(
+            ExaminationSession.exam_id.in_(demo_exam_ids)
+        )
+    ).scalars().all():
+        session.status = "NOT_STARTED"
+        session.gate_status = "GATES_CLOSED"
+        session.started_at = None
+        session.ended_at = None
+        session.gate_open_at = None
+
+    db.flush()
+    return stale_reference_urls, cleared
 
 
 # ── Endpoints ─────────────────────────────────────────────────────
@@ -244,15 +486,21 @@ def demo_load(
         subject.is_active = True
         db.flush()
 
-    # ── Exam (tomorrow so it never expires) ──
+    # ── Exam (today, full-day window so Start Exam is always available) ──
     # Reuse the newest existing demo exam so repeated loads across days
-    # never create duplicate exams for the same subject.
-    tomorrow = date.today() + timedelta(days=1)
+    # never create duplicate exams for the same subject. The window is
+    # anchored to the current UTC date and spans the whole day (with
+    # microsecond end) so the normal invigilator /start-exam validation
+    # (now >= exam_start - 15min and now <= exam_end) always holds for a
+    # freshly loaded demo, without weakening that validation anywhere.
+    today = datetime.now(timezone.utc).date()
+    window_start = time(0, 0)
+    window_end = time(23, 59, 59, 999999)
     exam = _latest_demo_exam(db, subject.id)
     if exam:
-        exam.exam_date = tomorrow
-        exam.start_time = time(9, 0)
-        exam.end_time = time(11, 0)
+        exam.exam_date = today
+        exam.start_time = window_start
+        exam.end_time = window_end
         exam.exam_name = "ExamGuard Demo Examination"
         exam.semester = DEMO_EXAM_SEMESTER
         exam.department = DEMO_EXAM_DEPT
@@ -263,12 +511,12 @@ def demo_load(
             db, Exam,
             unique_filters={
                 "subject_id": subject.id,
-                "exam_date": tomorrow,
-                "start_time": time(9, 0),
+                "exam_date": today,
+                "start_time": window_start,
             },
             defaults={
                 "exam_name": "ExamGuard Demo Examination",
-                "end_time": time(11, 0),
+                "end_time": window_end,
                 "semester": DEMO_EXAM_SEMESTER,
                 "department": DEMO_EXAM_DEPT,
             },
@@ -346,15 +594,7 @@ def demo_load(
         .filter_by(exam_id=exam.id, exam_hall_id=hall.id)
         .order_by(ExaminationSession.id.desc())
     ).scalars().first()
-    if session:
-        if session.status == "COMPLETED" or session.status == "CANCELLED":
-            session.status = "NOT_STARTED"
-            session.gate_status = "GATES_CLOSED"
-            session.started_at = None
-            session.ended_at = None
-            session.gate_open_at = None
-        db.flush()
-    else:
+    if not session:
         session, _ = _find_or_create(
             db, ExaminationSession,
             unique_filters={"exam_id": exam.id, "exam_hall_id": hall.id},
@@ -366,6 +606,14 @@ def demo_load(
                 "created_by": "demo-loader",
             },
         )
+
+    # ── Fresh demo state ──
+    # Every load produces a pristine demo: verification attempts return to
+    # CREATED/PENDING with no reference face, demo-scoped evidence, entry,
+    # attendance, security, risk and gate rows are removed, and all demo
+    # sessions return to NOT_STARTED. Detached reference-face URLs are
+    # deleted from storage after commit.
+    stale_reference_urls, _cleared = _clear_demo_runtime_state(db, subject)
 
     # ── Identity Verification Attempts (one per student) ──
     attempts = []
@@ -406,6 +654,9 @@ def demo_load(
 
     db.commit()
 
+    if stale_reference_urls:
+        _delete_reference_assets(stale_reference_urls)
+
     return DemoLoadResponse(
         status="ready",
         message="Demo data loaded successfully",
@@ -443,6 +694,12 @@ def demo_reset(
     exams = db.execute(
         select(Exam).filter_by(subject_id=subject.id)
     ).scalars().all()
+
+    # Clear demo-scoped runtime state first (evidence, entry, attendance,
+    # security/risk rows, detached reference-face URLs) so the structural
+    # deletions below never hit FK ordering problems.
+    stale_reference_urls, cleared = _clear_demo_runtime_state(db, subject)
+    deleted += cleared
 
     from app.models.attendance import AttendanceRecord
     from app.models.entry_verification import EntryVerification
@@ -572,6 +829,9 @@ def demo_reset(
 
     db.flush()
     db.commit()
+
+    if stale_reference_urls:
+        _delete_reference_assets(stale_reference_urls)
 
     return {
         "status": "reset",

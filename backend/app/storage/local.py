@@ -24,13 +24,14 @@ class LocalStorage(StorageBackend):
             raise FileNotFoundError(f"File not found: {key}")
         return str(resolved)
 
-    def delete(self, key: str) -> None:
+    def delete(self, key: str) -> bool:
         target = (self.base_dir / key).resolve()
         if not str(target).startswith(str(self.base_dir.resolve())):
             raise FileNotFoundError("Path traversal detected")
         if not target.exists():
-            raise FileNotFoundError(f"File not found: {key}")
+            return False
         target.unlink()
+        return True
 
     @staticmethod
     def generate_key(original_filename: str) -> str:

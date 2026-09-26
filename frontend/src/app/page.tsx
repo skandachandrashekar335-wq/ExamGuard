@@ -27,7 +27,15 @@ export default function Home() {
     <>
       {/* ── Pill Navigation ── */}
       <nav className={`eg-pill-nav${scrolled ? " eg-pill-nav--scrolled" : ""}`}>
-        <Link href="/" className="eg-nav-brand">ExamGuard</Link>
+        <Link
+          href="/"
+          className="eg-nav-brand"
+          style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icon.svg" alt="" className="w-5 h-5" />
+          ExamGuard
+        </Link>
         <a href="#pipeline">Pipeline</a>
         <a href="#features">Features</a>
         <a href="#security">Security</a>

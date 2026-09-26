@@ -150,10 +150,35 @@ export default function InvigilatorPage() {
   const abortRef = useRef<AbortController | null>(null);
   const loopRunningRef = useRef(false);
   const verifyStateRef = useRef<VerifyPhase>("idle");
+  const selectedRef = useRef<RegisteredStudent | null>(null);
 
   useEffect(() => {
     verifyStateRef.current = verifyState;
   }, [verifyState]);
+
+  useEffect(() => {
+    selectedRef.current = selectedStudent;
+  }, [selectedStudent]);
+
+  const stopVerificationLoop = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    loopRunningRef.current = false;
+  }, []);
+
+  const handleCloseVerify = useCallback(() => {
+    stopVerificationLoop();
+    cameraRef.current?.stop();
+    setVerifyAttemptId(null);
+    setSelectedStudent(null);
+    setVerifyCtx(null);
+    setVerifyState("idle");
+    setVerifyResult(null);
+    setVerifyError(null);
+    setCameraState("idle");
+    setCameraMessage("");
+    setLoopStatus("");
+  }, [stopVerificationLoop]);
 
   const load = useCallback(async () => {
     try {
@@ -165,7 +190,26 @@ export default function InvigilatorPage() {
         const studentsRes = await apiRequest<{ items: RegisteredStudent[]; total: number }>(
           `/api/v1/invigilator/registered-students`
         );
-        setStudents(studentsRes.items || []);
+        const fresh = studentsRes.items || [];
+        setStudents(fresh);
+        // Stale-selection guard: if a data refresh (e.g. "Load Demo Data" on
+        // the dashboard) removed the selected attempt or changed its
+        // reference image, drop the open modal and all verification state
+        // instead of showing a previous demo's candidate/reference.
+        const active = selectedRef.current;
+        if (active) {
+          const updated = fresh.find(
+            (s) => s.registration_id === active.registration_id
+          );
+          if (
+            !updated ||
+            updated.attempt_id !== active.attempt_id ||
+            (updated.reference_face_url ?? null) !==
+              (active.reference_face_url ?? null)
+          ) {
+            handleCloseVerify();
+          }
+        }
       } catch {
         setStudents([]);
       }
@@ -175,7 +219,7 @@ export default function InvigilatorPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [handleCloseVerify]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -212,12 +256,6 @@ export default function InvigilatorPage() {
       setActionLoading(false);
     }
   };
-
-  const stopVerificationLoop = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    loopRunningRef.current = false;
-  }, []);
 
   const runVerificationLoop = useCallback(
     async (attemptId: number) => {
@@ -435,20 +473,6 @@ export default function InvigilatorPage() {
   const handleVerifyNow = () => {
     if (!verifyAttemptId) return;
     void runVerificationLoop(verifyAttemptId);
-  };
-
-  const handleCloseVerify = () => {
-    stopVerificationLoop();
-    cameraRef.current?.stop();
-    setVerifyAttemptId(null);
-    setSelectedStudent(null);
-    setVerifyCtx(null);
-    setVerifyState("idle");
-    setVerifyResult(null);
-    setVerifyError(null);
-    setCameraState("idle");
-    setCameraMessage("");
-    setLoopStatus("");
   };
 
   const handleRetry = () => {
@@ -677,8 +701,10 @@ export default function InvigilatorPage() {
                         {s.attempt_status} / {s.attempt_decision || "PENDING"}
                       </span>
                     )}
-                    {s.reference_face_url && (
+                    {s.reference_face_url ? (
                       <span className="eg-badge eg-badge-info">Reference Enrolled</span>
+                    ) : (
+                      <span className="eg-badge eg-badge-neutral">REFERENCE NOT ENROLLED</span>
                     )}
                   </div>
                   {s.attempt_id && (
@@ -810,7 +836,7 @@ export default function InvigilatorPage() {
                           color: "var(--text-muted)",
                         }}
                       >
-                        No reference enrolled
+                        REFERENCE NOT ENROLLED
                       </div>
                     )}
                   </div>
