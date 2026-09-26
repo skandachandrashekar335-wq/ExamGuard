@@ -7,6 +7,7 @@ import {
   startSession,
   endSession,
   cancelSession,
+  ApiError,
   type ExaminationSession,
 } from "@/lib/session-api";
 import AppShell from "@/components/AppShell";
@@ -33,6 +34,7 @@ export default function ExaminationSessionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [endConfirmId, setEndConfirmId] = useState<number | null>(null);
 
   const [filterStatus, setFilterStatus] = useState("");
 
@@ -59,26 +61,36 @@ export default function ExaminationSessionsPage() {
   }, [page, filterStatus]);
 
   const handleStart = async (id: number) => {
+    const current = sessions.find((s) => s.id === id);
+    if (!current || current.status !== "NOT_STARTED" || actionLoading !== null) {
+      return;
+    }
     setActionLoading(id);
     try {
       await startSession(id);
       await fetchData();
-    } catch {
-      setError("Failed to start session");
+    } catch (e: unknown) {
+      setError(e instanceof ApiError ? e.message : "Failed to start session");
     } finally {
       setActionLoading(null);
     }
   };
 
   const handleEnd = async (id: number) => {
+    const current = sessions.find((s) => s.id === id);
+    if (!current || current.status !== "IN_PROGRESS" || actionLoading !== null) {
+      setEndConfirmId(null);
+      return;
+    }
     setActionLoading(id);
     try {
       await endSession(id);
       await fetchData();
-    } catch {
-      setError("Failed to end session");
+    } catch (e: unknown) {
+      setError(e instanceof ApiError ? e.message : "Failed to end session");
     } finally {
       setActionLoading(null);
+      setEndConfirmId(null);
     }
   };
 
@@ -89,8 +101,8 @@ export default function ExaminationSessionsPage() {
     try {
       await cancelSession(id, reason || "No reason provided");
       await fetchData();
-    } catch {
-      setError("Failed to cancel session");
+    } catch (e: unknown) {
+      setError(e instanceof ApiError ? e.message : "Failed to cancel session");
     } finally {
       setActionLoading(null);
     }
@@ -209,14 +221,14 @@ export default function ExaminationSessionsPage() {
                             <div className="flex justify-end gap-2">
                               <button
                                 onClick={() => handleStart(session.id)}
-                                disabled={actionLoading === session.id}
+                                disabled={actionLoading !== null}
                                 className="eg-btn eg-btn-primary text-xs"
                               >
                                 Start
                               </button>
                               <button
                                 onClick={() => handleCancel(session.id)}
-                                disabled={actionLoading === session.id}
+                                disabled={actionLoading !== null}
                                 className="eg-btn text-xs"
                               >
                                 Cancel
@@ -225,20 +237,43 @@ export default function ExaminationSessionsPage() {
                           )}
                           {session.status === "IN_PROGRESS" && (
                             <div className="flex justify-end gap-2">
-                              <button
-                                onClick={() => handleEnd(session.id)}
-                                disabled={actionLoading === session.id}
-                                className="eg-btn eg-btn-primary text-xs"
-                              >
-                                End
-                              </button>
-                              <button
-                                onClick={() => handleCancel(session.id)}
-                                disabled={actionLoading === session.id}
-                                className="eg-btn text-xs"
-                              >
-                                Cancel
-                              </button>
+                              {endConfirmId === session.id ? (
+                                <>
+                                  <button
+                                    onClick={() => handleEnd(session.id)}
+                                    disabled={actionLoading !== null}
+                                    className="eg-btn eg-btn-danger text-xs"
+                                  >
+                                    {actionLoading === session.id
+                                      ? "Ending..."
+                                      : "Confirm End"}
+                                  </button>
+                                  <button
+                                    onClick={() => setEndConfirmId(null)}
+                                    disabled={actionLoading !== null}
+                                    className="eg-btn text-xs"
+                                  >
+                                    Keep Running
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => setEndConfirmId(session.id)}
+                                    disabled={actionLoading !== null}
+                                    className="eg-btn eg-btn-primary text-xs"
+                                  >
+                                    End
+                                  </button>
+                                  <button
+                                    onClick={() => handleCancel(session.id)}
+                                    disabled={actionLoading !== null}
+                                    className="eg-btn text-xs"
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              )}
                             </div>
                           )}
                         </td>

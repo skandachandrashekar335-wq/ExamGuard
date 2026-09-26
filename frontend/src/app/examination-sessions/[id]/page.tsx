@@ -11,6 +11,7 @@ import {
   closeGates,
   openGates,
   listGateEvents,
+  ApiError,
   type ExaminationSession,
   type GateEvent,
 } from "@/lib/session-api";
@@ -25,6 +26,7 @@ export default function SessionDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [endConfirm, setEndConfirm] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -52,10 +54,11 @@ export default function SessionDetailPage() {
     try {
       await action();
       await fetchData();
-    } catch {
-      setError("Action failed");
+    } catch (e: unknown) {
+      setError(e instanceof ApiError ? e.message : "Action failed");
     } finally {
       setActionLoading(false);
+      setEndConfirm(false);
     }
   };
 
@@ -193,13 +196,41 @@ export default function SessionDetailPage() {
                     OPEN GATES
                   </button>
                 )}
-                <button
-                  onClick={() => handleAction(() => endSession(id))}
-                  disabled={actionLoading}
-                  className="eg-btn eg-btn-primary"
-                >
-                  END SESSION
-                </button>
+                {endConfirm ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        if (
+                          session.status === "COMPLETED" ||
+                          session.status === "CANCELLED"
+                        ) {
+                          setEndConfirm(false);
+                          return;
+                        }
+                        void handleAction(() => endSession(id));
+                      }}
+                      disabled={actionLoading}
+                      className="eg-btn eg-btn-danger"
+                    >
+                      {actionLoading ? "ENDING..." : "CONFIRM END SESSION"}
+                    </button>
+                    <button
+                      onClick={() => setEndConfirm(false)}
+                      disabled={actionLoading}
+                      className="eg-btn"
+                    >
+                      KEEP RUNNING
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setEndConfirm(true)}
+                    disabled={actionLoading}
+                    className="eg-btn eg-btn-primary"
+                  >
+                    END SESSION
+                  </button>
+                )}
                 <button
                   onClick={() => handleAction(() => cancelSession(id))}
                   disabled={actionLoading}

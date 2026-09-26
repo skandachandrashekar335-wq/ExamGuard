@@ -182,11 +182,23 @@ export default function DashboardPage() {
   };
 
   const handleFileSelect = (attemptId: number, file: File) => {
+    if (file.type !== "image/jpeg" && file.type !== "image/png") {
+      setDemoStudents((prev) =>
+        prev.map((s) =>
+          s.attempt_id === attemptId
+            ? { ...s, uploadMessage: "Choose a JPG or PNG image." }
+            : s
+        )
+      );
+      return;
+    }
     const url = URL.createObjectURL(file);
     setDemoStudents((prev) =>
-      prev.map((s) =>
-        s.attempt_id === attemptId ? { ...s, file, preview: url, uploadMessage: "" } : s
-      )
+      prev.map((s) => {
+        if (s.attempt_id !== attemptId) return s;
+        if (s.preview) URL.revokeObjectURL(s.preview);
+        return { ...s, file, preview: url, uploadMessage: "" };
+      })
     );
   };
 
@@ -238,11 +250,18 @@ export default function DashboardPage() {
       }
 
       setDemoStudents((prev) =>
-        prev.map((s) =>
-          s.attempt_id === attemptId
-            ? { ...s, reference_face_url: savedUrl, uploading: false, uploadMessage: "Reference saved" }
-            : s
-        )
+        prev.map((s) => {
+          if (s.attempt_id !== attemptId) return s;
+          if (s.preview) URL.revokeObjectURL(s.preview);
+          return {
+            ...s,
+            file: null,
+            preview: null,
+            reference_face_url: savedUrl,
+            uploading: false,
+            uploadMessage: "Reference saved",
+          };
+        })
       );
     } catch (e: any) {
       const errorMsg = e.message || "Upload failed";
@@ -302,7 +321,6 @@ export default function DashboardPage() {
     }
   };
 
-  const allEnrolled = demoStudents.length > 0 && demoStudents.every((s) => s.reference_face_url);
   const sessionActive = sessionStatus?.session_status === "IN_PROGRESS";
 
   const examName = sessionStatus?.exam_name || "ExamGuard Demo Examination";
@@ -420,7 +438,7 @@ export default function DashboardPage() {
                   <div
                     key={student.attempt_id}
                     className="p-4 rounded-lg"
-                    style={{ border: `1px solid ${student.reference_face_url ? "rgba(45,159,111,0.3)" : "var(--border)"}`, background: "rgba(255,255,255,0.02)" }}
+                    style={{ minWidth: 0, border: `1px solid ${student.reference_face_url ? "rgba(45,159,111,0.3)" : "var(--border)"}`, background: "rgba(255,255,255,0.02)" }}
                   >
                     <div className="flex items-center justify-between mb-3">
                       <div>
@@ -451,13 +469,13 @@ export default function DashboardPage() {
                         )}
                       </div>
 
-                      <div className="flex-1 flex flex-col justify-between">
+                      <div className="flex-1 flex flex-col justify-between" style={{ minWidth: 0 }}>
                         <div>
                           <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>
                             Face Photo
                           </label>
                           <label className="eg-btn text-xs w-full" style={{ cursor: "pointer", textAlign: "center", display: "block" }}>
-                            {student.file ? student.file.name : student.reference_face_url ? "Change Photo" : "Choose Photo"}
+                            {student.reference_face_url ? "Change Photo" : "Choose Photo"}
                             <input
                               type="file"
                               accept="image/jpeg,image/png"
@@ -465,9 +483,19 @@ export default function DashboardPage() {
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 if (file) handleFileSelect(student.attempt_id, file);
+                                e.target.value = "";
                               }}
                             />
                           </label>
+                          {student.file && (
+                            <p
+                              className="text-xs mt-1"
+                              style={{ color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                              title={student.file.name}
+                            >
+                              {student.file.name}
+                            </p>
+                          )}
                         </div>
                         {student.file && (
                           <button
@@ -483,12 +511,9 @@ export default function DashboardPage() {
                           </button>
                         )}
                         {student.uploadMessage && (
-                          <p className="text-xs mt-1" style={{ color: student.uploadMessage.includes("saved") || student.uploadMessage.includes("Saved") ? "var(--success)" : "var(--danger)" }}>
+                          <p className="text-xs mt-1" style={{ color: student.uploadMessage.includes("saved") || student.uploadMessage.includes("Saved") ? "var(--success)" : "var(--danger)", overflowWrap: "anywhere" }}>
                             {student.uploadMessage.includes("saved") || student.uploadMessage.includes("Saved") ? `✓ ${student.uploadMessage}` : student.uploadMessage}
                           </p>
-                        )}
-                        {student.reference_face_url && (
-                          <p className="text-xs mt-1" style={{ color: "var(--success)" }}>✓ Reference saved</p>
                         )}
                       </div>
                     </div>

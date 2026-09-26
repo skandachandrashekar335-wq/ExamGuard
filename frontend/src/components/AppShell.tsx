@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { isPublicRoute } from "@/lib/public-routes";
 
 interface NavLink {
   href: string;
@@ -181,19 +182,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return group.roles.includes(user.role);
   });
 
-  if (!loading && !authed) {
-    return <AuthGate />;
-  }
+  const publicRoute = isPublicRoute(pathname);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-base)]">
-        <div className="text-center">
-          <div className="eg-auth-spinner mx-auto mb-4" />
-          <p className="text-sm text-[var(--text-muted)]">Loading ExamGuard...</p>
+  if (!publicRoute) {
+    if (!loading && !authed) {
+      return <AuthGate />;
+    }
+
+    if (loading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[var(--bg-base)]">
+          <div className="text-center">
+            <div className="eg-auth-spinner mx-auto mb-4" />
+            <p className="text-sm text-[var(--text-muted)]">Loading ExamGuard...</p>
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
   }
 
   return (

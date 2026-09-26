@@ -1,18 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-
-const PUBLIC_ROUTES = [
-  "/",
-  "/privacy",
-  "/terms",
-  "/api",
-];
+import { isPublicRoute } from "@/lib/public-routes";
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Allow public routes
-  if (PUBLIC_ROUTES.some(route => pathname === route || pathname.startsWith(route + "/"))) {
+  if (isPublicRoute(pathname)) {
     return NextResponse.next();
   }
 

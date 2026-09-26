@@ -11,7 +11,7 @@ function authUrl(path: string): string {
 async function waitForAuth(page: import("@playwright/test").Page, timeout = 8000) {
   await page.waitForFunction(() => {
     const body = document.body?.textContent || "";
-    return !body.includes("Sign In Required") && !body.includes("Loading");
+    return !body.includes("Authentication Required") && !body.includes("Loading");
   }, { timeout });
 }
 
@@ -25,14 +25,14 @@ test.describe("Auth Bypass", () => {
     await page.goto("/dashboard");
     await page.waitForTimeout(3000);
     const content = await page.textContent("body");
-    expect(content).toContain("Sign In Required");
+    expect(content).toContain("Authentication Required");
   });
 
   test("Admin token bypasses auth on dashboard", async ({ page }) => {
     await page.goto(authUrl("/dashboard"));
     await waitForAuth(page);
     const content = await page.textContent("body");
-    expect(content).not.toContain("Sign In Required");
+    expect(content).not.toContain("Authentication Required");
     expect(content).toContain("Dashboard");
   });
 
@@ -144,7 +144,7 @@ test.describe("Navigation smoke test", () => {
       await page.goto(authUrl(link));
       await waitForAuth(page, 5000);
       const content = await page.textContent("body");
-      const hasAuth = !content?.includes("Sign In Required");
+      const hasAuth = !content?.includes("Authentication Required");
       console.log(`${link}: auth=${hasAuth}`);
       expect(hasAuth).toBeTruthy();
     }

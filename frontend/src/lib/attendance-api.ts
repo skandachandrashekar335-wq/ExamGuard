@@ -4,7 +4,7 @@ export interface AttendanceRecord {
   exam_id: number;
   exam_registration_id: number;
   status: string;
-  entry_verification_id: number;
+  entry_verification_id: number | null;
   entry_method: string;
   entry_time: string;
   hall_id: number;
@@ -18,7 +18,7 @@ export interface AttendanceEvent {
   student_id: number;
   exam_id: number;
   exam_registration_id: number;
-  entry_verification_id: number;
+  entry_verification_id: number | null;
   event_type: string;
   status_snapshot: string;
   recorded_by: string | null;
@@ -63,6 +63,22 @@ export interface AttendanceCorrectionRequest {
   recorded_by: string;
 }
 
+export interface ManualReviewStatus {
+  exam_registration_id: number;
+  review_state: "NOT_REVIEWED" | "CHECKED_IN" | "CHECKED_OUT";
+  latest_attempt_id: number | null;
+  latest_attempt_decision: string | null;
+  session_status: string | null;
+  events: AttendanceEvent[];
+}
+
+export interface ManualReviewResponse {
+  exam_registration_id: number;
+  review_state: "NOT_REVIEWED" | "CHECKED_IN" | "CHECKED_OUT";
+  event: AttendanceEvent;
+  attendance_record_id: number | null;
+}
+
 import { apiRequest, qs } from "./api";
 export { ApiError } from "./api";
 
@@ -103,4 +119,24 @@ export async function listEntryEvents(
   params: { page?: number; page_size?: number } = {},
 ): Promise<AttendanceEventListResponse> {
   return apiRequest(`/api/v1/attendance/events/${entryVerificationId}${qs(params)}`);
+}
+
+export async function getManualReviewStatus(
+  examRegistrationId: number,
+): Promise<ManualReviewStatus> {
+  return apiRequest(`/api/v1/attendance/manual-review/${examRegistrationId}`);
+}
+
+export async function submitManualReview(
+  examRegistrationId: number,
+  data: { action: "CHECK_IN" | "CHECK_OUT"; reason: string },
+): Promise<ManualReviewResponse> {
+  return apiRequest(`/api/v1/attendance/manual-review`, {
+    method: "POST",
+    body: JSON.stringify({
+      exam_registration_id: examRegistrationId,
+      action: data.action,
+      reason: data.reason,
+    }),
+  });
 }

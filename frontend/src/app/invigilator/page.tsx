@@ -9,11 +9,17 @@ import {
 } from "@/lib/invigilator-api";
 import { apiRequest } from "@/lib/api";
 import { ApiError } from "@/lib/api";
+import {
+  getManualReviewStatus,
+  submitManualReview,
+  type ManualReviewStatus,
+} from "@/lib/attendance-api";
 import { getAttemptContext, verifyFace, evaluateEvidence, ApiError as IvApiError } from "@/lib/iv-api";
 import type { VerificationContext } from "@/lib/types";
 import CameraCapture, { type CameraCaptureHandle, type CameraState } from "@/components/CameraCapture";
 import EvidenceDisplay from "@/components/EvidenceDisplay";
 import DecisionDisplay from "@/components/DecisionDisplay";
+import CheckSummaryDisplay from "@/components/CheckSummaryDisplay";
 import AppShell from "@/components/AppShell";
 
 function blobToBase64(blob: Blob): Promise<string> {
@@ -152,6 +158,30 @@ export default function InvigilatorPage() {
   const verifyStateRef = useRef<VerifyPhase>("idle");
   const selectedRef = useRef<RegisteredStudent | null>(null);
 
+  const [reviewStudent, setReviewStudent] = useState<RegisteredStudent | null>(null);
+  const [reviewStatus, setReviewStatus] = useState<ManualReviewStatus | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewAction, setReviewAction] = useState<"CHECK_IN" | "CHECK_OUT" | null>(null);
+  const [reviewReason, setReviewReason] = useState("");
+  const [reviewMsg, setReviewMsg] = useState<string | null>(null);
+  const [reviewMsgKind, setReviewMsgKind] = useState<"success" | "danger">("success");
+  const [probePreview, setProbePreview] = useState<{
+    registrationId: number;
+    url: string;
+  } | null>(null);
+  const probeUrlRef = useRef<string | null>(null);
+
+  const [endConfirm, setEndConfirm] = useState(false);
+
+  const setProbe = useCallback(
+    (preview: { registrationId: number; url: string } | null) => {
+      if (probeUrlRef.current) URL.revokeObjectURL(probeUrlRef.current);
+      probeUrlRef.current = preview?.url ?? null;
+      setProbePreview(preview);
+    },
+    [],
+  );
+
   useEffect(() => {
     verifyStateRef.current = verifyState;
   }, [verifyState]);
@@ -224,6 +254,12 @@ export default function InvigilatorPage() {
   useEffect(() => { load(); }, [load]);
 
   const handleStart = async () => {
+    if (!data || actionLoading) return;
+    if (data.profile.session_status === "IN_PROGRESS") {
+      setActionMsgKind("success");
+      setActionMsg("Exam session is already in progress.");
+      return;
+    }
     try {
       setActionLoading(true);
       setActionMsg(null);
@@ -241,6 +277,14 @@ export default function InvigilatorPage() {
   };
 
   const handleEnd = async () => {
+    if (!data || actionLoading) return;
+    const status = data.profile.session_status;
+    if (status === "COMPLETED" || status === "CANCELLED") {
+      setEndConfirm(false);
+      setActionMsgKind("success");
+      setActionMsg(`Exam session is already ${status}.`);
+      return;
+    }
     try {
       setActionLoading(true);
       setActionMsg(null);
@@ -254,6 +298,74 @@ export default function InvigilatorPage() {
       setActionMsg(msg);
     } finally {
       setActionLoading(false);
+      setEndConfirm(false);
+    }
+  };
+
+  const handleOpenReview = async (student: RegisteredStudent) => {
+    setReviewStudent(student);
+    setReviewStatus(null);
+    setReviewMsg(null);
+    setReviewReason("");
+    setReviewLoading(true);
+    try {
+      const status = await getManualReviewStatus(student.registration_id);
+      setReviewStatus(status);
+    } catch (e: unknown) {
+      setReviewMsgKind("danger");
+      setReviewMsg(
+        e instanceof ApiError ? e.message : "Failed to load the review panel.",
+      );
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
+  const handleCloseReview = () => {
+    if (reviewAction) return;
+    setProbe(null);
+    setReviewStudent(null);
+    setReviewStatus(null);
+    setReviewMsg(null);
+    setReviewReason("");
+  };
+
+  const handleSubmitReview = async (action: "CHECK_IN" | "CHECK_OUT") => {
+    if (!reviewStudent || reviewAction) return;
+    const reason = reviewReason.trim();
+    if (!reason) {
+      setReviewMsgKind("danger");
+      setReviewMsg(
+        "Enter a reason for this decision — it is recorded in the audit trail.",
+      );
+      return;
+    }
+    setReviewAction(action);
+    setReviewMsg(null);
+    try {
+      await submitManualReview(reviewStudent.registration_id, {
+        action,
+        reason,
+      });
+      const fresh = await getManualReviewStatus(reviewStudent.registration_id);
+      setReviewStatus(fresh);
+      setReviewReason("");
+      setReviewMsgKind("success");
+      setReviewMsg(
+        action === "CHECK_IN"
+          ? "Candidate checked in."
+          : "Candidate checked out.",
+      );
+      await load();
+    } catch (e: unknown) {
+      setReviewMsgKind("danger");
+      setReviewMsg(
+        e instanceof ApiError
+          ? e.message
+          : "Failed to record the review decision.",
+      );
+    } finally {
+      setReviewAction(null);
     }
   };
 
@@ -317,13 +429,20 @@ export default function InvigilatorPage() {
               provider: providerEv?.provider_name || null,
               evidenceId: similarity?.id ?? null,
             });
+            const probeRegId = selectedRef.current?.registration_id;
+            if (probeRegId != null) {
+              setProbe({
+                registrationId: probeRegId,
+                url: URL.createObjectURL(blob),
+              });
+            }
             setVerifyState("done");
             setLoopStatus("Verification complete");
             await load();
             return;
           } catch (e: unknown) {
             if (isAbortError(e)) return;
-            const msg = e instanceof IvApiError ? e.message : "Verification failed";
+            const msg = e instanceof IvApiError ? e.message : "The check did not complete. Please try again.";
 
             if (isRecoverableFaceMessage(msg)) {
               setVerifyState("verifying");
@@ -387,14 +506,14 @@ export default function InvigilatorPage() {
       } catch (e: unknown) {
         if (!isAbortError(e)) {
           setVerifyErrorKind("server");
-          setVerifyError(e instanceof Error ? e.message : "Verification failed");
+          setVerifyError(e instanceof Error ? e.message : "The check did not complete. Please try again.");
           setVerifyState("error");
         }
       } finally {
         loopRunningRef.current = false;
       }
     },
-    [load],
+    [load, setProbe],
   );
 
   const handleStartVerify = async (student: RegisteredStudent) => {
@@ -490,6 +609,7 @@ export default function InvigilatorPage() {
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
+      if (probeUrlRef.current) URL.revokeObjectURL(probeUrlRef.current);
       // CameraCapture stops its own tracks on unmount (its internal cleanup).
     };
   }, []);
@@ -550,6 +670,26 @@ export default function InvigilatorPage() {
     verifyErrorKind === "rate_limit" ||
     verifyErrorKind === "camera" ||
     verifyErrorKind === "server";
+
+  const reviewInconclusive =
+    reviewStatus?.latest_attempt_decision === "INCONCLUSIVE";
+  const reviewSessionActive = reviewStatus?.session_status === "IN_PROGRESS";
+  const reviewCanAct =
+    !!reviewStatus && reviewInconclusive && reviewSessionActive && !reviewAction;
+  const reviewCheckInDisabled =
+    !reviewCanAct || reviewStatus?.review_state !== "NOT_REVIEWED";
+  const reviewCheckOutDisabled =
+    !reviewCanAct || reviewStatus?.review_state === "CHECKED_OUT";
+
+  const reviewRefUrl = reviewStudent?.reference_face_url;
+  const reviewSafeRefUrl =
+    reviewRefUrl && /^https?:\/\//i.test(reviewRefUrl) ? reviewRefUrl : null;
+  const reviewProbeUrl =
+    probePreview && reviewStudent
+      ? probePreview.registrationId === reviewStudent.registration_id
+        ? probePreview.url
+        : null
+      : null;
 
   return (
     <AppShell>
@@ -615,15 +755,34 @@ export default function InvigilatorPage() {
               disabled={!data.can_start || actionLoading}
               className="eg-btn eg-btn-primary"
             >
-              {actionLoading ? "Starting..." : "Start Exam"}
+              {actionLoading && !endConfirm ? "Starting..." : "Start Exam"}
             </button>
-            <button
-              onClick={handleEnd}
-              disabled={!data.can_end || actionLoading}
-              className="eg-btn eg-btn-danger"
-            >
-              {actionLoading ? "Ending..." : "End Exam"}
-            </button>
+            {endConfirm ? (
+              <>
+                <button
+                  onClick={handleEnd}
+                  disabled={actionLoading || !data.can_end}
+                  className="eg-btn eg-btn-danger"
+                >
+                  {actionLoading ? "Ending..." : "Confirm End Exam"}
+                </button>
+                <button
+                  onClick={() => setEndConfirm(false)}
+                  disabled={actionLoading}
+                  className="eg-btn"
+                >
+                  Keep Exam Running
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setEndConfirm(true)}
+                disabled={!data.can_end || actionLoading}
+                className="eg-btn eg-btn-danger"
+              >
+                End Exam
+              </button>
+            )}
             <button onClick={load} disabled={actionLoading} className="eg-btn">
               Refresh
             </button>
@@ -707,15 +866,26 @@ export default function InvigilatorPage() {
                       <span className="eg-badge eg-badge-neutral">REFERENCE NOT ENROLLED</span>
                     )}
                   </div>
-                  {s.attempt_id && (
-                    <button
-                      onClick={() => handleStartVerify(s)}
-                      className="eg-btn eg-btn-primary"
-                      style={{ fontSize: "0.75rem", height: "32px", padding: "0 0.875rem" }}
-                    >
-                      Verify Face
-                    </button>
-                  )}
+                  <div className="flex items-center" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
+                    {s.attempt_id && (
+                      <button
+                        onClick={() => handleStartVerify(s)}
+                        className="eg-btn eg-btn-primary"
+                        style={{ fontSize: "0.75rem", height: "32px", padding: "0 0.875rem" }}
+                      >
+                        Verify Face
+                      </button>
+                    )}
+                    {s.attempt_decision === "INCONCLUSIVE" && (
+                      <button
+                        onClick={() => void handleOpenReview(s)}
+                        className="eg-btn"
+                        style={{ fontSize: "0.75rem", height: "32px", padding: "0 0.875rem" }}
+                      >
+                        Review Identity
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -919,6 +1089,9 @@ export default function InvigilatorPage() {
                       decision={verifyResult.decision}
                       failureReason={verifyCtx?.attempt?.failure_reason || null}
                     />
+                    <CheckSummaryDisplay
+                      evidence={verifyResult.evidence as VerificationContext["evidence"]}
+                    />
                     <div style={{ fontSize: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", color: "var(--text-muted)" }}>
                       <span>
                         Candidate:{" "}
@@ -944,6 +1117,19 @@ export default function InvigilatorPage() {
                     {verifyResult.evidence.length > 0 && (
                       <EvidenceDisplay evidence={verifyResult.evidence as VerificationContext["evidence"]} />
                     )}
+                    {verifyResult.decision === "INCONCLUSIVE" && selectedStudent && (
+                      <button
+                        onClick={() => {
+                          const student = selectedStudent;
+                          handleCloseVerify();
+                          void handleOpenReview(student);
+                        }}
+                        className="eg-btn eg-btn-primary"
+                        style={{ width: "100%" }}
+                      >
+                        Review Identity
+                      </button>
+                    )}
                     <button onClick={handleCloseVerify} className="eg-btn" style={{ width: "100%" }}>
                       Close
                     </button>
@@ -960,11 +1146,11 @@ export default function InvigilatorPage() {
                             ? "Candidate not enrolled"
                             : verifyErrorKind === "camera"
                               ? "Camera error"
-                              : verifyErrorKind === "rate_limit"
-                                ? "Rate limit reached"
-                                : "Verification failed"}
+                                : verifyErrorKind === "rate_limit"
+                                  ? "Rate limit reached"
+                                  : "Check did not complete"}
                       </strong>
-                      {verifyError || cameraMessage || "Verification failed"}
+                      {verifyError || cameraMessage || "The check did not complete. Please try again."}
                       {verifyErrorKind === "reference_mismatch" && (
                         <span style={{ display: "block", marginTop: "0.375rem", fontSize: "0.75rem" }}>
                           The stored reference does not belong to this candidate. Contact the operator to correct the selection.
@@ -992,6 +1178,284 @@ export default function InvigilatorPage() {
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {reviewStudent && (
+          <div
+            className="eg-modal-backdrop"
+            onClick={() => {
+              if (!reviewAction) handleCloseReview();
+            }}
+          >
+            <div
+              className="eg-modal glass-surface glass"
+              style={{ maxWidth: "720px" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="eg-modal-header">
+                <div>
+                  <h2 className="eg-page-title" style={{ fontSize: "1.125rem", marginBottom: "0.25rem" }}>
+                    Identity Review
+                  </h2>
+                  <p className="eg-page-desc" style={{ fontSize: "0.8125rem" }}>
+                    {reviewStudent.student_name} ({reviewStudent.student_usn})
+                  </p>
+                </div>
+                <div className="flex items-center" style={{ gap: "0.75rem" }}>
+                  <span
+                    className={`eg-badge ${
+                      reviewStatus?.review_state === "CHECKED_IN"
+                        ? "eg-badge-success"
+                        : reviewStatus?.review_state === "CHECKED_OUT"
+                          ? "eg-badge-neutral"
+                          : "eg-badge-warning"
+                    }`}
+                  >
+                    {reviewStatus
+                      ? reviewStatus.review_state.replace(/_/g, " ")
+                      : "LOADING"}
+                  </span>
+                  <button
+                    onClick={handleCloseReview}
+                    disabled={!!reviewAction}
+                    className="eg-modal-close"
+                    aria-label="Close review"
+                  >
+                    &times;
+                  </button>
+                </div>
+              </div>
+
+              <div className="eg-modal-body" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                {reviewMsg && (
+                  <div
+                    className={`eg-alert ${reviewMsgKind === "danger" ? "eg-alert-danger" : "eg-alert-success"}`}
+                  >
+                    {reviewMsg}
+                  </div>
+                )}
+
+                <div className="eg-grid-2">
+                  <div>
+                    <span className="eg-mono-sm" style={{ color: "var(--text-muted)", display: "block", marginBottom: "0.5rem" }}>
+                      Stored Reference
+                    </span>
+                    {reviewSafeRefUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={reviewSafeRefUrl}
+                        alt="Reference face"
+                        style={{
+                          width: "100%",
+                          height: "128px",
+                          objectFit: "cover",
+                          borderRadius: "var(--radius-sm)",
+                          border: "1px solid var(--border)",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "128px",
+                          borderRadius: "var(--radius-sm)",
+                          border: "1px dashed var(--border-strong)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "0.75rem",
+                          color: "var(--text-muted)",
+                        }}
+                      >
+                        REFERENCE NOT ENROLLED
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <span className="eg-mono-sm" style={{ color: "var(--text-muted)", display: "block", marginBottom: "0.5rem" }}>
+                      Captured Check Image
+                    </span>
+                    {reviewProbeUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={reviewProbeUrl}
+                        alt="Captured check image"
+                        style={{
+                          width: "100%",
+                          height: "128px",
+                          objectFit: "cover",
+                          borderRadius: "var(--radius-sm)",
+                          border: "1px solid var(--border)",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "128px",
+                          borderRadius: "var(--radius-sm)",
+                          border: "1px dashed var(--border-strong)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "0.75rem",
+                          color: "var(--text-muted)",
+                        }}
+                      >
+                        NO CAPTURED IMAGE
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {reviewLoading ? (
+                  <p className="eg-page-desc" style={{ fontSize: "0.875rem" }}>
+                    Loading review status...
+                  </p>
+                ) : reviewStatus ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                    <div className="eg-grid-2" style={{ gap: "0.5rem 1rem", fontSize: "0.8125rem" }}>
+                      <span style={{ color: "var(--text-muted)" }}>
+                        Latest check:{" "}
+                        <span style={{ color: "var(--text-secondary)" }}>
+                          {reviewStatus.latest_attempt_decision || "None"}
+                        </span>
+                      </span>
+                      <span style={{ color: "var(--text-muted)" }}>
+                        Exam session:{" "}
+                        <span style={{ color: "var(--text-secondary)" }}>
+                          {reviewStatus.session_status || "No session"}
+                        </span>
+                      </span>
+                      {reviewStatus.latest_attempt_id != null && (
+                        <span style={{ color: "var(--text-muted)" }}>
+                          Attempt:{" "}
+                          <span style={{ color: "var(--text-secondary)" }}>
+                            #{reviewStatus.latest_attempt_id}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+
+                    {!reviewInconclusive && (
+                      <div className="eg-alert">
+                        This candidate&apos;s latest identity check is{" "}
+                        {reviewStatus.latest_attempt_decision || "missing"} —
+                        manual review applies only to inconclusive checks.
+                        {reviewStatus.review_state !== "NOT_REVIEWED" &&
+                          " Review decisions already recorded are shown below."}
+                      </div>
+                    )}
+                    {reviewInconclusive && !reviewSessionActive && (
+                      <div className="eg-alert">
+                        Exam session is{" "}
+                        {reviewStatus.session_status || "not active"} — start
+                        the exam before recording a review decision.
+                      </div>
+                    )}
+
+                    <div>
+                      <span className="eg-mono-sm" style={{ color: "var(--text-muted)", display: "block", marginBottom: "0.5rem" }}>
+                        REVIEW HISTORY
+                      </span>
+                      {reviewStatus.events.length === 0 ? (
+                        <p className="eg-page-desc" style={{ fontSize: "0.8125rem" }}>
+                          No attendance events recorded yet.
+                        </p>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                          {reviewStatus.events.map((ev) => (
+                            <div
+                              key={ev.id}
+                              style={{
+                                padding: "0.5rem 0.75rem",
+                                borderRadius: "var(--radius-sm)",
+                                background: "var(--bg-glass-light)",
+                                border: "1px solid var(--border)",
+                                fontSize: "0.75rem",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "0.25rem",
+                              }}
+                            >
+                              <div className="flex items-center" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
+                                <span
+                                  className={`eg-badge ${
+                                    ev.event_type === "MANUAL_CHECK_IN"
+                                      ? "eg-badge-success"
+                                      : ev.event_type === "MANUAL_CHECK_OUT"
+                                        ? "eg-badge-warning"
+                                        : "eg-badge-neutral"
+                                  }`}
+                                >
+                                  {ev.event_type.replace(/_/g, " ")}
+                                </span>
+                                <span className="eg-mono-sm" style={{ color: "var(--text-muted)" }}>
+                                  {ev.status_snapshot}
+                                </span>
+                                <span className="eg-mono-sm" style={{ color: "var(--text-faint)", marginLeft: "auto" }}>
+                                  {new Date(ev.created_at).toLocaleString()}
+                                </span>
+                              </div>
+                              {ev.reason && (
+                                <span style={{ color: "var(--text-secondary)" }}>{ev.reason}</span>
+                              )}
+                              {ev.recorded_by && (
+                                <span style={{ color: "var(--text-muted)" }}>
+                                  Recorded by {ev.recorded_by}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="eg-page-desc" style={{ fontSize: "0.8125rem", marginBottom: "0.5rem" }}>
+                        {reviewStatus.review_state === "CHECKED_IN"
+                          ? "Candidate is checked in. Checking out now records the candidate as absent."
+                          : reviewStatus.review_state === "CHECKED_OUT"
+                            ? "Candidate has been checked out. Attendance can only be changed afterwards by an admin correction."
+                            : "Check In admits the candidate. Check Out records that the candidate was not admitted."}
+                      </p>
+                      <label className="eg-label" htmlFor="manual-review-reason">
+                        Reason (required)
+                      </label>
+                      <textarea
+                        id="manual-review-reason"
+                        value={reviewReason}
+                        onChange={(e) => setReviewReason(e.target.value)}
+                        rows={2}
+                        maxLength={1000}
+                        placeholder="What did you verify? e.g. Photo and ID card match, face check inconclusive"
+                        className="eg-input w-full resize-none"
+                        style={{ margin: "0.375rem 0 0.75rem" }}
+                      />
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => void handleSubmitReview("CHECK_IN")}
+                          disabled={reviewCheckInDisabled}
+                          className="eg-btn eg-btn-primary"
+                          style={{ flex: 1 }}
+                        >
+                          {reviewAction === "CHECK_IN" ? "Checking in..." : "Check In"}
+                        </button>
+                        <button
+                          onClick={() => void handleSubmitReview("CHECK_OUT")}
+                          disabled={reviewCheckOutDisabled}
+                          className="eg-btn eg-btn-danger"
+                          style={{ flex: 1 }}
+                        >
+                          {reviewAction === "CHECK_OUT" ? "Checking out..." : "Check Out"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>

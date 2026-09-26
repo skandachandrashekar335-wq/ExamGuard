@@ -16,7 +16,7 @@ async function waitForAuth(
     () => {
       const body = document.body?.innerText || "";
       return (
-        !body.includes("Sign In Required") && !body.includes("Loading")
+        !body.includes("Authentication Required") && !body.includes("Loading")
       );
     },
     { timeout }

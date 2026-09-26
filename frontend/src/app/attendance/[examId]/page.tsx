@@ -292,12 +292,27 @@ export default function ExamAttendancePage() {
                         {new Date(r.entry_time).toLocaleString()}
                       </td>
                       <td>
-                        <button
-                          onClick={() => loadEvents(r.entry_verification_id)}
-                          className="eg-mono-sm text-[var(--text-primary)] hover:text-[var(--text-secondary)] transition-colors"
-                        >
-                          #{r.entry_verification_id}
-                        </button>
+                        {r.entry_verification_id != null ? (
+                          <button
+                            onClick={() => {
+                              const evId = r.entry_verification_id;
+                              if (evId != null) loadEvents(evId);
+                            }}
+                            className="eg-mono-sm text-[var(--text-primary)] hover:text-[var(--text-secondary)] transition-colors"
+                          >
+                            #{r.entry_verification_id}
+                          </button>
+                        ) : (
+                          <span
+                            style={{
+                              color: "var(--text-muted)",
+                              fontFamily: "var(--font-mono)",
+                              fontSize: "0.75rem",
+                            }}
+                          >
+                            —
+                          </span>
+                        )}
                       </td>
                       <td className="text-right">
                         <button

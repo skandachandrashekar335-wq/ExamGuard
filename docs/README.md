@@ -19,6 +19,8 @@ Documentation is organized by audience and topic.
 | [architecture/architecture.md](architecture/architecture.md) | Structure and architectural principles |
 | [architecture/BACKEND_SCHEMA.md](architecture/BACKEND_SCHEMA.md) | Data model overview |
 | [architecture/FACE_VERIFICATION.md](architecture/FACE_VERIFICATION.md) | Face pipeline overview |
+| [architecture/runtime-architecture.html](architecture/runtime-architecture.html) | Interactive runtime architecture diagram (Archify) |
+| [architecture/runtime-architecture.architecture.json](architecture/runtime-architecture.architecture.json) | Archify diagram source |
 
 ### Development
 

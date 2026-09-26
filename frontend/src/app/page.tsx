@@ -571,6 +571,7 @@ export default function Home() {
                 <span className="eg-footer__dot" />
                 <span>System operational</span>
               </div>
+              <Link href="/how-it-works">How ExamGuard Works</Link>
               <span className="eg-footer__version">v0.7.0</span>
             </div>
           </div>

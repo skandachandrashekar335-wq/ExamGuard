@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /$
+Allow: /privacy$
+Allow: /terms$
+Allow: /how-it-works$
+Disallow: /
+
+Sitemap: https://exam-guardian-management.vercel.app/sitemap.xml

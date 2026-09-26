@@ -1,0 +1,216 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "ExamGuard Runtime Architecture",
+    "output": "runtime-architecture.html",
+    "quality_profile": "showcase",
+    "viewBox": [1330, 662],
+    "views": [
+      {
+        "id": "verification-path",
+        "label": "Primary runtime path",
+        "focus": ["browser", "frontend", "backend", "face", "decision", "db"],
+        "note": "Follow one verification from staff browser to recorded evidence."
+      },
+      {
+        "id": "authentication",
+        "label": "Authentication boundary",
+        "focus": ["frontend", "firebase", "backend"],
+        "note": "Google sign-in is exchanged server-side for the application session."
+      },
+      {
+        "id": "data-and-storage",
+        "label": "Data and storage",
+        "focus": ["backend", "storage", "db"],
+        "note": "Reference photos and examination records stay behind the backend."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "browser",
+      "type": "external",
+      "label": "Staff Browser",
+      "sublabel": "Camera + Google sign-in",
+      "pos": [40, 340],
+      "size": [150, 70]
+    },
+    {
+      "id": "frontend",
+      "type": "frontend",
+      "label": "ExamGuard Web App",
+      "sublabel": "Next.js on Vercel",
+      "pos": [260, 340],
+      "size": [170, 70]
+    },
+    {
+      "id": "firebase",
+      "type": "security",
+      "label": "Firebase Authentication",
+      "sublabel": "Google sign-in",
+      "tag": "External identity",
+      "pos": [260, 130],
+      "size": [170, 66]
+    },
+    {
+      "id": "backend",
+      "type": "backend",
+      "label": "ExamGuard API",
+      "sublabel": "FastAPI on Railway",
+      "tag": "JWT + RBAC",
+      "pos": [560, 340],
+      "size": [180, 70]
+    },
+    {
+      "id": "face",
+      "type": "backend",
+      "label": "Face Verification",
+      "sublabel": "UniFace - similarity + liveness",
+      "tag": "Local models",
+      "pos": [560, 515],
+      "size": [180, 70]
+    },
+    {
+      "id": "decision",
+      "type": "backend",
+      "label": "Decision Engine",
+      "sublabel": "Thresholds applied server-side",
+      "pos": [850, 340],
+      "size": [170, 70]
+    },
+    {
+      "id": "storage",
+      "type": "cloud",
+      "label": "Cloudinary",
+      "sublabel": "Reference face images",
+      "pos": [1110, 515],
+      "size": [170, 70]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL / Neon",
+      "sublabel": "Exams, attendance, evidence",
+      "pos": [1110, 340],
+      "size": [170, 70]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "Firebase - identity provider",
+      "wraps": ["firebase"],
+      "pad": 14
+    },
+    {
+      "kind": "region",
+      "label": "Vercel - web hosting",
+      "wraps": ["frontend"],
+      "pad": 14
+    },
+    {
+      "kind": "region",
+      "label": "Railway - API and face verification",
+      "wraps": ["backend", "face", "decision"],
+      "pad": 16
+    },
+    {
+      "kind": "region",
+      "label": "Managed cloud services (external)",
+      "wraps": ["db", "storage"],
+      "pad": 16
+    }
+  ],
+  "connections": [
+    {
+      "id": "browser-to-app",
+      "from": "browser",
+      "to": "frontend",
+      "label": "HTTPS + camera frames",
+      "variant": "emphasis",
+      "labelAt": [225, 424]
+    },
+    {
+      "id": "app-to-backend",
+      "from": "frontend",
+      "to": "backend",
+      "label": "authorized API calls",
+      "variant": "emphasis",
+      "labelAt": [505, 445]
+    },
+    {
+      "id": "google-sign-in",
+      "from": "frontend",
+      "to": "firebase",
+      "label": "Google sign-in",
+      "labelAt": [345, 250]
+    },
+    {
+      "id": "token-exchange",
+      "from": "firebase",
+      "to": "backend",
+      "label": "ID token exchanged for session",
+      "variant": "security"
+    },
+    {
+      "id": "verify-identity",
+      "from": "backend",
+      "to": "face",
+      "label": "verify similarity + liveness",
+      "variant": "emphasis",
+      "labelAt": [650, 470]
+    },
+    {
+      "id": "evaluate-evidence",
+      "from": "backend",
+      "to": "decision",
+      "label": "evidence package"
+    },
+    {
+      "id": "record-decision",
+      "from": "decision",
+      "to": "db",
+      "label": "record decision + evidence",
+      "variant": "emphasis",
+      "labelAt": [1065, 424]
+    },
+    {
+      "id": "reference-photos",
+      "from": "backend",
+      "to": "storage",
+      "label": "reference photos: store + fetch",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Primary path",
+      "items": [
+        "Camera frames flow from the staff browser through the web app to the API",
+        "Face verification returns similarity and liveness as evidence",
+        "The decision engine records the outcome with the examination data"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Trust boundaries",
+      "items": [
+        "Google sign-in is exchanged server-side for the application session",
+        "Role and scope checks run on the server for every action",
+        "Reference photos are stored and fetched by the backend, never by the browser",
+        "Face models run locally inside the backend service"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Confirmed by source",
+      "items": [
+        "Vercel web app / Railway API / Neon database",
+        "Firebase Authentication / Cloudinary image storage",
+        "UniFace similarity + liveness with server-side decision thresholds"
+      ]
+    }
+  ]
+}

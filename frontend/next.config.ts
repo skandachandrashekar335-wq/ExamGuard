@@ -19,7 +19,15 @@ const securityHeaders = [
   },
   {
     key: "Permissions-Policy",
-    value: "camera=(self), microphone=(), geolocation=(), browsing-topics=(), attribution-reporting=(), private-aggregation=(), join-ad-interest-group=(), run-ad-auction=()",
+    value: "camera=(self), microphone=(), geolocation=(), browsing-topics=(), attribution-reporting=(), private-aggregation=(), join-ad-interest-group=(), run-ad-auction()",
+  },
+  {
+    key: "Strict-Transport-Security",
+    value: "max-age=63072000; includeSubDomains",
+  },
+  {
+    key: "Content-Security-Policy",
+    value: "frame-ancestors 'none'",
   },
 ];
 

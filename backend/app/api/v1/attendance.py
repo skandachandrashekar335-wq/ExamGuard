@@ -22,6 +22,9 @@ from app.schemas.attendance import (
     AttendanceListResponse,
     AttendanceRecordResponse,
     AttendanceSummaryResponse,
+    ManualReviewRequest,
+    ManualReviewResponse,
+    ManualReviewStatusResponse,
 )
 from app.services.attendance import service as att_service
 from app.services.monitoring.publisher import (
@@ -304,4 +307,128 @@ def list_entry_events(
         total=result["total"],
         page=result["page"],
         page_size=result["page_size"],
+    )
+
+
+# ---------------------------------------------------------------------------
+# 8. Manual review of INCONCLUSIVE identity attempts
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/manual-review/{exam_registration_id}",
+    response_model=ManualReviewStatusResponse,
+    summary="Manual review status for a registration",
+)
+def get_manual_review_status(
+    exam_registration_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.INVIGILATOR])),
+):
+    """Current manual review state for a registration.
+
+    Returns the derived review state (NOT_REVIEWED / CHECKED_IN /
+    CHECKED_OUT), the latest identity verification attempt, the session
+    status, and the full attendance event history for the registration.
+    """
+    scope = get_invigilator_scope(_user, db)
+    if scope is None:
+        raise HTTPException(
+            status_code=403, detail="Invigilator assignment not found"
+        )
+    try:
+        reg = att_service.get_registration(db, exam_registration_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    check_invigilator_scope(scope, reg.exam_id)
+
+    try:
+        status = att_service.get_manual_review_status(
+            db, exam_registration_id, hall_id=scope.hall_id
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return ManualReviewStatusResponse(
+        exam_registration_id=status["exam_registration_id"],
+        review_state=status["review_state"],
+        latest_attempt_id=status["latest_attempt_id"],
+        latest_attempt_decision=status["latest_attempt_decision"],
+        session_status=status["session_status"],
+        events=[
+            AttendanceEventResponse.model_validate(ev)
+            for ev in status["events"]
+        ],
+    )
+
+
+@router.post(
+    "/manual-review",
+    response_model=ManualReviewResponse,
+    status_code=200,
+    summary="Record a manual review decision for an inconclusive identity attempt",
+)
+def submit_manual_review(
+    body: ManualReviewRequest,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.INVIGILATOR])),
+):
+    """Record an invigilator manual review decision (CHECK_IN / CHECK_OUT).
+
+    Only INVIGILATOR may act, and only within their assigned exam/hall
+    scope. The server enforces that the latest identity verification
+    attempt is INCONCLUSIVE, that an exam session is in progress, and that
+    the review state machine permits the action. A reason is required and
+    recorded for audit. This endpoint never fabricates an
+    EntryVerification.
+
+    Admins should use POST /attendance/registrations/{id}/correct for
+    post-hoc attendance correction.
+    """
+    scope = get_invigilator_scope(_user, db)
+    if scope is None:
+        raise HTTPException(
+            status_code=403, detail="Invigilator assignment not found"
+        )
+    try:
+        reg = att_service.get_registration(db, body.exam_registration_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    check_invigilator_scope(scope, reg.exam_id)
+
+    recorded_by = _user.get("email") or _user.get("sub") or "unknown"
+    try:
+        event, record = att_service.record_manual_review(
+            db,
+            body.exam_registration_id,
+            action=body.action,
+            reason=body.reason,
+            recorded_by=recorded_by,
+            hall_id=scope.hall_id,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except att_service.ManualReviewConflict as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    # Notify monitoring when an attendance record exists. Event-only
+    # check-outs have no record — nothing to publish for them.
+    if record is not None:
+        publish_attendance_corrected(
+            attendance_record_id=record.id,
+            exam_registration_id=body.exam_registration_id,
+            student_id=record.student_id,
+            exam_id=record.exam_id,
+            hall_id=record.hall_id,
+            reason=body.reason,
+            recorded_by=recorded_by,
+        )
+    return ManualReviewResponse(
+        exam_registration_id=body.exam_registration_id,
+        review_state=att_service.get_review_state(
+            db, body.exam_registration_id
+        ),
+        event=AttendanceEventResponse.model_validate(event),
+        attendance_record_id=record.id if record is not None else None,
     )

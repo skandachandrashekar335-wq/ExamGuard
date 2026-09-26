@@ -22,6 +22,7 @@ import CameraCapture from "@/components/CameraCapture";
 import ImageUpload from "@/components/ImageUpload";
 import EvidenceDisplay from "@/components/EvidenceDisplay";
 import DecisionDisplay from "@/components/DecisionDisplay";
+import CheckSummaryDisplay from "@/components/CheckSummaryDisplay";
 import VerificationState, {
   type VerificationUIState,
 } from "@/components/VerificationState";
@@ -119,7 +120,7 @@ export default function IdentityVerificationDetailPage() {
       if (e instanceof ApiError) {
         setVerifyError(e.message);
       } else {
-        setVerifyError("Verification failed");
+        setVerifyError("The check did not complete. Please try again.");
       }
     }
   };
@@ -403,6 +404,9 @@ export default function IdentityVerificationDetailPage() {
               <h3 className="eg-mono-sm text-[var(--text-muted)] mb-3">
                 Evidence
               </h3>
+              <div className="mb-3">
+                <CheckSummaryDisplay evidence={evidence} />
+              </div>
               <EvidenceDisplay evidence={evidence} />
             </div>
 

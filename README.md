@@ -133,6 +133,23 @@ Browser
 
 Detailed structure: [docs/architecture/architecture.md](docs/architecture/architecture.md)
 
+**Interactive runtime architecture** (self-contained, open in a browser):
+[docs/architecture/runtime-architecture.html](docs/architecture/runtime-architecture.html)
+— components, trust boundaries, data flows, and guided views generated with
+[Archify](https://github.com/tt-a1i/archify). Editable source:
+[docs/architecture/runtime-architecture.architecture.json](docs/architecture/runtime-architecture.architecture.json).
+
+To regenerate after the diagram source changes:
+
+```bash
+npx -y skills add tt-a1i/archify        # installs the Archify skill
+node <skill-dir>/bin/archify.mjs validate architecture docs/architecture/runtime-architecture.architecture.json --quality showcase --json
+node <skill-dir>/bin/archify.mjs deliver   architecture docs/architecture/runtime-architecture.architecture.json docs/architecture/runtime-architecture.html --quality showcase --json
+node <skill-dir>/bin/archify.mjs visual-check docs/architecture/runtime-architecture.html --json
+```
+
+The JSON is the source of truth; the HTML is a build artifact (do not hand-edit it).
+
 ---
 
 ## Verification Workflow
@@ -382,6 +399,8 @@ Full index: [docs/README.md](docs/README.md)
 | [docs/architecture/architecture.md](docs/architecture/architecture.md) | Structure and principles |
 | [docs/architecture/BACKEND_SCHEMA.md](docs/architecture/BACKEND_SCHEMA.md) | Data model overview |
 | [docs/architecture/FACE_VERIFICATION.md](docs/architecture/FACE_VERIFICATION.md) | Face pipeline overview |
+| [docs/architecture/runtime-architecture.html](docs/architecture/runtime-architecture.html) | Interactive runtime architecture diagram (Archify) |
+| [docs/architecture/runtime-architecture.architecture.json](docs/architecture/runtime-architecture.architecture.json) | Archify diagram source |
 | [docs/development/TRD.md](docs/development/TRD.md) | Technical requirements |
 | [docs/development/TESTING.md](docs/development/TESTING.md) | Test commands and scope |
 | [docs/development/DEPLOYMENT.md](docs/development/DEPLOYMENT.md) | Deploy notes |

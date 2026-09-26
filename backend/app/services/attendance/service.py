@@ -33,6 +33,11 @@ from app.models.entry_verification import (
 from app.models.exam import Exam
 from app.models.exam_hall import ExamHall
 from app.models.exam_registration import ExamRegistration, RegistrationStatus
+from app.models.examination_session import ExaminationSession, SessionStatus
+from app.models.identity_verification import (
+    IdentityVerificationAttempt,
+    IdentityVerificationDecision,
+)
 from app.models.seat_assignment import SeatAssignment, SeatAssignmentStatus
 from app.models.student import Student
 
@@ -534,6 +539,352 @@ def mark_manual_attendance(
         exam_registration_id, status, recorded_by, reason,
     )
     return record
+
+
+# ---------------------------------------------------------------------------
+# 5b. Manual review of INCONCLUSIVE identity attempts
+# ---------------------------------------------------------------------------
+
+
+class ManualReviewConflict(ValueError):
+    """Manual review precondition or state conflict.
+
+    Subclass of ValueError so generic ValueError handlers remain a safe
+    fallback; the API layer maps it to HTTP 409.
+    """
+
+
+MANUAL_REVIEW_ACTIONS = {"CHECK_IN", "CHECK_OUT"}
+REVIEW_NOT_REVIEWED = "NOT_REVIEWED"
+REVIEW_CHECKED_IN = "CHECKED_IN"
+REVIEW_CHECKED_OUT = "CHECKED_OUT"
+
+
+def get_registration(db: Session, exam_registration_id: int) -> ExamRegistration:
+    """Public registration lookup (for API scope checks).
+
+    Raises:
+        LookupError: If registration not found.
+    """
+    return _get_registration(db, exam_registration_id)
+
+
+def get_review_state(db: Session, exam_registration_id: int) -> str:
+    """Derive manual review state from recorded manual review events.
+
+    CHECKED_OUT if any MANUAL_CHECK_OUT event exists, else CHECKED_IN if any
+    MANUAL_CHECK_IN event exists, else NOT_REVIEWED.
+    """
+    has_check_out = (
+        db.query(AttendanceEvent.id)
+        .filter(
+            AttendanceEvent.exam_registration_id == exam_registration_id,
+            AttendanceEvent.event_type
+            == AttendanceEventType.MANUAL_CHECK_OUT.value,
+        )
+        .first()
+        is not None
+    )
+    if has_check_out:
+        return REVIEW_CHECKED_OUT
+
+    has_check_in = (
+        db.query(AttendanceEvent.id)
+        .filter(
+            AttendanceEvent.exam_registration_id == exam_registration_id,
+            AttendanceEvent.event_type
+            == AttendanceEventType.MANUAL_CHECK_IN.value,
+        )
+        .first()
+        is not None
+    )
+    if has_check_in:
+        return REVIEW_CHECKED_IN
+    return REVIEW_NOT_REVIEWED
+
+
+def _get_latest_attempt(
+    db: Session, exam_registration_id: int
+) -> IdentityVerificationAttempt | None:
+    return (
+        db.query(IdentityVerificationAttempt)
+        .filter(
+            IdentityVerificationAttempt.exam_registration_id
+            == exam_registration_id
+        )
+        .order_by(IdentityVerificationAttempt.id.desc())
+        .first()
+    )
+
+
+def _get_session(
+    db: Session, exam_id: int, hall_id: int | None
+) -> ExaminationSession | None:
+    if hall_id is None:
+        return None
+    return (
+        db.query(ExaminationSession)
+        .filter(
+            ExaminationSession.exam_id == exam_id,
+            ExaminationSession.exam_hall_id == hall_id,
+        )
+        .order_by(ExaminationSession.created_at.desc())
+        .first()
+    )
+
+
+def get_manual_review_status(
+    db: Session,
+    exam_registration_id: int,
+    *,
+    hall_id: int | None,
+) -> dict:
+    """Current manual review status for a registration (read-only).
+
+    Returns dict with review_state, latest_attempt_id,
+    latest_attempt_decision, session_status, and events (full audit trail
+    for the registration, oldest first).
+
+    Raises:
+        LookupError: If registration not found.
+    """
+    reg = _get_registration(db, exam_registration_id)
+    attempt = _get_latest_attempt(db, exam_registration_id)
+    session = _get_session(db, reg.exam_id, hall_id)
+    events = (
+        db.query(AttendanceEvent)
+        .filter(AttendanceEvent.exam_registration_id == exam_registration_id)
+        .order_by(AttendanceEvent.id)
+        .all()
+    )
+    return {
+        "exam_registration_id": exam_registration_id,
+        "review_state": get_review_state(db, exam_registration_id),
+        "latest_attempt_id": attempt.id if attempt else None,
+        "latest_attempt_decision": attempt.decision if attempt else None,
+        "session_status": session.status if session else None,
+        "events": events,
+    }
+
+
+def record_manual_review(
+    db: Session,
+    exam_registration_id: int,
+    *,
+    action: str,
+    reason: str,
+    recorded_by: str,
+    hall_id: int | None,
+) -> tuple[AttendanceEvent, AttendanceRecord | None]:
+    """Record an auditable manual review decision for an INCONCLUSIVE
+    identity verification attempt.
+
+    This is the only attendance path that acts on an inconclusive face
+    decision, and it requires an explicit invigilator action plus reason.
+    It never fabricates an EntryVerification.
+
+    Preconditions:
+        - action must be CHECK_IN or CHECK_OUT (ValueError).
+        - reason and recorded_by required (ValueError).
+        - registration exists (LookupError) and is not cancelled (ValueError).
+        - latest identity verification attempt exists and is INCONCLUSIVE
+          (ManualReviewConflict).
+        - an examination session exists for (registration exam, hall) and is
+          IN_PROGRESS (ManualReviewConflict).
+
+    State machine (events are the source of truth):
+        - CHECK_IN: only from NOT_REVIEWED, and only when no attendance
+          record exists yet (ManualReviewConflict otherwise — verified
+          entries/admin corrections are handled via attendance correction).
+        - CHECK_OUT: from NOT_REVIEWED (event only, snapshot N/A — no
+          record is created or flipped) or from CHECKED_IN (record status
+          becomes ABSENT). CHECKED_OUT is terminal (ManualReviewConflict).
+
+    Effects:
+        - CHECK_IN: creates MANUAL_CHECK_IN event (status PRESENT) and a
+          PRESENT AttendanceRecord (MANUAL_ENTRY, entry_verification_id
+          null, hall/seat/session snapshot).
+        - CHECK_OUT from NOT_REVIEWED: creates MANUAL_CHECK_OUT event only.
+        - CHECK_OUT from CHECKED_IN: creates MANUAL_CHECK_OUT event
+          (snapshot ABSENT) and flips the record to ABSENT.
+
+    Returns:
+        (event, record) — record is None for event-only check-out.
+
+    Raises:
+        LookupError: If registration not found.
+        ManualReviewConflict: On precondition/state conflicts (HTTP 409).
+        ValueError: On validation errors (HTTP 422).
+    """
+    if action not in MANUAL_REVIEW_ACTIONS:
+        raise ValueError(
+            f"Invalid review action '{action}'. "
+            f"Allowed: {sorted(MANUAL_REVIEW_ACTIONS)}"
+        )
+    if not reason or not reason.strip():
+        raise ValueError("Reason is required for a manual review decision")
+    if not recorded_by or not recorded_by.strip():
+        raise ValueError("recorded_by is required for a manual review decision")
+
+    reg = _get_registration(db, exam_registration_id)
+    if reg.status == RegistrationStatus.CANCELLED.value:
+        raise ValueError(f"Registration {exam_registration_id} is cancelled")
+
+    attempt = _get_latest_attempt(db, exam_registration_id)
+    if attempt is None:
+        raise ManualReviewConflict(
+            f"No identity verification attempt found for registration "
+            f"{exam_registration_id} — manual review is only available after "
+            f"an identity check has been run"
+        )
+    if attempt.decision != IdentityVerificationDecision.INCONCLUSIVE.value:
+        raise ManualReviewConflict(
+            f"Latest identity verification decision is {attempt.decision}, "
+            f"not INCONCLUSIVE — manual review does not apply"
+        )
+
+    session = _get_session(db, reg.exam_id, hall_id)
+    if session is None:
+        raise ManualReviewConflict(
+            f"No examination session found for exam {reg.exam_id} in "
+            f"hall {hall_id} — start the exam before recording a manual "
+            f"review decision"
+        )
+    if session.status != SessionStatus.IN_PROGRESS.value:
+        raise ManualReviewConflict(
+            f"Examination session for exam {reg.exam_id} in hall "
+            f"{hall_id} is {session.status}, not IN_PROGRESS — start the "
+            f"exam before recording a manual review decision"
+        )
+
+    review_state = get_review_state(db, exam_registration_id)
+
+    with db.no_autoflush:
+        record = (
+            db.query(AttendanceRecord)
+            .filter(
+                AttendanceRecord.exam_registration_id == exam_registration_id
+            )
+            .first()
+        )
+
+    now = datetime.now(timezone.utc)
+    reason_clean = reason.strip()
+    recorded_by_clean = recorded_by.strip()
+
+    if action == "CHECK_IN":
+        if review_state != REVIEW_NOT_REVIEWED:
+            raise ManualReviewConflict(
+                f"Registration {exam_registration_id} is already "
+                f"{review_state} — reload the review panel for current state"
+            )
+        if record is not None:
+            raise ManualReviewConflict(
+                f"Attendance already recorded for registration "
+                f"{exam_registration_id} ({record.status} via "
+                f"{record.entry_method}) — use attendance correction instead"
+            )
+
+        seat_number = None
+        seat = (
+            db.query(SeatAssignment)
+            .filter(
+                SeatAssignment.exam_registration_id == exam_registration_id,
+                SeatAssignment.status == SeatAssignmentStatus.ASSIGNED.value,
+            )
+            .first()
+        )
+        if seat is not None:
+            seat_number = seat.seat_number
+
+        event = AttendanceEvent(
+            student_id=reg.student_id,
+            exam_id=reg.exam_id,
+            exam_registration_id=exam_registration_id,
+            entry_verification_id=None,
+            event_type=AttendanceEventType.MANUAL_CHECK_IN.value,
+            status_snapshot=AttendanceStatus.PRESENT.value,
+            recorded_by=recorded_by_clean,
+            reason=reason_clean,
+        )
+        db.add(event)
+
+        record = AttendanceRecord(
+            student_id=reg.student_id,
+            exam_id=reg.exam_id,
+            exam_registration_id=exam_registration_id,
+            status=AttendanceStatus.PRESENT.value,
+            entry_verification_id=None,
+            entry_method=EntryMethod.MANUAL_ENTRY.value,
+            entry_time=now,
+            hall_id=session.exam_hall_id,
+            session_id=session.id,
+            seat_number=seat_number,
+        )
+        db.add(record)
+    else:  # CHECK_OUT
+        if review_state == REVIEW_CHECKED_OUT:
+            raise ManualReviewConflict(
+                f"Registration {exam_registration_id} is already CHECKED_OUT"
+            )
+        if review_state == REVIEW_CHECKED_IN:
+            if record is None:
+                raise ManualReviewConflict(
+                    f"Registration {exam_registration_id} has a check-in "
+                    f"event but no attendance record — inconsistent state, "
+                    f"use attendance correction"
+                )
+            record.status = AttendanceStatus.ABSENT.value
+            snapshot = AttendanceStatus.ABSENT.value
+        else:
+            # NOT_REVIEWED: an existing record was created by verified entry
+            # or admin correction — a manual check-out must not flip it to
+            # ABSENT (never mark ABSENT from a face decision alone).
+            if record is not None:
+                raise ManualReviewConflict(
+                    f"Attendance already recorded for registration "
+                    f"{exam_registration_id} ({record.status} via "
+                    f"{record.entry_method}) — use attendance correction "
+                    f"instead"
+                )
+            snapshot = "N/A"
+
+        event = AttendanceEvent(
+            student_id=reg.student_id,
+            exam_id=reg.exam_id,
+            exam_registration_id=exam_registration_id,
+            entry_verification_id=None,
+            event_type=AttendanceEventType.MANUAL_CHECK_OUT.value,
+            status_snapshot=snapshot,
+            recorded_by=recorded_by_clean,
+            reason=reason_clean,
+        )
+        db.add(event)
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise ManualReviewConflict(
+            f"Concurrent manual review for registration "
+            f"{exam_registration_id} — reload and retry"
+        )
+
+    db.refresh(event)
+    if record is not None:
+        db.refresh(record)
+
+    logger.info(
+        "ATTENDANCE_AUDIT: registration_id=%d event=%s review_state=%s "
+        "attempt_id=%d recorded_by=%s reason=%s",
+        exam_registration_id,
+        event.event_type,
+        get_review_state(db, exam_registration_id),
+        attempt.id,
+        recorded_by_clean,
+        reason_clean,
+    )
+    return event, record
 
 
 # ---------------------------------------------------------------------------

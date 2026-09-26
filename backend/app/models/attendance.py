@@ -25,6 +25,8 @@ class AttendanceEventType(str, enum.Enum):
     ATTENDANCE_RECORDED = "ATTENDANCE_RECORDED"
     ATTENDANCE_CORRECTED = "ATTENDANCE_CORRECTED"
     ATTENDANCE_EXCUSED = "ATTENDANCE_EXCUSED"
+    MANUAL_CHECK_IN = "MANUAL_CHECK_IN"
+    MANUAL_CHECK_OUT = "MANUAL_CHECK_OUT"
 
 
 class AttendanceRecord(Base):
@@ -65,12 +67,12 @@ class AttendanceRecord(Base):
         index=True,
         comment="Current attendance status",
     )
-    entry_verification_id: Mapped[int] = mapped_column(
+    entry_verification_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("entry_verifications.id"),
-        nullable=False,
+        nullable=True,
         index=True,
-        comment="Entry verification that established this attendance",
+        comment="Entry verification that established this attendance (null for manual review)",
     )
     entry_method: Mapped[str] = mapped_column(
         String(50),
@@ -156,12 +158,12 @@ class AttendanceEvent(Base):
         index=True,
         comment="Exam registration this event is for",
     )
-    entry_verification_id: Mapped[int] = mapped_column(
+    entry_verification_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("entry_verifications.id"),
-        nullable=False,
+        nullable=True,
         index=True,
-        comment="Entry verification that triggered this event",
+        comment="Entry verification that triggered this event (null for manual review events)",
     )
     event_type: Mapped[str] = mapped_column(
         String(50),
