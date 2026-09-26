@@ -303,7 +303,14 @@ test.describe("Documents Upload and Process", () => {
     const processBtn = page.locator('button:has-text("Process")').first();
     if (await processBtn.isVisible()) {
       await processBtn.click();
-      await page.waitForTimeout(5000);
+      // OCR + extraction can take several seconds (tesseract cold start);
+      // poll for the success message instead of a fixed sleep.
+      await expect
+        .poll(async () => getPageText(page), {
+          timeout: 45_000,
+          message: "document processed confirmation",
+        })
+        .toContain("processed");
 
       const contentAfterProcess = await getPageText(page);
       expect(contentAfterProcess).toContain("processed");

@@ -354,6 +354,7 @@ def get_manual_review_status(
         latest_attempt_id=status["latest_attempt_id"],
         latest_attempt_decision=status["latest_attempt_decision"],
         session_status=status["session_status"],
+        seat_number=status.get("seat_number"),
         events=[
             AttendanceEventResponse.model_validate(ev)
             for ev in status["events"]

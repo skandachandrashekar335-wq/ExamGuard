@@ -58,6 +58,22 @@ def _download_reference_image(url: str) -> bytes:
     return data
 
 
+def invalidate_reference_cache(url: str | None = None) -> None:
+    """Drop cached reference bytes after a reference-face re-upload.
+
+    The cache is keyed by URL. If a re-upload returns the same URL (storage
+    backend quirk, CDN behaviour), verify-face would keep serving the OLD
+    image for up to the TTL — comparing the probe against a stale face.
+    Upload paths call this so every verification after a replace uses the
+    freshly stored bytes.
+    """
+    with _reference_cache_lock:
+        if url is None:
+            _reference_cache.clear()
+        else:
+            _reference_cache.pop(url, None)
+
+
 def _enforce_attempt_scope(db: Session, user: dict, attempt) -> None:
     """Enforce INVIGILATOR scope on an attempt. No-op for other roles."""
     if user.get("role") != Role.INVIGILATOR:
@@ -274,6 +290,10 @@ def save_reference_face(
     db.commit()
     db.refresh(attempt)
 
+    # A replaced reference must be re-downloaded on the next verify-face
+    # call — never served from the stale URL-keyed cache.
+    invalidate_reference_cache()
+
     return IdentityVerificationResponse.model_validate(attempt)
 
 
@@ -325,6 +345,40 @@ def create_attempt(
 ):
     try:
         return iv_service.create_attempt(db, data)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.post(
+    "/{attempt_id}/reverify",
+    response_model=IdentityVerificationResponse,
+    status_code=201,
+    summary="Start a fresh verification attempt (REVERIFY)",
+)
+def reverify_attempt(
+    attempt_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(
+        require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])
+    ),
+):
+    """Create a fresh attempt after a NO_MATCH or INCONCLUSIVE result.
+
+    The previous attempt and all of its evidence remain untouched. The new
+    attempt inherits the stored reference face and starts CREATED/PENDING
+    with a fresh rate-limit budget. INVIGILATOR may only reverify attempts
+    inside their assigned exam scope.
+    """
+    prev = iv_service.get_attempt(db, attempt_id)
+    if not prev:
+        raise HTTPException(
+            status_code=404, detail="Identity verification attempt not found"
+        )
+    _enforce_attempt_scope(db, _user, prev)
+    try:
+        return iv_service.create_reverify_attempt(db, attempt_id)
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -435,13 +489,17 @@ def get_attempt_context(
     evidence = ctx["evidence"]
     student = ctx["student"]
     exam = ctx["exam"]
+    from app.core.config import get_settings
+
     return IdentityVerificationContextResponse(
         attempt=IdentityVerificationResponse.model_validate(attempt),
         evidence=[
-            IdentityVerificationEvidenceResponse.model_validate(e) for e in evidence
+            IdentityVerificationEvidenceResponse.model_validate(e)
+            for e in evidence
         ],
         student=IdentityVerificationStudentInfo.model_validate(student) if student else None,
         exam=IdentityVerificationExamInfo.model_validate(exam) if exam else None,
+        match_threshold=get_settings().IDENTITY_VERIFICATION_MATCH_THRESHOLD,
     )
 
 

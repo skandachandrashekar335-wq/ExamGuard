@@ -378,11 +378,14 @@ def demo_status(
 
     exam = _latest_demo_exam(db, subject.id)
     students = db.execute(
-        select(Student).filter(Student.usn.in_(DEMO_STUDENT_USNS))
+        select(Student)
+        .filter(Student.usn.in_(DEMO_STUDENT_USNS))
+        .order_by(Student.id)
     ).scalars().all()
 
     session = None
     attempts = None
+    status_students = students
     if exam:
         session = db.execute(
             select(ExaminationSession)
@@ -391,20 +394,45 @@ def demo_status(
         ).scalars().first()
     if exam and students:
         student_ids = [s.id for s in students]
-        reg_ids = [
-            r.id for r in db.execute(
-                select(ExamRegistration).filter(
-                    ExamRegistration.exam_id == exam.id,
-                    ExamRegistration.student_id.in_(student_ids),
-                )
-            ).scalars().all()
-        ]
+        regs = db.execute(
+            select(ExamRegistration).filter(
+                ExamRegistration.exam_id == exam.id,
+                ExamRegistration.student_id.in_(student_ids),
+            ).order_by(ExamRegistration.id)
+        ).scalars().all()
+        reg_by_student = {r.student_id: r for r in regs}
+        reg_ids = [r.id for r in regs]
         if reg_ids:
-            attempts = db.execute(
+            all_attempts = db.execute(
                 select(IdentityVerificationAttempt)
-                .filter(IdentityVerificationAttempt.exam_registration_id.in_(reg_ids))
-                .order_by(IdentityVerificationAttempt.id)
+                .filter(
+                    IdentityVerificationAttempt.exam_registration_id.in_(reg_ids)
+                )
+                .order_by(IdentityVerificationAttempt.id.desc())
             ).scalars().all()
+            latest_by_reg: dict[int, IdentityVerificationAttempt] = {}
+            for att in all_attempts:
+                # id DESC scan → first hit is the newest attempt per
+                # registration (reverify creates follow-up attempts).
+                latest_by_reg.setdefault(att.exam_registration_id, att)
+            kept_students: list[Student] = []
+            kept_attempts: list[IdentityVerificationAttempt] = []
+            for s in students:
+                reg = reg_by_student.get(s.id)
+                if reg is None:
+                    continue
+                att = latest_by_reg.get(reg.id)
+                if att is not None:
+                    kept_students.append(s)
+                    kept_attempts.append(att)
+            if kept_attempts:
+                # Student list and attempt list are built in the same
+                # iteration, so demo_student_usns[i] always names the owner
+                # of demo_attempt_ids[i] / reference_face_urls[i] — the
+                # index-zipped response cannot drift apart even when a
+                # registration has multiple attempts or query order differs.
+                status_students = kept_students
+                attempts = kept_attempts
 
     ref_urls = []
     if attempts:
@@ -420,9 +448,9 @@ def demo_status(
         loaded=True,
         demo_exam_id=exam.id if exam else None,
         demo_hall_id=session.exam_hall_id if session else None,
-        demo_student_ids=[s.id for s in students] if students else None,
-        demo_student_usns=[s.usn for s in students] if students else None,
-        demo_student_names=[s.name for s in students] if students else None,
+        demo_student_ids=[s.id for s in status_students] if status_students else None,
+        demo_student_usns=[s.usn for s in status_students] if status_students else None,
+        demo_student_names=[s.name for s in status_students] if status_students else None,
         demo_session_id=session.id if session else None,
         demo_attempt_ids=[a.id for a in attempts] if attempts else None,
         reference_face_urls=ref_urls if ref_urls else None,
@@ -958,6 +986,12 @@ def demo_upload_reference_face(
     attempt.reference_face_url = url
     db.commit()
     db.refresh(attempt)
+
+    # Ensure the next verify-face downloads the freshly saved bytes instead
+    # of a cached copy keyed by the (possibly unchanged) URL.
+    from app.api.v1.identity_verification import invalidate_reference_cache
+
+    invalidate_reference_cache()
 
     return {
         "status": "saved",

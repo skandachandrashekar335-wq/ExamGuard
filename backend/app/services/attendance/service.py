@@ -651,6 +651,15 @@ def get_manual_review_status(
     reg = _get_registration(db, exam_registration_id)
     attempt = _get_latest_attempt(db, exam_registration_id)
     session = _get_session(db, reg.exam_id, hall_id)
+    with db.no_autoflush:
+        seat = (
+            db.query(SeatAssignment)
+            .filter(
+                SeatAssignment.exam_registration_id == exam_registration_id,
+                SeatAssignment.status == SeatAssignmentStatus.ASSIGNED.value,
+            )
+            .first()
+        )
     events = (
         db.query(AttendanceEvent)
         .filter(AttendanceEvent.exam_registration_id == exam_registration_id)
@@ -663,6 +672,7 @@ def get_manual_review_status(
         "latest_attempt_id": attempt.id if attempt else None,
         "latest_attempt_decision": attempt.decision if attempt else None,
         "session_status": session.status if session else None,
+        "seat_number": seat.seat_number if seat else None,
         "events": events,
     }
 
@@ -738,6 +748,15 @@ def record_manual_review(
             f"an identity check has been run"
         )
     if attempt.decision != IdentityVerificationDecision.INCONCLUSIVE.value:
+        if attempt.decision == IdentityVerificationDecision.NO_MATCH.value:
+            # Hard security rule: an automated NO_MATCH must never be
+            # manually allowed — not via UI, API, or any hidden path.
+            # Only REVERIFY (a fresh attempt) is available for NO_MATCH.
+            raise ManualReviewConflict(
+                f"Latest identity verification decision is NO_MATCH — "
+                f"manual review cannot allow a failed identity check; "
+                f"only REVERIFY is available"
+            )
         raise ManualReviewConflict(
             f"Latest identity verification decision is {attempt.decision}, "
             f"not INCONCLUSIVE — manual review does not apply"

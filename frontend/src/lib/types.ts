@@ -42,6 +42,7 @@ export interface VerificationContext {
   evidence: IdentityVerificationEvidence[];
   student: StudentInfo | null;
   exam: ExamInfo | null;
+  match_threshold?: number | null;
 }
 
 export interface VerificationListResponse {

@@ -397,6 +397,13 @@ body {
    FORMS
    ======================================== */
 
+/* Visible label for an sr-only file input (reference-photo cards). The
+   input stays keyboard-focusable; the focus ring is drawn on the label. */
+.eg-file-label:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .eg-input {
   font-family: var(--font-body);
   font-size: 0.8125rem;

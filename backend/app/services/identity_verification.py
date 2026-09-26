@@ -196,6 +196,66 @@ def create_attempt(
     return attempt
 
 
+def create_reverify_attempt(
+    db: Session, attempt_id: int
+) -> IdentityVerificationAttempt:
+    """Create a fresh attempt for a finished (NO_MATCH/INCONCLUSIVE/failed) one.
+
+    Invigilator REVERIFY flow. The previous attempt and its evidence are
+    never modified — history stays intact for audit. The new attempt:
+    - copies the student/registration/hall-ticket binding (revalidated),
+    - copies reference_face_url so the same stored reference is compared,
+    - starts CREATED / PENDING, which resets the per-attempt rate-limit
+      budget and drops any accumulated evidence from the prior attempt.
+
+    Raises:
+        LookupError: attempt not found.
+        ValueError: previous attempt not terminal, already MATCH, another
+            active attempt exists, or binding no longer authorized.
+    """
+    prev = get_attempt(db, attempt_id)
+    if not prev:
+        raise LookupError(f"Identity verification attempt {attempt_id} not found")
+
+    if prev.status not in (
+        IdentityVerificationStatus.COMPLETED.value,
+        IdentityVerificationStatus.FAILED.value,
+    ):
+        raise ValueError(
+            f"Attempt {attempt_id} is {prev.status} — reverify is only "
+            f"available after the previous check has finished"
+        )
+
+    if prev.decision == IdentityVerificationDecision.MATCH.value:
+        raise ValueError(
+            "Attempt already resulted in MATCH — reverify does not apply"
+        )
+
+    # Enrollment / reference-ownership must still hold for the new attempt.
+    validate_attempt_authorization(db, prev)
+    _check_duplicate_active(db, prev.student_id, prev.exam_registration_id)
+
+    attempt = IdentityVerificationAttempt(
+        student_id=prev.student_id,
+        exam_registration_id=prev.exam_registration_id,
+        hall_ticket_id=prev.hall_ticket_id,
+        status=IdentityVerificationStatus.CREATED.value,
+        verification_method=prev.verification_method,
+        decision=IdentityVerificationDecision.PENDING.value,
+        reference_face_url=prev.reference_face_url,
+    )
+    db.add(attempt)
+    db.commit()
+    db.refresh(attempt)
+    logger.info(
+        "Reverify attempt %s created from attempt %s (student %s)",
+        attempt.id,
+        attempt_id,
+        attempt.student_id,
+    )
+    return attempt
+
+
 def get_attempt(db: Session, attempt_id: int) -> IdentityVerificationAttempt | None:
     return (
         db.query(IdentityVerificationAttempt)

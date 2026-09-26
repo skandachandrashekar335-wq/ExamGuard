@@ -78,6 +78,14 @@ export async function evaluateEvidence(
   });
 }
 
+export async function reverifyAttempt(
+  id: number,
+): Promise<IdentityVerificationAttempt> {
+  return apiRequest(`/api/v1/identity-verifications/${id}/reverify`, {
+    method: "POST",
+  });
+}
+
 export async function reviewAttempt(
   id: number,
   reviewer_notes?: string,

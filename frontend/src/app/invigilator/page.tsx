@@ -14,7 +14,13 @@ import {
   submitManualReview,
   type ManualReviewStatus,
 } from "@/lib/attendance-api";
-import { getAttemptContext, verifyFace, evaluateEvidence, ApiError as IvApiError } from "@/lib/iv-api";
+import {
+  getAttemptContext,
+  verifyFace,
+  evaluateEvidence,
+  reverifyAttempt,
+  ApiError as IvApiError,
+} from "@/lib/iv-api";
 import type { VerificationContext } from "@/lib/types";
 import CameraCapture, { type CameraCaptureHandle, type CameraState } from "@/components/CameraCapture";
 import EvidenceDisplay from "@/components/EvidenceDisplay";
@@ -99,6 +105,27 @@ function stripErrorPrefix(msg: string): string {
   return msg;
 }
 
+function formatAutomatedResult(ctx: VerificationContext | null): string {
+  if (!ctx) return "Unavailable";
+  const sim = ctx.evidence.find((e) => e.signal_type === "similarity_score");
+  const live = ctx.evidence.find((e) => e.signal_type === "liveness");
+  const parts: string[] = [ctx.attempt.decision || "PENDING"];
+  const simValue = sim?.confidence ?? sim?.signal_value;
+  if (simValue !== null && simValue !== undefined) {
+    parts.push(`similarity ${Number(simValue).toFixed(3)}`);
+  }
+  if (ctx.match_threshold != null) {
+    parts.push(`threshold ${ctx.match_threshold.toFixed(3)}`);
+  }
+  if (live?.signal_value) {
+    parts.push(`liveness ${live.signal_value}`);
+  }
+  if (ctx.attempt.completed_at) {
+    parts.push(new Date(ctx.attempt.completed_at).toLocaleString());
+  }
+  return parts.join(" · ");
+}
+
 interface RegisteredStudent {
   registration_id: number;
   student_id: number;
@@ -157,9 +184,18 @@ export default function InvigilatorPage() {
   const loopRunningRef = useRef(false);
   const verifyStateRef = useRef<VerifyPhase>("idle");
   const selectedRef = useRef<RegisteredStudent | null>(null);
+  const verifyAttemptIdRef = useRef<number | null>(null);
+  const autoVerifyRef = useRef(false);
+  const reverifyLoadingRef = useRef(false);
 
   const [reviewStudent, setReviewStudent] = useState<RegisteredStudent | null>(null);
   const [reviewStatus, setReviewStatus] = useState<ManualReviewStatus | null>(null);
+  const [reviewCtx, setReviewCtx] = useState<VerificationContext | null>(null);
+  const [reviewOutcome, setReviewOutcome] = useState<{
+    outcome: string;
+    automated: string;
+  } | null>(null);
+  const [reverifyLoading, setReverifyLoading] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewAction, setReviewAction] = useState<"CHECK_IN" | "CHECK_OUT" | null>(null);
   const [reviewReason, setReviewReason] = useState("");
@@ -199,7 +235,9 @@ export default function InvigilatorPage() {
   const handleCloseVerify = useCallback(() => {
     stopVerificationLoop();
     cameraRef.current?.stop();
+    autoVerifyRef.current = false;
     setVerifyAttemptId(null);
+    verifyAttemptIdRef.current = null;
     setSelectedStudent(null);
     setVerifyCtx(null);
     setVerifyState("idle");
@@ -305,12 +343,24 @@ export default function InvigilatorPage() {
   const handleOpenReview = async (student: RegisteredStudent) => {
     setReviewStudent(student);
     setReviewStatus(null);
+    setReviewCtx(null);
+    setReviewOutcome(null);
     setReviewMsg(null);
     setReviewReason("");
     setReviewLoading(true);
     try {
       const status = await getManualReviewStatus(student.registration_id);
       setReviewStatus(status);
+      // Best-effort attempt context: exam/evidence/threshold shown in the
+      // review panel. The decision itself stays server-authoritative.
+      if (status.latest_attempt_id != null) {
+        try {
+          const ctx = await getAttemptContext(status.latest_attempt_id);
+          setReviewCtx(ctx);
+        } catch {
+          setReviewCtx(null);
+        }
+      }
     } catch (e: unknown) {
       setReviewMsgKind("danger");
       setReviewMsg(
@@ -326,6 +376,8 @@ export default function InvigilatorPage() {
     setProbe(null);
     setReviewStudent(null);
     setReviewStatus(null);
+    setReviewCtx(null);
+    setReviewOutcome(null);
     setReviewMsg(null);
     setReviewReason("");
   };
@@ -351,11 +403,14 @@ export default function InvigilatorPage() {
       setReviewStatus(fresh);
       setReviewReason("");
       setReviewMsgKind("success");
-      setReviewMsg(
-        action === "CHECK_IN"
-          ? "Candidate checked in."
-          : "Candidate checked out.",
-      );
+      setReviewMsg("Manual review recorded.");
+      setReviewOutcome({
+        outcome:
+          action === "CHECK_IN"
+            ? "ALLOW ENTRY — candidate admitted (CHECKED_IN)"
+            : "DENY ENTRY — candidate not admitted (CHECKED_OUT)",
+        automated: formatAutomatedResult(reviewCtx),
+      });
       await load();
     } catch (e: unknown) {
       setReviewMsgKind("danger");
@@ -516,49 +571,57 @@ export default function InvigilatorPage() {
     [load, setProbe],
   );
 
-  const handleStartVerify = async (student: RegisteredStudent) => {
-    const attemptId = student.attempt_id;
-    if (!attemptId) return;
-    stopVerificationLoop();
-    setSelectedStudent(student);
-    setVerifyAttemptId(attemptId);
-    setVerifyState("starting");
-    setVerifyResult(null);
-    setVerifyError(null);
-    setVerifyCtx(null);
-    setCameraState("idle");
-    setCameraMessage("");
-    setLoopStatus("Starting camera...");
-    setCameraKey((k) => k + 1);
+  const handleStartVerify = useCallback(
+    async (
+      student: RegisteredStudent,
+      opts?: { autoVerify?: boolean },
+    ) => {
+      const attemptId = student.attempt_id;
+      if (!attemptId) return;
+      stopVerificationLoop();
+      autoVerifyRef.current = opts?.autoVerify === true;
+      setSelectedStudent(student);
+      setVerifyAttemptId(attemptId);
+      verifyAttemptIdRef.current = attemptId;
+      setVerifyState("starting");
+      setVerifyResult(null);
+      setVerifyError(null);
+      setVerifyCtx(null);
+      setCameraState("idle");
+      setCameraMessage("");
+      setLoopStatus("Starting camera...");
+      setCameraKey((k) => k + 1);
 
-    try {
-      const ctx = await getAttemptContext(attemptId);
-      setVerifyCtx(ctx);
+      try {
+        const ctx = await getAttemptContext(attemptId);
+        setVerifyCtx(ctx);
 
-      if (
-        ctx.attempt.decision &&
-        ctx.attempt.decision !== "PENDING" &&
-        (ctx.attempt.status === "COMPLETED" || ctx.attempt.status === "FAILED")
-      ) {
-        setVerifyResult({
-          decision: ctx.attempt.decision,
-          evidence: ctx.evidence || [],
-          verifiedAt: ctx.attempt.completed_at || new Date().toISOString(),
-          provider:
-            (ctx.evidence || []).find((e) => e.provider_name)?.provider_name ||
-            null,
-          evidenceId: null,
-        });
-        setVerifyState("done");
-        setLoopStatus("Verification complete");
-        return;
+        if (
+          ctx.attempt.decision &&
+          ctx.attempt.decision !== "PENDING" &&
+          (ctx.attempt.status === "COMPLETED" || ctx.attempt.status === "FAILED")
+        ) {
+          setVerifyResult({
+            decision: ctx.attempt.decision,
+            evidence: ctx.evidence || [],
+            verifiedAt: ctx.attempt.completed_at || new Date().toISOString(),
+            provider:
+              (ctx.evidence || []).find((e) => e.provider_name)?.provider_name ||
+              null,
+            evidenceId: null,
+          });
+          setVerifyState("done");
+          setLoopStatus("Verification complete");
+          return;
+        }
+      } catch {
+        setVerifyErrorKind("server");
+        setVerifyError("Failed to load attempt context");
+        setVerifyState("error");
       }
-    } catch {
-      setVerifyErrorKind("server");
-      setVerifyError("Failed to load attempt context");
-      setVerifyState("error");
-    }
-  };
+    },
+    [stopVerificationLoop],
+  );
 
   const handleCameraState = useCallback(
     (state: CameraState, message?: string) => {
@@ -568,12 +631,22 @@ export default function InvigilatorPage() {
       if (state === "active" && phase === "starting") {
         setVerifyState("ready");
         setLoopStatus("Position your face inside the frame");
+        if (autoVerifyRef.current) {
+          // REVERIFY: once the fresh camera session is live, go straight
+          // into the verification loop ([REVERIFY] → [VERIFYING...]).
+          autoVerifyRef.current = false;
+          const aid = verifyAttemptIdRef.current;
+          if (aid != null) {
+            setTimeout(() => void runVerificationLoop(aid), 300);
+          }
+        }
       }
       if (state === "requesting" && (phase === "starting" || phase === "ready")) {
         setLoopStatus("Starting camera...");
       }
       if ((state === "error" || state === "unsupported") && phase !== "done") {
         stopVerificationLoop();
+        autoVerifyRef.current = false;
         setLoopStatus(
           state === "unsupported" ? "Camera unavailable" : message || "Camera unavailable",
         );
@@ -586,7 +659,7 @@ export default function InvigilatorPage() {
         setVerifyState("error");
       }
     },
-    [stopVerificationLoop],
+    [stopVerificationLoop, runVerificationLoop],
   );
 
   const handleVerifyNow = () => {
@@ -597,6 +670,7 @@ export default function InvigilatorPage() {
   const handleRetry = () => {
     if (!verifyAttemptId) return;
     stopVerificationLoop();
+    autoVerifyRef.current = false;
     cameraRef.current?.stop();
     setVerifyError(null);
     setVerifyResult(null);
@@ -605,6 +679,50 @@ export default function InvigilatorPage() {
     setCameraState("idle");
     setCameraKey((k) => k + 1);
   };
+
+  // REVERIFY — start a fresh attempt for the same candidate. The previous
+  // attempt and all of its evidence stay untouched on the server; only the
+  // new attempt receives camera frames, with a fresh rate-limit budget.
+  const handleReverify = useCallback(
+    async (source: RegisteredStudent, attemptId: number) => {
+      if (reverifyLoadingRef.current) return;
+      reverifyLoadingRef.current = true;
+      setReverifyLoading(true);
+      try {
+        const fresh = await reverifyAttempt(attemptId);
+        const updated: RegisteredStudent = {
+          ...source,
+          attempt_id: fresh.id,
+          attempt_status: fresh.status,
+          attempt_decision: fresh.decision,
+          reference_face_url:
+            fresh.reference_face_url ?? source.reference_face_url,
+        };
+        // Point the stale-selection guard at the fresh attempt BEFORE any
+        // data refresh can observe the old one.
+        selectedRef.current = updated;
+        setStudents((prev) =>
+          prev.map((s) =>
+            s.registration_id === updated.registration_id ? updated : s,
+          ),
+        );
+        await handleStartVerify(updated, { autoVerify: true });
+      } catch (e: unknown) {
+        autoVerifyRef.current = false;
+        setVerifyErrorKind("server");
+        setVerifyError(
+          e instanceof ApiError
+            ? e.message
+            : "Failed to start a new verification attempt",
+        );
+        setVerifyState("error");
+      } finally {
+        reverifyLoadingRef.current = false;
+        setReverifyLoading(false);
+      }
+    },
+    [handleStartVerify],
+  );
 
   useEffect(() => {
     return () => {
@@ -680,6 +798,16 @@ export default function InvigilatorPage() {
     !reviewCanAct || reviewStatus?.review_state !== "NOT_REVIEWED";
   const reviewCheckOutDisabled =
     !reviewCanAct || reviewStatus?.review_state === "CHECKED_OUT";
+
+  const reviewSimEvidence = reviewCtx?.evidence.find(
+    (e) => e.signal_type === "similarity_score",
+  );
+  const reviewLiveEvidence = reviewCtx?.evidence.find(
+    (e) => e.signal_type === "liveness",
+  );
+  const reviewSimValue =
+    reviewSimEvidence?.confidence ?? reviewSimEvidence?.signal_value;
+  const reviewAttemptId = reviewStatus?.latest_attempt_id ?? null;
 
   const reviewRefUrl = reviewStudent?.reference_face_url;
   const reviewSafeRefUrl =
@@ -1110,6 +1238,11 @@ export default function InvigilatorPage() {
                             : verifyResult.provider
                           : "—"}
                       </span>
+                      {verifyCtx?.match_threshold != null && (
+                        <span>
+                          Match threshold: {verifyCtx.match_threshold.toFixed(3)}
+                        </span>
+                      )}
                       {verifyResult.evidenceId != null && (
                         <span>Evidence ID: #{verifyResult.evidenceId}</span>
                       )}
@@ -1117,18 +1250,62 @@ export default function InvigilatorPage() {
                     {verifyResult.evidence.length > 0 && (
                       <EvidenceDisplay evidence={verifyResult.evidence as VerificationContext["evidence"]} />
                     )}
+                    {verifyResult.decision === "NO_MATCH" && (
+                      <div className="eg-alert eg-alert-danger" style={{ fontSize: "0.75rem" }}>
+                        Automated result: identity not verified. A manual
+                        allow is never available for a failed check — run
+                        REVERIFY or contact an operator.
+                      </div>
+                    )}
+                    {verifyResult.decision === "INCONCLUSIVE" && (
+                      <div className="eg-alert" style={{ fontSize: "0.75rem" }}>
+                        Automated result is inconclusive. An invigilator must
+                        record ALLOW ENTRY or DENY ENTRY with a reason, or run
+                        REVERIFY for a fresh check.
+                      </div>
+                    )}
+                    {(verifyResult.decision === "NO_MATCH" ||
+                      verifyResult.decision === "INCONCLUSIVE") &&
+                      selectedStudent &&
+                      verifyAttemptId != null && (
+                        <button
+                          onClick={() =>
+                            void handleReverify(selectedStudent, verifyAttemptId)
+                          }
+                          disabled={reverifyLoading}
+                          className="eg-btn eg-btn-primary"
+                          style={{ width: "100%", whiteSpace: "normal" }}
+                        >
+                          {reverifyLoading
+                            ? "Starting new check..."
+                            : "REVERIFY"}
+                        </button>
+                      )}
                     {verifyResult.decision === "INCONCLUSIVE" && selectedStudent && (
-                      <button
-                        onClick={() => {
-                          const student = selectedStudent;
-                          handleCloseVerify();
-                          void handleOpenReview(student);
-                        }}
-                        className="eg-btn eg-btn-primary"
-                        style={{ width: "100%" }}
-                      >
-                        Review Identity
-                      </button>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => {
+                            const student = selectedStudent;
+                            handleCloseVerify();
+                            void handleOpenReview(student);
+                          }}
+                          className="eg-btn eg-btn-primary"
+                          style={{ flex: 1, whiteSpace: "normal" }}
+                        >
+                          ALLOW ENTRY
+                        </button>
+                        <button
+                          onClick={() => {
+                            const student = selectedStudent;
+                            handleCloseVerify();
+                            void handleOpenReview(student);
+                          }}
+                          className="eg-btn eg-btn-danger"
+                          style={{ flex: 1, whiteSpace: "normal" }}
+                        >
+                          DENY ENTRY
+                        </button>
+                      </div>
                     )}
                     <button onClick={handleCloseVerify} className="eg-btn" style={{ width: "100%" }}>
                       Close
@@ -1237,6 +1414,22 @@ export default function InvigilatorPage() {
                     {reviewMsg}
                   </div>
                 )}
+                {reviewOutcome && reviewMsgKind === "success" && (
+                  <div
+                    className="eg-alert eg-alert-success"
+                    style={{ fontSize: "0.8125rem" }}
+                  >
+                    <strong style={{ display: "block", marginBottom: "0.25rem" }}>
+                      Manual review recorded
+                    </strong>
+                    <span style={{ display: "block" }}>
+                      Outcome: {reviewOutcome.outcome}
+                    </span>
+                    <span style={{ display: "block" }}>
+                      Automated result: {reviewOutcome.automated}
+                    </span>
+                  </div>
+                )}
 
                 <div className="eg-grid-2">
                   <div>
@@ -1319,7 +1512,7 @@ export default function InvigilatorPage() {
                   <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                     <div className="eg-grid-2" style={{ gap: "0.5rem 1rem", fontSize: "0.8125rem" }}>
                       <span style={{ color: "var(--text-muted)" }}>
-                        Latest check:{" "}
+                        Automated result:{" "}
                         <span style={{ color: "var(--text-secondary)" }}>
                           {reviewStatus.latest_attempt_decision || "None"}
                         </span>
@@ -1330,6 +1523,56 @@ export default function InvigilatorPage() {
                           {reviewStatus.session_status || "No session"}
                         </span>
                       </span>
+                      {reviewCtx?.exam?.exam_name && (
+                        <span style={{ color: "var(--text-muted)" }}>
+                          Exam:{" "}
+                          <span style={{ color: "var(--text-secondary)" }}>
+                            {reviewCtx.exam.exam_name}
+                          </span>
+                        </span>
+                      )}
+                      {reviewStatus.seat_number && (
+                        <span style={{ color: "var(--text-muted)" }}>
+                          Seat:{" "}
+                          <span style={{ color: "var(--text-secondary)" }}>
+                            {reviewStatus.seat_number}
+                          </span>
+                        </span>
+                      )}
+                      {reviewSimValue != null && (
+                        <span style={{ color: "var(--text-muted)" }}>
+                          Similarity:{" "}
+                          <span style={{ color: "var(--text-secondary)" }}>
+                            {Number(reviewSimValue).toFixed(3)}
+                          </span>
+                        </span>
+                      )}
+                      {reviewCtx?.match_threshold != null && (
+                        <span style={{ color: "var(--text-muted)" }}>
+                          Match threshold:{" "}
+                          <span style={{ color: "var(--text-secondary)" }}>
+                            {reviewCtx.match_threshold.toFixed(3)}
+                          </span>
+                        </span>
+                      )}
+                      {reviewLiveEvidence?.signal_value && (
+                        <span style={{ color: "var(--text-muted)" }}>
+                          Liveness:{" "}
+                          <span style={{ color: "var(--text-secondary)" }}>
+                            {reviewLiveEvidence.signal_value}
+                          </span>
+                        </span>
+                      )}
+                      {reviewCtx?.attempt?.completed_at && (
+                        <span style={{ color: "var(--text-muted)" }}>
+                          Check time:{" "}
+                          <span style={{ color: "var(--text-secondary)" }}>
+                            {new Date(
+                              reviewCtx.attempt.completed_at,
+                            ).toLocaleString()}
+                          </span>
+                        </span>
+                      )}
                       {reviewStatus.latest_attempt_id != null && (
                         <span style={{ color: "var(--text-muted)" }}>
                           Attempt:{" "}
@@ -1417,10 +1660,10 @@ export default function InvigilatorPage() {
                     <div>
                       <p className="eg-page-desc" style={{ fontSize: "0.8125rem", marginBottom: "0.5rem" }}>
                         {reviewStatus.review_state === "CHECKED_IN"
-                          ? "Candidate is checked in. Checking out now records the candidate as absent."
+                          ? "Candidate is ALLOWED ENTRY (checked in). A later DENY ENTRY records the candidate as absent."
                           : reviewStatus.review_state === "CHECKED_OUT"
-                            ? "Candidate has been checked out. Attendance can only be changed afterwards by an admin correction."
-                            : "Check In admits the candidate. Check Out records that the candidate was not admitted."}
+                            ? "Candidate has been DENIED ENTRY. Attendance can only be changed afterwards by an admin correction."
+                            : "ALLOW ENTRY admits the candidate. DENY ENTRY records that the candidate was not admitted. A reason is required for both."}
                       </p>
                       <label className="eg-label" htmlFor="manual-review-reason">
                         Reason (required)
@@ -1440,19 +1683,56 @@ export default function InvigilatorPage() {
                           onClick={() => void handleSubmitReview("CHECK_IN")}
                           disabled={reviewCheckInDisabled}
                           className="eg-btn eg-btn-primary"
-                          style={{ flex: 1 }}
+                          style={{ flex: 1, whiteSpace: "normal" }}
                         >
-                          {reviewAction === "CHECK_IN" ? "Checking in..." : "Check In"}
+                          {reviewAction === "CHECK_IN"
+                            ? "Allowing..."
+                            : "ALLOW ENTRY"}
                         </button>
                         <button
                           onClick={() => void handleSubmitReview("CHECK_OUT")}
                           disabled={reviewCheckOutDisabled}
                           className="eg-btn eg-btn-danger"
-                          style={{ flex: 1 }}
+                          style={{ flex: 1, whiteSpace: "normal" }}
                         >
-                          {reviewAction === "CHECK_OUT" ? "Checking out..." : "Check Out"}
+                          {reviewAction === "CHECK_OUT"
+                            ? "Denying..."
+                            : "DENY ENTRY"}
                         </button>
                       </div>
+                      <button
+                        onClick={() => {
+                          if (
+                            !reviewStudent ||
+                            reviewAttemptId == null ||
+                            reviewAction ||
+                            !reviewStatus.latest_attempt_decision ||
+                            reviewStatus.latest_attempt_decision === "PENDING"
+                          ) {
+                            return;
+                          }
+                          const student = reviewStudent;
+                          setReviewStudent(null);
+                          void handleReverify(student, reviewAttemptId);
+                        }}
+                        disabled={
+                          reviewAttemptId == null ||
+                          !!reviewAction ||
+                          reverifyLoading ||
+                          !reviewStatus.latest_attempt_decision ||
+                          reviewStatus.latest_attempt_decision === "PENDING"
+                        }
+                        className="eg-btn"
+                        style={{
+                          width: "100%",
+                          whiteSpace: "normal",
+                          marginTop: "0.75rem",
+                        }}
+                      >
+                        {reverifyLoading
+                          ? "Starting new check..."
+                          : "REVERIFY"}
+                      </button>
                     </div>
                   </div>
                 ) : null}

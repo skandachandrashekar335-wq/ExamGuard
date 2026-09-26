@@ -110,13 +110,14 @@ class IdentityVerificationExamInfo(BaseModel):
     subject_id: int
     exam_name: str
 
-
 class IdentityVerificationContextResponse(BaseModel):
     """Full context response with student and exam info."""
+
     attempt: IdentityVerificationResponse
     evidence: list[IdentityVerificationEvidenceResponse]
     student: IdentityVerificationStudentInfo | None = None
     exam: IdentityVerificationExamInfo | None = None
+    match_threshold: float | None = None
 
 
 class VerifyFaceResponse(BaseModel):

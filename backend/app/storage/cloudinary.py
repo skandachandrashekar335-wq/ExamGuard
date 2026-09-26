@@ -112,7 +112,24 @@ class CloudinaryStorage(StorageBackend):
                     public_id=cloud_key,
                     resource="raw",
                     folder="examguard",
+                    # Deterministic keys (e.g. face-references/attempt-N) are
+                    # re-used on every replace. Cloudinary's default is
+                    # overwrite=False, which silently DISCARDS the new bytes
+                    # and returns the existing asset — a replaced reference
+                    # photo would never take effect. overwrite=True makes a
+                    # save actually replace the stored object; invalidate
+                    # purges the CDN copy so consumers fetch the new bytes.
+                    overwrite=True,
+                    invalidate=True,
                 )
+                if result.get("existing"):
+                    # Defensive: with overwrite=True this should never happen,
+                    # but if it does the uploaded bytes were discarded — fail
+                    # loudly instead of silently keeping stale content.
+                    raise RuntimeError(
+                        "Cloudinary kept the existing asset for key "
+                        f"{cloud_key}; uploaded bytes were not stored"
+                    )
                 secure_url = result.get("secure_url")
                 if not secure_url:
                     raise RuntimeError("Cloudinary upload returned no secure_url")

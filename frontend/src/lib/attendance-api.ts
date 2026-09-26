@@ -69,6 +69,7 @@ export interface ManualReviewStatus {
   latest_attempt_id: number | null;
   latest_attempt_decision: string | null;
   session_status: string | null;
+  seat_number?: string | null;
   events: AttendanceEvent[];
 }
 

@@ -145,6 +145,7 @@ class ManualReviewStatusResponse(BaseModel):
     latest_attempt_id: int | None
     latest_attempt_decision: str | None
     session_status: str | None
+    seat_number: str | None = None
     events: list[AttendanceEventResponse]
 
 

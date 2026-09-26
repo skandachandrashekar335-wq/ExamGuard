@@ -433,89 +433,219 @@ export default function DashboardPage() {
               <p className="text-xs text-[var(--text-muted)] mb-4">
                 Upload one clear face photo for each demo candidate. Each photo becomes that student&apos;s reference face for live verification.
               </p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "1rem" }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fill, minmax(min(280px, 100%), 1fr))",
+                  gap: "1rem",
+                }}
+              >
                 {demoStudents.map((student) => (
                   <div
                     key={student.attempt_id}
                     className="p-4 rounded-lg"
-                    style={{ minWidth: 0, border: `1px solid ${student.reference_face_url ? "rgba(45,159,111,0.3)" : "var(--border)"}`, background: "rgba(255,255,255,0.02)" }}
+                    style={{
+                      minWidth: 0,
+                      overflow: "hidden",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.75rem",
+                      border: `1px solid ${student.reference_face_url ? "rgba(45,159,111,0.3)" : "var(--border)"}`,
+                      background: "rgba(255,255,255,0.02)",
+                    }}
                   >
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <span className="font-mono text-sm font-semibold">{student.student_usn}</span>
-                        <span className="text-xs text-[var(--text-muted)] ml-2">{student.student_name}</span>
+                    <div
+                      className="flex items-start justify-between"
+                      style={{ gap: "0.5rem", minWidth: 0 }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <span className="font-mono text-sm font-semibold truncate block">
+                          {student.student_usn}
+                        </span>
+                        <span
+                          className="text-xs text-[var(--text-muted)] truncate block"
+                          title={student.student_name}
+                        >
+                          {student.student_name}
+                        </span>
                       </div>
                       {student.reference_face_url ? (
-                        <span className="text-xs px-2 py-0.5 rounded" style={{ background: "rgba(45,159,111,0.2)", color: "var(--success)" }}>
+                        <span
+                          className="text-xs px-2 py-0.5 rounded"
+                          style={{
+                            flexShrink: 0,
+                            background: "rgba(45,159,111,0.2)",
+                            color: "var(--success)",
+                          }}
+                        >
                           ENROLLED
                         </span>
                       ) : (
-                        <span className="text-xs px-2 py-0.5 rounded" style={{ background: "rgba(255,255,255,0.05)", color: "var(--text-muted)" }}>
-                          REFERENCE NOT ENROLLED
+                        <span
+                          className="text-xs px-2 py-0.5 rounded"
+                          style={{
+                            flexShrink: 0,
+                            background: "rgba(255,255,255,0.05)",
+                            color: "var(--text-muted)",
+                          }}
+                        >
+                          NOT ENROLLED
                         </span>
                       )}
                     </div>
 
-                    <div className="flex gap-4">
-                      <div style={{ width: "120px", height: "120px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", border: "1px solid var(--border)", aspectRatio: "1 / 1" }}>
+                    <div className="flex gap-4" style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          width: "120px",
+                          height: "120px",
+                          flexShrink: 0,
+                          borderRadius: "8px",
+                          overflow: "hidden",
+                          border: "1px solid var(--border)",
+                          aspectRatio: "1 / 1",
+                        }}
+                      >
                         {student.reference_face_url ? (
-                          <img src={student.reference_face_url} alt={student.student_usn} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          <img
+                            src={student.reference_face_url}
+                            alt={`Reference photo for ${student.student_usn}`}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                            }}
+                          />
                         ) : student.preview ? (
-                          <img src={student.preview} alt={student.student_usn} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          <img
+                            src={student.preview}
+                            alt={`Selected photo for ${student.student_usn}`}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                            }}
+                          />
                         ) : (
-                          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "0.6875rem", textAlign: "center", padding: "0.5rem", lineHeight: 1.3 }}>
-                            REFERENCE NOT ENROLLED
+                          <div
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: "var(--text-muted)",
+                              fontSize: "0.6875rem",
+                              textAlign: "center",
+                              padding: "0.5rem",
+                              lineHeight: 1.3,
+                            }}
+                          >
+                            NO PHOTO
                           </div>
                         )}
                       </div>
 
-                      <div className="flex-1 flex flex-col justify-between" style={{ minWidth: 0 }}>
-                        <div>
-                          <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>
-                            Face Photo
-                          </label>
-                          <label className="eg-btn text-xs w-full" style={{ cursor: "pointer", textAlign: "center", display: "block" }}>
-                            {student.reference_face_url ? "Change Photo" : "Choose Photo"}
-                            <input
-                              type="file"
-                              accept="image/jpeg,image/png"
-                              style={{ display: "none" }}
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) handleFileSelect(student.attempt_id, file);
-                                e.target.value = "";
-                              }}
-                            />
-                          </label>
-                          {student.file && (
-                            <p
-                              className="text-xs mt-1"
-                              style={{ color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                              title={student.file.name}
-                            >
-                              {student.file.name}
-                            </p>
-                          )}
-                        </div>
+                      <div
+                        className="flex-1 flex flex-col"
+                        style={{ minWidth: 0, gap: "0.375rem" }}
+                      >
+                        <label
+                          htmlFor={`ref-photo-input-${student.attempt_id}`}
+                          style={{
+                            display: "block",
+                            fontSize: "0.75rem",
+                            color: "var(--text-muted)",
+                          }}
+                        >
+                          Face Photo
+                        </label>
+                        <label
+                          htmlFor={`ref-photo-input-${student.attempt_id}`}
+                          className="eg-btn text-xs w-full eg-file-label"
+                          style={{
+                            cursor: "pointer",
+                            textAlign: "center",
+                            display: "block",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {student.reference_face_url
+                            ? "Change Photo"
+                            : "Choose Photo"}
+                        </label>
+                        <input
+                          id={`ref-photo-input-${student.attempt_id}`}
+                          type="file"
+                          accept="image/jpeg,image/png"
+                          className="sr-only"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleFileSelect(student.attempt_id, file);
+                            e.target.value = "";
+                          }}
+                        />
                         {student.file && (
-                          <button
-                            onClick={() => handleUploadFace(student.attempt_id)}
-                            disabled={student.uploading}
-                            className="eg-btn eg-btn-primary text-xs mt-2"
+                          <p
+                            className="text-xs truncate"
+                            style={{
+                              color: "var(--text-muted)",
+                              maxWidth: "100%",
+                            }}
+                            title={student.file.name}
                           >
-                            {student.uploading
-                              ? "Saving..."
-                              : student.reference_face_url
-                                ? "Replace Reference Face"
-                                : "Save Reference Face"}
-                          </button>
-                        )}
-                        {student.uploadMessage && (
-                          <p className="text-xs mt-1" style={{ color: student.uploadMessage.includes("saved") || student.uploadMessage.includes("Saved") ? "var(--success)" : "var(--danger)", overflowWrap: "anywhere" }}>
-                            {student.uploadMessage.includes("saved") || student.uploadMessage.includes("Saved") ? `✓ ${student.uploadMessage}` : student.uploadMessage}
+                            {student.file.name}
                           </p>
                         )}
                       </div>
+                    </div>
+
+                    {/* Actions span the full card so long button text can
+                        never overflow into the neighbouring card. */}
+                    <div
+                      style={{
+                        marginTop: "auto",
+                        minWidth: 0,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.375rem",
+                      }}
+                    >
+                      {student.file && (
+                        <button
+                          onClick={() => handleUploadFace(student.attempt_id)}
+                          disabled={student.uploading}
+                          className="eg-btn eg-btn-primary text-xs w-full"
+                          style={{ whiteSpace: "normal", overflowWrap: "anywhere" }}
+                        >
+                          {student.uploading
+                            ? "Saving..."
+                            : student.reference_face_url
+                              ? "Replace Reference Face"
+                              : "Save Reference Face"}
+                        </button>
+                      )}
+                      {student.uploadMessage && (
+                        <p
+                          className="text-xs"
+                          style={{
+                            color:
+                              student.uploadMessage.includes("saved") ||
+                              student.uploadMessage.includes("Saved")
+                                ? "var(--success)"
+                                : "var(--danger)",
+                            overflowWrap: "anywhere",
+                          }}
+                        >
+                          {student.uploadMessage.includes("saved") ||
+                          student.uploadMessage.includes("Saved")
+                            ? `✓ ${student.uploadMessage}`
+                            : student.uploadMessage}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}
