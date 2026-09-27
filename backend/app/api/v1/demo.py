@@ -377,11 +377,31 @@ def demo_status(
         return DemoStatusResponse(loaded=False)
 
     exam = _latest_demo_exam(db, subject.id)
-    students = db.execute(
-        select(Student)
-        .filter(Student.usn.in_(DEMO_STUDENT_USNS))
-        .order_by(Student.id)
-    ).scalars().all()
+    students: list[Student] = []
+    if exam:
+        regs = db.execute(
+            select(ExamRegistration)
+            .filter(ExamRegistration.exam_id == exam.id)
+            .order_by(ExamRegistration.id)
+        ).scalars().all()
+        ordered_ids: list[int] = []
+        for reg in regs:
+            if reg.student_id not in ordered_ids:
+                ordered_ids.append(reg.student_id)
+        if ordered_ids:
+            found = {
+                student.id: student
+                for student in db.execute(
+                    select(Student).filter(Student.id.in_(ordered_ids))
+                ).scalars().all()
+            }
+            students = [found[student_id] for student_id in ordered_ids if student_id in found]
+    else:
+        students = db.execute(
+            select(Student)
+            .filter(Student.usn.in_(DEMO_STUDENT_USNS))
+            .order_by(Student.id)
+        ).scalars().all()
 
     session = None
     attempts = None
@@ -710,6 +730,7 @@ def demo_reset(
     Any authenticated user may reset demo data.
     """
     deleted = 0
+    demo_student_ids: set[int] = set()
 
     # Find demo subject
     subject = db.execute(
@@ -781,6 +802,7 @@ def demo_reset(
             select(ExamRegistration).filter_by(exam_id=exam.id)
         ).scalars().all()
         for reg in regs:
+            demo_student_ids.add(reg.student_id)
             hts = db.execute(
                 select(HallTicket).filter_by(exam_registration_id=reg.id)
             ).scalars().all()
@@ -823,12 +845,18 @@ def demo_reset(
         db.delete(exam)
         deleted += 1
 
-    # Delete demo students
+    # Delete the students who were registered for the demo exam, including
+    # any whose USN was edited away from the original DEMO00x value, plus
+    # any original demo USN that no longer has a registration.
     for usn in DEMO_STUDENT_USNS:
         student = db.execute(
             select(Student).filter_by(usn=usn)
         ).scalar_one_or_none()
         if student:
+            demo_student_ids.add(student.id)
+    for student_id in demo_student_ids:
+        student = db.get(Student, student_id)
+        if student is not None:
             db.delete(student)
             deleted += 1
 
@@ -874,17 +902,31 @@ def demo_reset(
 # but ONLY on deterministic demo records. They do NOT weaken normal RBAC.
 
 def _is_demo_attempt(db: Session, attempt_id: int) -> bool:
-    """Check if an attempt belongs to a demo student."""
+    """Check if an attempt belongs to the current demo exam registration.
+
+    Identity is the registration on the demo exam, not the original USN.
+    Editing a candidate's USN must not detach their reference upload.
+    """
     attempt = db.execute(
         select(IdentityVerificationAttempt).filter_by(id=attempt_id)
     ).scalar_one_or_none()
     if not attempt:
         return False
-    student = db.execute(
-        select(Student).filter(Student.usn.in_(DEMO_STUDENT_USNS))
-        .filter(Student.id == attempt.student_id)
+    subject = db.execute(
+        select(Subject).filter_by(code=DEMO_SUBJECT_CODE, is_active=True)
     ).scalar_one_or_none()
-    return student is not None
+    if not subject:
+        return False
+    exam = _latest_demo_exam(db, subject.id)
+    if not exam:
+        return False
+    registration = db.execute(
+        select(ExamRegistration).filter_by(
+            id=attempt.exam_registration_id,
+            exam_id=exam.id,
+        )
+    ).scalar_one_or_none()
+    return registration is not None and registration.student_id == attempt.student_id
 
 
 def _get_demo_session(db: Session) -> "ExaminationSession | None":

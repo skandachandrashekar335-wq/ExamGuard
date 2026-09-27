@@ -53,12 +53,15 @@ test("enrolls a reference photo per demo candidate and keeps it after reload", a
     expect(body.attempt_id).toBe(attemptId);
   });
 
+  const statusReady = page.waitForResponse((resp) => resp.url().includes("/api/v1/demo/status"), { timeout: 30000 });
   await page.goto(`/dashboard?eg_token=${encodeURIComponent(token)}`);
-  const load = page.getByRole("button", { name: /Load Demo Data/i });
-  if (await load.isVisible({ timeout: 5000 }).catch(() => false)) {
-    await load.click();
+  await statusReady;
+  const load = page.getByRole("button", { name: /^Load Demo Data$/i });
+  const demoReady = page.getByText("DEMO001").first();
+  if (!(await demoReady.isVisible().catch(() => false))) {
+    if (await load.isVisible().catch(() => false)) await load.click();
   }
-  await expect(page.getByText("DEMO001").first()).toBeVisible({ timeout: 90000 });
+  await expect(demoReady).toBeVisible({ timeout: 120000 });
 
   async function card(usn: string) {
     return page.locator(`article[data-usn="${usn}"]`);

@@ -52,12 +52,21 @@ function CandidateFaceCard({
   student,
   onFile,
   onSave,
+  onSaveIdentity,
 }: {
   student: DemoStudent;
   onFile: (attemptId: number, file: File) => void;
   onSave: (attemptId: number) => void;
+  onSaveIdentity: (studentId: number, usn: string, name: string) => Promise<void>;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [editing, setEditing] = useState(false);
+  const [draftUsn, setDraftUsn] = useState(student.student_usn);
+  const [draftName, setDraftName] = useState(student.student_name);
+  const [savingIdentity, setSavingIdentity] = useState(false);
+  const [identityError, setIdentityError] = useState("");
+  const [usnError, setUsnError] = useState("");
+  const [nameError, setNameError] = useState("");
   const persisted = Boolean(student.reference_face_url);
   const selected = Boolean(student.file);
   const uploading = student.uploadState === "uploading";
@@ -71,11 +80,62 @@ function CandidateFaceCard({
         ? "Replace Reference Face"
         : "Save Reference Face";
   const showSave = selected || uploading;
+  const usnFieldId = `candidate-usn-${student.student_id}`;
+  const nameFieldId = `candidate-name-${student.student_id}`;
+
+  const openEdit = () => {
+    setDraftUsn(student.student_usn);
+    setDraftName(student.student_name);
+    setUsnError("");
+    setNameError("");
+    setIdentityError("");
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    if (savingIdentity) return;
+    setEditing(false);
+    setUsnError("");
+    setNameError("");
+    setIdentityError("");
+  };
+
+  const submitIdentity = async () => {
+    if (savingIdentity) return;
+    const usn = draftUsn.trim();
+    const name = draftName.trim();
+    const nextUsnError = !usn
+      ? "Candidate ID / USN is required"
+      : usn.length > 20
+        ? "Candidate ID / USN must be 20 characters or fewer"
+        : "";
+    const nextNameError = !name
+      ? "Name is required"
+      : name.length > 255
+        ? "Name must be 255 characters or fewer"
+        : "";
+    setUsnError(nextUsnError);
+    setNameError(nextNameError);
+    setIdentityError("");
+    if (nextUsnError || nextNameError) return;
+
+    setSavingIdentity(true);
+    try {
+      await onSaveIdentity(student.student_id, usn, name);
+      setEditing(false);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Could not save candidate";
+      setIdentityError(message);
+    } finally {
+      setSavingIdentity(false);
+    }
+  };
 
   return (
     <article
       className="eg-ref-card"
       data-attempt-id={student.attempt_id}
+      data-student-id={student.student_id}
       data-usn={student.student_usn}
       data-enrolled={persisted ? "true" : "false"}
       style={{ borderColor: persisted ? "rgba(45,159,111,0.3)" : undefined }}
@@ -87,63 +147,143 @@ function CandidateFaceCard({
             {student.student_name}
           </span>
         </div>
-        <span className={persisted ? "eg-ref-badge eg-ref-badge-on" : "eg-ref-badge"}>
-          {persisted ? "REFERENCE ENROLLED" : "REFERENCE NOT ENROLLED"}
-        </span>
+        <div className="eg-ref-card-tools">
+          <span className={persisted ? "eg-ref-badge eg-ref-badge-on" : "eg-ref-badge"}>
+            {persisted ? "REFERENCE ENROLLED" : "REFERENCE NOT ENROLLED"}
+          </span>
+          {!editing && (
+            <button
+              type="button"
+              className="eg-btn eg-btn-ghost eg-ref-edit"
+              onClick={openEdit}
+              disabled={uploading || !student.student_id}
+            >
+              Edit
+            </button>
+          )}
+        </div>
       </header>
 
-      <div className="eg-ref-photo">
-        {student.preview ? (
-          <img src={student.preview} alt={`Selected photo for ${student.student_usn}`} />
-        ) : student.reference_face_url ? (
-          <img src={student.reference_face_url} alt={`Reference photo for ${student.student_usn}`} />
-        ) : (
-          <div className="eg-ref-photo-empty">NO PHOTO</div>
-        )}
-      </div>
-
-      <div className="eg-ref-upload-row">
-        <p className="eg-ref-filename" title={filename}>
-          {filename}
-        </p>
-        <button
-          type="button"
-          className="eg-btn eg-ref-choose"
-          disabled={uploading}
-          onClick={() => inputRef.current?.click()}
-        >
-          {chooseLabel}
-        </button>
-        <input
-          ref={inputRef}
-          id={`ref-photo-input-${student.attempt_id}`}
-          className="eg-ref-file-input"
-          type="file"
-          accept="image/jpeg,image/png,.jpg,.jpeg,.png"
-          disabled={uploading}
-          aria-label={`${chooseLabel} for ${student.student_usn}`}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) onFile(student.attempt_id, file);
-            e.target.value = "";
+      {editing ? (
+        <form
+          className="eg-ref-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submitIdentity();
           }}
-        />
-      </div>
+        >
+          <p className="eg-ref-caption">Edit Candidate</p>
+          <div>
+            <label className="eg-label" htmlFor={usnFieldId}>
+              Candidate ID / USN
+            </label>
+            <input
+              id={usnFieldId}
+              className="eg-input"
+              value={draftUsn}
+              disabled={savingIdentity}
+              aria-invalid={usnError ? true : undefined}
+              aria-describedby={usnError ? `${usnFieldId}-error` : undefined}
+              onChange={(e) => setDraftUsn(e.target.value)}
+            />
+            {usnError && (
+              <p id={`${usnFieldId}-error`} className="eg-ref-field-error" role="alert">
+                {usnError}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="eg-label" htmlFor={nameFieldId}>
+              Name
+            </label>
+            <input
+              id={nameFieldId}
+              className="eg-input"
+              value={draftName}
+              disabled={savingIdentity}
+              aria-invalid={nameError ? true : undefined}
+              aria-describedby={nameError ? `${nameFieldId}-error` : undefined}
+              onChange={(e) => setDraftName(e.target.value)}
+            />
+            {nameError && (
+              <p id={`${nameFieldId}-error`} className="eg-ref-field-error" role="alert">
+                {nameError}
+              </p>
+            )}
+          </div>
+          {identityError && (
+            <p className="eg-ref-message" role="alert">
+              {identityError}
+            </p>
+          )}
+          <div className="eg-ref-form-actions">
+            <button type="button" className="eg-btn eg-btn-ghost" onClick={cancelEdit} disabled={savingIdentity}>
+              Cancel
+            </button>
+            <button type="submit" className="eg-btn eg-btn-primary" disabled={savingIdentity}>
+              {savingIdentity ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <div className="eg-ref-photo">
+            {student.preview ? (
+              <img src={student.preview} alt={`Selected photo for ${student.student_name}, ${student.student_usn}`} />
+            ) : student.reference_face_url ? (
+              <img src={student.reference_face_url} alt={`Reference photo for ${student.student_name}, ${student.student_usn}`} />
+            ) : (
+              <div className="eg-ref-photo-empty">NO PHOTO</div>
+            )}
+          </div>
+          <p className="eg-ref-caption">Reference Face</p>
 
-      {showSave && (
-        <div className="eg-ref-footer">
-          <button
-            type="button"
-            className="eg-btn eg-btn-primary eg-ref-save"
-            disabled={uploading || !student.file}
-            onClick={() => onSave(student.attempt_id)}
-          >
-            {saveLabel}
-          </button>
-        </div>
-      )}
-      {student.uploadState === "error" && student.errorMessage && (
-        <p className="eg-ref-message">{student.errorMessage}</p>
+          <div className="eg-ref-upload-row">
+            <p className="eg-ref-filename" title={filename}>
+              {filename}
+            </p>
+            <button
+              type="button"
+              className="eg-btn eg-ref-choose"
+              disabled={uploading}
+              onClick={() => inputRef.current?.click()}
+            >
+              {chooseLabel}
+            </button>
+            <input
+              ref={inputRef}
+              id={`ref-photo-input-${student.attempt_id}`}
+              className="eg-ref-file-input"
+              type="file"
+              accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+              disabled={uploading}
+              aria-label={`${chooseLabel} for ${student.student_usn}`}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onFile(student.attempt_id, file);
+                e.target.value = "";
+              }}
+            />
+          </div>
+
+          {showSave && (
+            <div className="eg-ref-footer">
+              <button
+                type="button"
+                className="eg-btn eg-btn-primary eg-ref-save"
+                disabled={uploading || !student.file}
+                onClick={() => onSave(student.attempt_id)}
+              >
+                {saveLabel}
+              </button>
+            </div>
+          )}
+          {student.uploadState === "error" && student.errorMessage && (
+            <p className="eg-ref-message" role="alert">
+              {student.errorMessage}
+            </p>
+          )}
+        </>
       )}
     </article>
   );
@@ -400,6 +540,21 @@ export default function DashboardPage() {
     }
   };
 
+  const handleSaveIdentity = async (studentId: number, usn: string, name: string) => {
+    const updated = await apiRequest<{ id: number; usn: string; name: string }>(
+      `/api/v1/students/${studentId}`,
+      { method: "PATCH", body: JSON.stringify({ usn, name }) },
+    );
+    setDemoStudents((prev) =>
+      prev.map((s) =>
+        s.student_id === updated.id
+          ? { ...s, student_usn: updated.usn, student_name: updated.name }
+          : s,
+      ),
+    );
+    void refreshDemoState();
+  };
+
   const handleAssignInvigilator = async () => {
     if (!invigilatorEmail) return;
     setAssignLoading(true);
@@ -565,6 +720,7 @@ export default function DashboardPage() {
                     student={student}
                     onFile={handleFileSelect}
                     onSave={handleUploadFace}
+                    onSaveIdentity={handleSaveIdentity}
                   />
                 ))}
               </div>

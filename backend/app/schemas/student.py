@@ -1,6 +1,13 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+def _strip_text(value: object) -> object:
+    """Trim identity fields before length checks so whitespace-only values fail."""
+    if isinstance(value, str):
+        return value.strip()
+    return value
 
 
 class StudentCreate(BaseModel):
@@ -19,6 +26,11 @@ class StudentCreate(BaseModel):
         examples=["Rahul Kumar"],
     )
 
+    @field_validator("usn", "name", mode="before")
+    @classmethod
+    def strip_identity(cls, value: object) -> object:
+        return _strip_text(value)
+
 
 class StudentUpdate(BaseModel):
     usn: str | None = Field(
@@ -33,6 +45,11 @@ class StudentUpdate(BaseModel):
         max_length=255,
         description="Full name of the student",
     )
+
+    @field_validator("usn", "name", mode="before")
+    @classmethod
+    def strip_identity(cls, value: object) -> object:
+        return _strip_text(value)
     is_active: bool | None = Field(
         default=None,
         description="Set to false to deactivate a student",

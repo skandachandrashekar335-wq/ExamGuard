@@ -111,3 +111,38 @@ def test_demo_status_latest_attempt_per_registration_aligned(client, db):
     finally:
         client.post(DEMO_RESET_URL)
         client.post(DEMO_LOAD_URL)
+
+
+def test_renamed_demo_candidate_stays_attached_to_reference(client, db):
+    """Editing USN/name must not drop the candidate or their attempt."""
+    client.post(DEMO_RESET_URL)
+    try:
+        client.post(DEMO_LOAD_URL)
+        student = db.query(Student).filter(Student.usn == "DEMO001").one()
+        before = client.get(DEMO_STATUS_URL).json()
+        index = before["demo_student_usns"].index("DEMO001")
+        attempt_id = before["demo_attempt_ids"][index]
+        reference = before["reference_face_urls"][index]
+
+        patched = client.patch(
+            f"/api/v1/students/{student.id}",
+            json={"usn": "TEST001", "name": "Test Candidate Alpha"},
+        )
+        assert patched.status_code == 200
+        assert patched.json()["id"] == student.id
+
+        status = client.get(DEMO_STATUS_URL).json()
+        assert status["demo_student_usns"].count("TEST001") == 1
+        renamed_at = status["demo_student_usns"].index("TEST001")
+        assert status["demo_student_names"][renamed_at] == "Test Candidate Alpha"
+        assert status["demo_attempt_ids"][renamed_at] == attempt_id
+        assert status["reference_face_urls"][renamed_at] == reference
+        assert status["demo_student_ids"][renamed_at] == student.id
+
+        from app.api.v1.demo import _is_demo_attempt
+
+        db.expire_all()
+        assert _is_demo_attempt(db, attempt_id) is True
+    finally:
+        client.post(DEMO_RESET_URL)
+        client.post(DEMO_LOAD_URL)

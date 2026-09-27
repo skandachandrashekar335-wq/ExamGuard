@@ -14,7 +14,7 @@ def clean_test_students():
     try:
         test_prefixes = (
             "API00", "DUP", "NORM", "GET00", "UPD0", "LIST",
-            "SRCH", "DEL00", "HID00", "UPD00", "UPD01",
+            "SRCH", "DEL00", "HID00", "UPD00", "UPD01", "EDIT", "BLANK", "KEEP",
         )
         for prefix in test_prefixes:
             db.execute(
@@ -122,6 +122,183 @@ class TestStudentAPI:
             json={"usn": "UPD002"},
         )
         assert response.status_code == 409
+
+    def test_update_trims_and_persists(self, client):
+        create = client.post(
+            "/api/v1/students",
+            json={"usn": "EDIT001", "name": "Before Edit"},
+        )
+        student_id = create.json()["id"]
+        response = client.patch(
+            f"/api/v1/students/{student_id}",
+            json={"usn": "  EDIT002  ", "name": "  After Edit  "},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["usn"] == "EDIT002"
+        assert body["name"] == "After Edit"
+        assert body["id"] == student_id
+        fetched = client.get(f"/api/v1/students/{student_id}")
+        assert fetched.status_code == 200
+        assert fetched.json()["usn"] == "EDIT002"
+        assert fetched.json()["name"] == "After Edit"
+
+    def test_update_rejects_blank_identity(self, client):
+        create = client.post(
+            "/api/v1/students",
+            json={"usn": "BLANK001", "name": "Blank Test"},
+        )
+        student_id = create.json()["id"]
+        blank_usn = client.patch(
+            f"/api/v1/students/{student_id}",
+            json={"usn": "   "},
+        )
+        blank_name = client.patch(
+            f"/api/v1/students/{student_id}",
+            json={"name": "   "},
+        )
+        long_usn = client.patch(
+            f"/api/v1/students/{student_id}",
+            json={"usn": "U" * 21},
+        )
+        long_name = client.patch(
+            f"/api/v1/students/{student_id}",
+            json={"name": "N" * 256},
+        )
+        assert blank_usn.status_code == 422
+        assert blank_name.status_code == 422
+        assert long_usn.status_code == 422
+        assert long_name.status_code == 422
+        fetched = client.get(f"/api/v1/students/{student_id}")
+        assert fetched.json()["usn"] == "BLANK001"
+        assert fetched.json()["name"] == "Blank Test"
+
+    def test_update_rejected_for_invigilator_and_anonymous(self, client):
+        from app.auth import Role, get_current_user
+        from app.main import app
+
+        create = client.post(
+            "/api/v1/students",
+            json={"usn": "EDITROLE1", "name": "Role Guard"},
+        )
+        student_id = create.json()["id"]
+        prev = app.dependency_overrides[get_current_user]
+        app.dependency_overrides[get_current_user] = lambda: {
+            "sub": "9",
+            "role": Role.INVIGILATOR,
+            "email": "inv@example.com",
+        }
+        try:
+            denied = client.patch(
+                f"/api/v1/students/{student_id}",
+                json={"name": "Should Not Stick"},
+            )
+            assert denied.status_code == 403
+        finally:
+            app.dependency_overrides[get_current_user] = prev
+
+        app.dependency_overrides.pop(get_current_user, None)
+        try:
+            anonymous = client.patch(
+                f"/api/v1/students/{student_id}",
+                json={"name": "Still No"},
+            )
+            assert anonymous.status_code == 401
+        finally:
+            app.dependency_overrides[get_current_user] = prev
+
+        fetched = client.get(f"/api/v1/students/{student_id}")
+        assert fetched.json()["name"] == "Role Guard"
+
+    def test_identity_edit_keeps_reference_attempt(self, client):
+        from datetime import date, time
+
+        from app.core.database import SessionLocal
+        from app.models.exam import Exam
+        from app.models.exam_registration import ExamRegistration, RegistrationStatus
+        from app.models.identity_verification import IdentityVerificationAttempt
+        from app.models.student import Student
+        from app.models.subject import Subject
+
+        create = client.post(
+            "/api/v1/students",
+            json={"usn": "KEEP001", "name": "Keeps Reference"},
+        )
+        student_id = create.json()["id"]
+        db = SessionLocal()
+        try:
+            subject = Subject(
+                code="KEEPSUB1",
+                name="Keep Subject",
+                department="Keep",
+                semester=1,
+                credits=3,
+            )
+            db.add(subject)
+            db.commit()
+            db.refresh(subject)
+            exam = Exam(
+                subject_id=subject.id,
+                exam_name="Keep Exam",
+                exam_date=date(2026, 12, 1),
+                start_time=time(9, 0),
+                end_time=time(12, 0),
+                semester=1,
+                department="Keep",
+            )
+            db.add(exam)
+            db.commit()
+            db.refresh(exam)
+            reg = ExamRegistration(
+                student_id=student_id,
+                exam_id=exam.id,
+                status=RegistrationStatus.REGISTERED.value,
+            )
+            db.add(reg)
+            db.commit()
+            db.refresh(reg)
+            attempt = IdentityVerificationAttempt(
+                student_id=student_id,
+                exam_registration_id=reg.id,
+                reference_face_url="https://res.cloudinary.com/example/image/upload/v1/keep.png",
+            )
+            db.add(attempt)
+            db.commit()
+            db.refresh(attempt)
+            attempt_id = attempt.id
+            reg_id = reg.id
+        finally:
+            db.close()
+
+        response = client.patch(
+            f"/api/v1/students/{student_id}",
+            json={"usn": "KEEP002", "name": "Rahul Kumar"},
+        )
+        assert response.status_code == 200
+        assert response.json()["id"] == student_id
+
+        db = SessionLocal()
+        try:
+            stored = db.query(IdentityVerificationAttempt).filter(
+                IdentityVerificationAttempt.id == attempt_id
+            ).one()
+            student = db.query(Student).filter(Student.id == student_id).one()
+            assert stored.student_id == student_id
+            assert stored.exam_registration_id == reg_id
+            assert stored.reference_face_url.endswith("/keep.png")
+            assert student.usn == "KEEP002"
+            assert student.name == "Rahul Kumar"
+            db.delete(stored)
+            registration = db.query(ExamRegistration).filter(ExamRegistration.id == reg_id).one()
+            exam_id = registration.exam_id
+            db.delete(registration)
+            exam_row = db.query(Exam).filter(Exam.id == exam_id).one()
+            subject_id = exam_row.subject_id
+            db.delete(exam_row)
+            db.query(Subject).filter(Subject.id == subject_id).delete()
+            db.commit()
+        finally:
+            db.close()
 
     def test_list_students(self, client):
         client.post(
