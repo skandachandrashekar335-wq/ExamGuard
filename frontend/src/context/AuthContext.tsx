@@ -126,27 +126,9 @@ function makeAuthStateUpdate(overrides: Partial<AuthState>): AuthState {
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  const devToken = getDevToken();
-  const devUser = devToken ? devTokenToUser(devToken) : null;
+  const [authState, setAuthState] = useState<AuthState>(AuthStateDefault);
 
-  const [authState, setAuthState] = useState<AuthState>(() => {
-    if (devToken && devUser) {
-      setTokenGetter(() => devToken);
-      return {
-        ...AuthStateDefault,
-        user: devUser,
-        loading: false,
-        examGuardToken: devToken,
-        requiresOnboarding: false,
-        displayName: devUser.email || "Dev User",
-        isAuthenticated: true,
-        authPhase: "authenticated",
-      };
-    }
-    return AuthStateDefault;
-  });
-
-  const devTokenUsed = useRef(!!devUser);
+  const devTokenUsed = useRef(false);
   const exchangeInProgress = useRef(false);
   const signInWithGoogleRef = useRef<() => Promise<void>>(async () => {});
   const signOutRef = useRef<() => Promise<void>>(async () => {});
@@ -205,6 +187,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   }, []);
 
   useEffect(() => {
+    const token = getDevToken();
+    const devUser = token ? devTokenToUser(token) : null;
+    if (token && devUser) {
+      devTokenUsed.current = true;
+      setTokenGetter(() => token);
+      setAuthState({
+        ...AuthStateDefault,
+        user: devUser,
+        loading: false,
+        examGuardToken: token,
+        requiresOnboarding: false,
+        displayName: devUser.email || "Dev User",
+        isAuthenticated: true,
+        authPhase: "authenticated",
+        signInWithGoogle: signInWithGoogleRef.current,
+        signOut: signOutRef.current,
+        clearAuthError: () => setAuthState((prev) => ({ ...prev, authError: null })),
+      });
+      return;
+    }
+
     if (devTokenUsed.current) return;
 
     const unsubscribe = onAuthStateChangedCallback(
@@ -284,6 +287,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
   signInWithGoogleRef.current = signInWithGoogle;
   signOutRef.current = handleSignOut;
+
+  // Set the token during render so child effects (dashboard fetches) see it.
+  // A later effect would run after those children and the first request would
+  // go out without Authorization.
+  if (authState.examGuardToken) {
+    setTokenGetter(() => authState.examGuardToken);
+  }
 
   useEffect(() => {
     setTokenGetter(() => authState.examGuardToken);

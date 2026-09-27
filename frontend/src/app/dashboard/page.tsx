@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import { useAuth } from "@/context/AuthContext";
@@ -31,16 +31,122 @@ interface ExamListItem {
   subject_name: string | null;
 }
 
+type ReferenceUploadState = "idle" | "uploading" | "success" | "error";
+
 interface DemoStudent {
   attempt_id: number;
   student_id: number;
   student_usn: string;
   student_name: string;
+  /** Server-persisted reference. A local file selection does not set this. */
   reference_face_url: string | null;
+  /** Local file chosen by the user and not yet uploaded. */
   file: File | null;
   preview: string | null;
-  uploading: boolean;
-  uploadMessage: string;
+  uploadState: ReferenceUploadState;
+  errorMessage: string;
+  savedFileName: string | null;
+}
+
+function CandidateFaceCard({
+  student,
+  onFile,
+  onSave,
+}: {
+  student: DemoStudent;
+  onFile: (attemptId: number, file: File) => void;
+  onSave: (attemptId: number) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const persisted = Boolean(student.reference_face_url);
+  const selected = Boolean(student.file);
+  const uploading = student.uploadState === "uploading";
+  const filename = student.file?.name || student.savedFileName || (persisted ? "Saved reference" : "No photo selected");
+  const chooseLabel = selected ? "Change Photo" : persisted ? "Replace Reference Face" : "Choose Photo";
+  const saveLabel = uploading
+    ? "Saving..."
+    : student.uploadState === "error"
+      ? "Retry Save"
+      : persisted
+        ? "Replace Reference Face"
+        : "Save Reference Face";
+  const showSave = selected || uploading;
+
+  return (
+    <article
+      className="eg-ref-card"
+      data-attempt-id={student.attempt_id}
+      data-usn={student.student_usn}
+      data-enrolled={persisted ? "true" : "false"}
+      style={{ borderColor: persisted ? "rgba(45,159,111,0.3)" : undefined }}
+    >
+      <header className="eg-ref-card-head">
+        <div className="eg-ref-card-id">
+          <span className="font-mono text-sm font-semibold">{student.student_usn}</span>
+          <span className="text-xs text-[var(--text-muted)]" title={student.student_name}>
+            {student.student_name}
+          </span>
+        </div>
+        <span className={persisted ? "eg-ref-badge eg-ref-badge-on" : "eg-ref-badge"}>
+          {persisted ? "REFERENCE ENROLLED" : "REFERENCE NOT ENROLLED"}
+        </span>
+      </header>
+
+      <div className="eg-ref-photo">
+        {student.preview ? (
+          <img src={student.preview} alt={`Selected photo for ${student.student_usn}`} />
+        ) : student.reference_face_url ? (
+          <img src={student.reference_face_url} alt={`Reference photo for ${student.student_usn}`} />
+        ) : (
+          <div className="eg-ref-photo-empty">NO PHOTO</div>
+        )}
+      </div>
+
+      <div className="eg-ref-upload-row">
+        <p className="eg-ref-filename" title={filename}>
+          {filename}
+        </p>
+        <button
+          type="button"
+          className="eg-btn eg-ref-choose"
+          disabled={uploading}
+          onClick={() => inputRef.current?.click()}
+        >
+          {chooseLabel}
+        </button>
+        <input
+          ref={inputRef}
+          id={`ref-photo-input-${student.attempt_id}`}
+          className="eg-ref-file-input"
+          type="file"
+          accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+          disabled={uploading}
+          aria-label={`${chooseLabel} for ${student.student_usn}`}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) onFile(student.attempt_id, file);
+            e.target.value = "";
+          }}
+        />
+      </div>
+
+      {showSave && (
+        <div className="eg-ref-footer">
+          <button
+            type="button"
+            className="eg-btn eg-btn-primary eg-ref-save"
+            disabled={uploading || !student.file}
+            onClick={() => onSave(student.attempt_id)}
+          >
+            {saveLabel}
+          </button>
+        </div>
+      )}
+      {student.uploadState === "error" && student.errorMessage && (
+        <p className="eg-ref-message">{student.errorMessage}</p>
+      )}
+    </article>
+  );
 }
 
 function blobToBase64(blob: Blob): Promise<string> {
@@ -95,18 +201,27 @@ export default function DashboardPage() {
         setDemoLoaded(true);
         const names = status.demo_student_names || [];
         const refUrls = status.reference_face_urls || [];
-        const students: DemoStudent[] = status.demo_attempt_ids.map((aid, i) => ({
-          attempt_id: aid,
-          student_id: status.demo_student_ids?.[i] || 0,
-          student_usn: status.demo_student_usns?.[i] || `DEMO00${i + 1}`,
-          student_name: names[i] || `Demo Candidate ${i + 1}`,
-          reference_face_url: refUrls[i] || null,
-          file: null,
-          preview: null,
-          uploading: false,
-          uploadMessage: "",
-        }));
-        setDemoStudents(students);
+        const attemptIds = status.demo_attempt_ids;
+        setDemoStudents((prev) => {
+          const previous = new Map(prev.map((s) => [s.attempt_id, s]));
+          return attemptIds.map((aid, i) => {
+            const prior = previous.get(aid);
+            const serverUrl = refUrls[i] || null;
+            const keepLocalFile = Boolean(prior?.file);
+            return {
+              attempt_id: aid,
+              student_id: status.demo_student_ids?.[i] || 0,
+              student_usn: status.demo_student_usns?.[i] || `DEMO00${i + 1}`,
+              student_name: names[i] || `Demo Candidate ${i + 1}`,
+              reference_face_url: serverUrl,
+              file: keepLocalFile ? prior!.file : null,
+              preview: keepLocalFile ? prior!.preview : null,
+              uploadState: prior?.uploadState === "uploading" ? "uploading" : keepLocalFile ? prior!.uploadState : "idle",
+              errorMessage: prior?.uploadState === "error" && keepLocalFile ? prior.errorMessage : "",
+              savedFileName: keepLocalFile ? prior?.savedFileName ?? null : prior?.savedFileName ?? null,
+            };
+          });
+        });
       } else {
         setDemoLoaded(false);
         setDemoStudents([]);
@@ -182,11 +297,20 @@ export default function DashboardPage() {
   };
 
   const handleFileSelect = (attemptId: number, file: File) => {
-    if (file.type !== "image/jpeg" && file.type !== "image/png") {
+    const type = (file.type || "").toLowerCase();
+    const name = file.name.toLowerCase();
+    const allowedType =
+      type === "image/jpeg" ||
+      type === "image/jpg" ||
+      type === "image/pjpeg" ||
+      type === "image/png";
+    const allowedName =
+      name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png");
+    if (!allowedType && !allowedName) {
       setDemoStudents((prev) =>
         prev.map((s) =>
           s.attempt_id === attemptId
-            ? { ...s, uploadMessage: "Choose a JPG or PNG image." }
+            ? { ...s, file: null, preview: null, uploadState: "error", errorMessage: "Choose a JPG or PNG image." }
             : s
         )
       );
@@ -197,7 +321,7 @@ export default function DashboardPage() {
       prev.map((s) => {
         if (s.attempt_id !== attemptId) return s;
         if (s.preview) URL.revokeObjectURL(s.preview);
-        return { ...s, file, preview: url, uploadMessage: "" };
+        return { ...s, file, preview: url, uploadState: "idle", errorMessage: "" };
       })
     );
   };
@@ -207,7 +331,7 @@ export default function DashboardPage() {
     if (!student?.file) return;
 
     setDemoStudents((prev) =>
-      prev.map((s) => (s.attempt_id === attemptId ? { ...s, uploading: true, uploadMessage: "" } : s))
+      prev.map((s) => (s.attempt_id === attemptId ? { ...s, uploadState: "uploading", errorMessage: "" } : s))
     );
 
     try {
@@ -258,8 +382,9 @@ export default function DashboardPage() {
             file: null,
             preview: null,
             reference_face_url: savedUrl,
-            uploading: false,
-            uploadMessage: "Reference saved",
+            uploadState: "success",
+            errorMessage: "",
+            savedFileName: file.name,
           };
         })
       );
@@ -268,7 +393,7 @@ export default function DashboardPage() {
       setDemoStudents((prev) =>
         prev.map((s) =>
           s.attempt_id === attemptId
-            ? { ...s, uploading: false, uploadMessage: errorMsg }
+            ? { ...s, uploadState: "error", errorMessage: errorMsg }
             : s
         )
       );
@@ -433,221 +558,14 @@ export default function DashboardPage() {
               <p className="text-xs text-[var(--text-muted)] mb-4">
                 Upload one clear face photo for each demo candidate. Each photo becomes that student&apos;s reference face for live verification.
               </p>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns:
-                    "repeat(auto-fill, minmax(min(280px, 100%), 1fr))",
-                  gap: "1rem",
-                }}
-              >
+              <div className="eg-ref-grid">
                 {demoStudents.map((student) => (
-                  <div
+                  <CandidateFaceCard
                     key={student.attempt_id}
-                    className="p-4 rounded-lg"
-                    style={{
-                      minWidth: 0,
-                      overflow: "hidden",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "0.75rem",
-                      border: `1px solid ${student.reference_face_url ? "rgba(45,159,111,0.3)" : "var(--border)"}`,
-                      background: "rgba(255,255,255,0.02)",
-                    }}
-                  >
-                    <div
-                      className="flex items-start justify-between"
-                      style={{ gap: "0.5rem", minWidth: 0 }}
-                    >
-                      <div style={{ minWidth: 0 }}>
-                        <span className="font-mono text-sm font-semibold truncate block">
-                          {student.student_usn}
-                        </span>
-                        <span
-                          className="text-xs text-[var(--text-muted)] truncate block"
-                          title={student.student_name}
-                        >
-                          {student.student_name}
-                        </span>
-                      </div>
-                      {student.reference_face_url ? (
-                        <span
-                          className="text-xs px-2 py-0.5 rounded"
-                          style={{
-                            flexShrink: 0,
-                            background: "rgba(45,159,111,0.2)",
-                            color: "var(--success)",
-                          }}
-                        >
-                          ENROLLED
-                        </span>
-                      ) : (
-                        <span
-                          className="text-xs px-2 py-0.5 rounded"
-                          style={{
-                            flexShrink: 0,
-                            background: "rgba(255,255,255,0.05)",
-                            color: "var(--text-muted)",
-                          }}
-                        >
-                          NOT ENROLLED
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex gap-4" style={{ minWidth: 0 }}>
-                      <div
-                        style={{
-                          width: "120px",
-                          height: "120px",
-                          flexShrink: 0,
-                          borderRadius: "8px",
-                          overflow: "hidden",
-                          border: "1px solid var(--border)",
-                          aspectRatio: "1 / 1",
-                        }}
-                      >
-                        {student.reference_face_url ? (
-                          <img
-                            src={student.reference_face_url}
-                            alt={`Reference photo for ${student.student_usn}`}
-                            style={{
-                              width: "100%",
-                              height: "100%",
-                              objectFit: "cover",
-                            }}
-                          />
-                        ) : student.preview ? (
-                          <img
-                            src={student.preview}
-                            alt={`Selected photo for ${student.student_usn}`}
-                            style={{
-                              width: "100%",
-                              height: "100%",
-                              objectFit: "cover",
-                            }}
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              width: "100%",
-                              height: "100%",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: "var(--text-muted)",
-                              fontSize: "0.6875rem",
-                              textAlign: "center",
-                              padding: "0.5rem",
-                              lineHeight: 1.3,
-                            }}
-                          >
-                            NO PHOTO
-                          </div>
-                        )}
-                      </div>
-
-                      <div
-                        className="flex-1 flex flex-col"
-                        style={{ minWidth: 0, gap: "0.375rem" }}
-                      >
-                        <label
-                          htmlFor={`ref-photo-input-${student.attempt_id}`}
-                          style={{
-                            display: "block",
-                            fontSize: "0.75rem",
-                            color: "var(--text-muted)",
-                          }}
-                        >
-                          Face Photo
-                        </label>
-                        <label
-                          htmlFor={`ref-photo-input-${student.attempt_id}`}
-                          className="eg-btn text-xs w-full eg-file-label"
-                          style={{
-                            cursor: "pointer",
-                            textAlign: "center",
-                            display: "block",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {student.reference_face_url
-                            ? "Change Photo"
-                            : "Choose Photo"}
-                        </label>
-                        <input
-                          id={`ref-photo-input-${student.attempt_id}`}
-                          type="file"
-                          accept="image/jpeg,image/png"
-                          className="sr-only"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleFileSelect(student.attempt_id, file);
-                            e.target.value = "";
-                          }}
-                        />
-                        {student.file && (
-                          <p
-                            className="text-xs truncate"
-                            style={{
-                              color: "var(--text-muted)",
-                              maxWidth: "100%",
-                            }}
-                            title={student.file.name}
-                          >
-                            {student.file.name}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Actions span the full card so long button text can
-                        never overflow into the neighbouring card. */}
-                    <div
-                      style={{
-                        marginTop: "auto",
-                        minWidth: 0,
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "0.375rem",
-                      }}
-                    >
-                      {student.file && (
-                        <button
-                          onClick={() => handleUploadFace(student.attempt_id)}
-                          disabled={student.uploading}
-                          className="eg-btn eg-btn-primary text-xs w-full"
-                          style={{ whiteSpace: "normal", overflowWrap: "anywhere" }}
-                        >
-                          {student.uploading
-                            ? "Saving..."
-                            : student.reference_face_url
-                              ? "Replace Reference Face"
-                              : "Save Reference Face"}
-                        </button>
-                      )}
-                      {student.uploadMessage && (
-                        <p
-                          className="text-xs"
-                          style={{
-                            color:
-                              student.uploadMessage.includes("saved") ||
-                              student.uploadMessage.includes("Saved")
-                                ? "var(--success)"
-                                : "var(--danger)",
-                            overflowWrap: "anywhere",
-                          }}
-                        >
-                          {student.uploadMessage.includes("saved") ||
-                          student.uploadMessage.includes("Saved")
-                            ? `✓ ${student.uploadMessage}`
-                            : student.uploadMessage}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                    student={student}
+                    onFile={handleFileSelect}
+                    onSave={handleUploadFace}
+                  />
                 ))}
               </div>
             </div>

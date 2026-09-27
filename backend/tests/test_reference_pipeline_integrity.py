@@ -206,6 +206,37 @@ class TestCloudinaryOverwrite:
         assert kwargs["invalidate"] is True
         assert kwargs["resource"] == "raw"
 
+    def test_settings_credentials_used_when_environ_empty(self, monkeypatch):
+        """`.env` values live on Settings, not os.environ. Save must still upload."""
+        from types import SimpleNamespace
+
+        monkeypatch.delenv("CLOUDINARY_CLOUD_NAME", raising=False)
+        monkeypatch.delenv("CLOUDINARY_API_KEY", raising=False)
+        monkeypatch.delenv("CLOUDINARY_API_SECRET", raising=False)
+        monkeypatch.setattr(
+            "app.core.config.get_settings",
+            lambda: SimpleNamespace(
+                CLOUDINARY_CLOUD_NAME="from-settings",
+                CLOUDINARY_API_KEY="settings-key",
+                CLOUDINARY_API_SECRET="settings-secret",
+            ),
+        )
+        with patch("cloudinary.config") as cfg, patch(
+            "cloudinary.uploader.upload",
+            return_value={
+                "secure_url": "https://res.cloudinary.com/from-settings/image/upload/v2/x.jpg",
+            },
+        ) as upload:
+            url = CloudinaryStorage().save(
+                "face-references/attempt-9.jpg", b"new-reference-bytes"
+            )
+
+        assert url.startswith("https://res.cloudinary.com/")
+        cfg.assert_called_once()
+        assert cfg.call_args.kwargs["cloud_name"] == "from-settings"
+        upload.assert_called_once()
+        assert upload.call_args.kwargs["overwrite"] is True
+
     def test_discarded_upload_is_a_hard_error(self, monkeypatch):
         _set_cloudinary_env(monkeypatch)
         with patch(

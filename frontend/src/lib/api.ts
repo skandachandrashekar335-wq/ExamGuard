@@ -64,7 +64,16 @@ export async function apiRequest<T>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new ApiError(res.status, body.detail || "Request failed");
+    const detail = body?.detail;
+    let message = res.statusText || "Request failed";
+    if (typeof detail === "string" && detail) {
+      message = detail;
+    } else if (Array.isArray(detail)) {
+      message = detail
+        .map((item) => (typeof item === "string" ? item : item?.msg || "Invalid request"))
+        .join("; ");
+    }
+    throw new ApiError(res.status, message);
   }
 
   if (res.status === 204) return undefined as T;

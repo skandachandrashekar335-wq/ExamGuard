@@ -48,10 +48,22 @@ class CloudinaryStorage(StorageBackend):
     """
 
     def __init__(self, base_dir: Optional[str] = None):
-        # Initialize Cloudinary SDK if credentials are available
+        # Initialize Cloudinary SDK if credentials are available.
+        # Prefer the process environment (tests and hosts that export vars),
+        # then application settings. pydantic-settings loads `.env` into
+        # Settings and does not copy those values into os.environ, so reading
+        # only os.environ makes a configured deployment look unconfigured and
+        # silently stores a relative local key.
         cloud_name = os.environ.get("CLOUDINARY_CLOUD_NAME")
         api_key = os.environ.get("CLOUDINARY_API_KEY")
         api_secret = os.environ.get("CLOUDINARY_API_SECRET")
+        if not (cloud_name and api_key and api_secret):
+            from app.core.config import get_settings
+
+            settings = get_settings()
+            cloud_name = cloud_name or settings.CLOUDINARY_CLOUD_NAME
+            api_key = api_key or settings.CLOUDINARY_API_KEY
+            api_secret = api_secret or settings.CLOUDINARY_API_SECRET
 
         if cloud_name and api_key and api_secret:
             cloudinary.config(
