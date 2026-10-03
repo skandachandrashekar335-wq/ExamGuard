@@ -1,7 +1,13 @@
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
-from app.auth import Role, require_role
+from app.auth import (
+    Role,
+    require_role,
+    get_invigilator_scope,
+    check_invigilator_scope,
+    constrain_scope_filters,
+)
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.security.hardening import sanitize_error
@@ -15,9 +21,11 @@ from app.schemas.extraction_review import (
     ReviewProgress,
 )
 from app.schemas.hall_ticket_match import HallTicketMatchResultResponse, HallTicketMatchSignalResponse
+from app.schemas.hall_ticket import CandidateEnrollmentRequest, CandidateEnrollmentResponse
 from app.schemas.verification import VerificationOutcomeResponse, VerificationSummaryResponse
 from app.services import document as doc_service
 from app.services import extraction_review
+from app.services import hall_ticket as hall_ticket_service
 from app.services import hall_ticket_matching
 from app.services import processing
 from app.services import verification
@@ -25,6 +33,53 @@ from app.services import verification
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
 settings = get_settings()
+
+
+def _enforce_document_scope(db: Session, _user: dict, document_id: int) -> None:
+    """Restrict document reads to the caller's assigned exam scope.
+
+    No-op for unrestricted roles (ADMIN/OPERATOR, or a REVIEWER with no
+    assignment). Scoped callers may only read documents bound to an exam
+    inside their active assignment.
+    """
+    scope = get_invigilator_scope(_user, db)
+    if scope is None:
+        return
+    document = doc_service.get_document(db, document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if document.exam_id is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: document is outside your assigned exam",
+        )
+    check_invigilator_scope(scope, resource_exam_id=document.exam_id)
+
+
+@router.post(
+    "/{document_id}/enroll-candidate",
+    response_model=CandidateEnrollmentResponse,
+    summary="Confirm reviewed hall-ticket candidate enrollment",
+)
+def enroll_candidate(
+    document_id: int,
+    body: CandidateEnrollmentRequest,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
+):
+    try:
+        result = hall_ticket_service.confirm_candidate_enrollment(
+            db,
+            document_id,
+            exam_id=body.exam_id,
+            confirmed=body.confirmed,
+            performed_by=_user.get("email") or _user.get("sub") or "unknown",
+        )
+        return CandidateEnrollmentResponse(**result)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
 
 @router.post(
@@ -36,6 +91,7 @@ settings = get_settings()
 async def upload_document(
     file: UploadFile = File(...),
     document_type: str = Query(..., description="Document type (e.g. HALL_TICKET)"),
+    exam_id: int | None = Query(None, gt=0, description="Selected exam for exam-specific documents"),
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
@@ -51,7 +107,10 @@ async def upload_document(
             content_type=file.content_type or "application/octet-stream",
             data=data,
             doc_type=document_type,
+            exam_id=exam_id,
         )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
@@ -61,11 +120,15 @@ def list_documents(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     document_type: str | None = Query(None, description="Filter by document type"),
+    exam_id: int | None = Query(None, gt=0, description="Filter by exam"),
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     documents, total = doc_service.list_documents(
-        db, page=page, page_size=page_size, doc_type=document_type
+        db, page=page, page_size=page_size, doc_type=document_type,
+        exam_id=constrain_scope_filters(
+            get_invigilator_scope(_user, db), exam_id=exam_id
+        )[0],
     )
     return DocumentListResponse(
         items=[DocumentResponse.model_validate(d) for d in documents],
@@ -81,6 +144,7 @@ def get_document(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
+    _enforce_document_scope(db, _user, document_id)
     document = doc_service.get_document(db, document_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -103,6 +167,11 @@ def process_document(
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=500,
+            detail="Stored document file is missing; upload the document again",
+        )
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=sanitize_error(e))
 
@@ -130,6 +199,7 @@ def get_extraction(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
+    _enforce_document_scope(db, _user, document_id)
     result = processing.get_extraction_result(db, document_id)
     if not result:
         raise HTTPException(status_code=404, detail="No extraction results found for this document")
@@ -173,6 +243,7 @@ def get_review(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
+    _enforce_document_scope(db, _user, document_id)
     try:
         data = extraction_review.get_review_data(db, document_id)
     except LookupError as e:
@@ -337,6 +408,7 @@ def get_match_result(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
+    _enforce_document_scope(db, _user, document_id)
     result = hall_ticket_matching.get_latest_match_result(db, document_id)
     if not result:
         raise HTTPException(
@@ -391,6 +463,7 @@ def get_verification_summary(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
+    _enforce_document_scope(db, _user, document_id)
     try:
         data = verification.get_verification_summary(db, document_id)
     except LookupError as e:
@@ -444,6 +517,7 @@ def get_verification_outcome(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
+    _enforce_document_scope(db, _user, document_id)
     outcome = verification.get_latest_outcome(db, document_id)
     if not outcome:
         raise HTTPException(

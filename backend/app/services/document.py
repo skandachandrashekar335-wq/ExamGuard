@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models.document import Document, DocumentStatus, DocumentType
+from app.models.exam import Exam
 from app.storage.local import LocalStorage
 
 settings = get_settings()
@@ -67,10 +68,19 @@ def upload_document(
     content_type: str,
     data: bytes,
     doc_type: str,
+    exam_id: int | None = None,
 ) -> Document:
     ok, message = validate_upload(filename, content_type, data, doc_type)
     if not ok:
         raise ValueError(message)
+    if doc_type == DocumentType.HALL_TICKET.value and exam_id is None:
+        raise ValueError("exam_id is required for hall-ticket documents")
+    if exam_id is not None:
+        exam = db.query(Exam).filter(Exam.id == exam_id).first()
+        if exam is None:
+            raise LookupError(f"Exam with id {exam_id} not found")
+        if not exam.is_active:
+            raise ValueError(f"Exam {exam_id} is inactive")
 
     storage = LocalStorage(settings.UPLOAD_DIR)
     key = LocalStorage.generate_key(filename)
@@ -82,6 +92,7 @@ def upload_document(
         content_type=content_type,
         file_size=len(data),
         document_type=DocumentType(doc_type),
+        exam_id=exam_id,
         status=DocumentStatus.READY_FOR_PROCESSING,
     )
     db.add(document)
@@ -100,11 +111,14 @@ def list_documents(
     page: int = 1,
     page_size: int = 20,
     doc_type: str | None = None,
+    exam_id: int | None = None,
 ) -> tuple[list[Document], int]:
     query = db.query(Document)
 
     if doc_type:
         query = query.filter(Document.document_type == doc_type)
+    if exam_id is not None:
+        query = query.filter(Document.exam_id == exam_id)
 
     total = query.count()
     documents = (

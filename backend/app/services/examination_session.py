@@ -19,6 +19,8 @@ from app.models.examination_session import (
 )
 from app.models.entry_verification import EntryVerification
 from app.models.attendance import AttendanceRecord
+from app.models.exam import Exam
+from app.models.exam_hall import ExamHall
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +47,31 @@ def create_examination_session(
     created_by: str | None = None,
 ) -> ExaminationSession:
     """Create a new examination session."""
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if exam is None:
+        raise LookupError(f"Exam with id {exam_id} not found")
+    if not exam.is_active:
+        raise ValueError(f"Exam {exam_id} is inactive")
+
+    hall = db.query(ExamHall).filter(ExamHall.id == exam_hall_id).first()
+    if hall is None:
+        raise LookupError(f"Exam hall with id {exam_hall_id} not found")
+    if not hall.is_active:
+        raise ValueError(f"Exam hall {exam_hall_id} is inactive")
+
+    existing = (
+        db.query(ExaminationSession)
+        .filter(
+            ExaminationSession.exam_id == exam_id,
+            ExaminationSession.exam_hall_id == exam_hall_id,
+        )
+        .first()
+    )
+    if existing is not None:
+        raise ValueError(
+            f"A session already exists for exam {exam_id} and hall {exam_hall_id}"
+        )
+
     session = ExaminationSession(
         exam_id=exam_id,
         exam_hall_id=exam_hall_id,
@@ -53,7 +80,17 @@ def create_examination_session(
         created_by=created_by,
     )
     db.add(session)
-    db.commit()
+    try:
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        from sqlalchemy.exc import IntegrityError
+
+        if isinstance(exc, IntegrityError):
+            raise ValueError(
+                f"A session already exists for exam {exam_id} and hall {exam_hall_id}"
+            ) from exc
+        raise
     logger.info(
         "Examination session created: id=%d exam_id=%d hall_id=%d",
         session.id,
@@ -159,6 +196,9 @@ def end_session(
         performed_by=performed_by,
     )
     db.add(gate_event)
+    from app.services.invigilator_assignment import deactivate_assignments_for_hall
+
+    deactivate_assignments_for_hall(db, session.exam_id, session.exam_hall_id)
     db.commit()
     logger.info("Session %d ended by %s", session_id, performed_by)
     return session
@@ -196,6 +236,9 @@ def cancel_session(
         )
         db.add(gate_event)
 
+    from app.services.invigilator_assignment import deactivate_assignments_for_hall
+
+    deactivate_assignments_for_hall(db, session.exam_id, session.exam_hall_id)
     db.commit()
     logger.info("Session %d cancelled by %s", session_id, performed_by)
     return session

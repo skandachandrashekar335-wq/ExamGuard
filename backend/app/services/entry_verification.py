@@ -11,6 +11,7 @@ AI/perception = evidence. Business layer = authorization decision.
 import logging
 from datetime import datetime, timezone
 
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.models.camera import Camera, CameraStatus
@@ -263,8 +264,24 @@ def list_entry_verifications(
     entry_point_id: int | None = None,
     status: str | None = None,
     session_id: int | None = None,
+    scope_pairs: list[tuple[int, int]] | None = None,
 ) -> dict:
     query = db.query(EntryVerification)
+
+    if scope_pairs is not None:
+        if not scope_pairs:
+            query = query.filter(False)
+        else:
+            query = query.join(
+                ExamRegistration,
+                ExamRegistration.id == EntryVerification.exam_registration_id,
+            ).filter(or_(*[
+                and_(
+                    ExamRegistration.exam_id == exam_id,
+                    EntryVerification.exam_hall_id == hall_id,
+                )
+                for exam_id, hall_id in scope_pairs
+            ]))
 
     if student_id is not None:
         query = query.filter(EntryVerification.student_id == student_id)

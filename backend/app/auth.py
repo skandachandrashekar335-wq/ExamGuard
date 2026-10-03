@@ -437,6 +437,55 @@ def check_invigilator_scope(
 
 
 
+def constrain_scope_filters(
+
+    scope: InvigilatorScope | None,
+
+    exam_id: int | None = None,
+
+    hall_id: int | None = None,
+
+) -> tuple[int | None, int | None]:
+
+    """Narrow optional exam/hall list filters to the caller's assignments.
+
+    Unrestricted callers (scope is None) keep both filters unchanged. For a
+
+    scoped caller a missing filter falls back to their primary assignment and
+
+    any supplied filter outside every active assignment raises 403.
+
+    """
+
+    if scope is None:
+
+        return exam_id, hall_id
+
+    pairs = scope.scopes or [(scope.exam_id, scope.hall_id)]
+
+    if exam_id is None and hall_id is None:
+
+        return pairs[0]
+
+    if exam_id is None:
+
+        exam_id = next((e for e, h in pairs if h == hall_id), scope.exam_id)
+
+    elif hall_id is None:
+
+        assigned_halls = [h for e, h in pairs if e == exam_id]
+
+        if assigned_halls:
+
+            hall_id = assigned_halls[0]
+
+    check_invigilator_scope(scope, exam_id, hall_id)
+
+    return exam_id, hall_id
+
+
+
+
 
 def require_role_or_active_assignment(allowed_roles: List[str]):
 

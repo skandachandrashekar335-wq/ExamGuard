@@ -194,7 +194,7 @@ class TestRuleBasedFieldExtractor:
 
         output = self.extractor.extract([ocr_result])
 
-        assert len(output.fields) == len(["name", "usn", "exam_name", "subject", "exam_date",
+        assert len(output.fields) == len(["name", "usn", "seat_number", "exam_name", "subject", "exam_date",
                                           "start_time", "end_time", "semester", "department", "exam_hall"])
         for field in output.fields:
             assert field.extracted_value is None

@@ -134,6 +134,18 @@ def _encode_b64(data: bytes) -> str:
     return base64.b64encode(data).decode("ascii")
 
 
+def _store_reference(attempt_id: int, url: str = "https://example.test/enrolled.jpg"):
+    db = SessionLocal()
+    try:
+        attempt = db.query(IdentityVerificationAttempt).filter(
+            IdentityVerificationAttempt.id == attempt_id
+        ).one()
+        attempt.reference_face_url = url
+        db.commit()
+    finally:
+        db.close()
+
+
 FAKE_JPEG = _make_valid_jpeg()
 FAKE_PNG = _make_valid_png()
 FAKE_JPEG_B64 = _encode_b64(FAKE_JPEG)
@@ -531,37 +543,40 @@ class TestAPIInputValidation:
         )
         assert resp.status_code == 422
 
-    def test_valid_jpeg_accepted(self, client, sample_data):
+    def test_client_reference_override_rejected(self, client, sample_data):
         attempt_id = self._create_face_attempt(client, sample_data)
-        provider = DeterministicProvider()
-        with patch(
-            "app.services.face_verification.get_face_verification_provider",
-            return_value=provider,
-        ):
-            resp = client.post(
-                f"/api/v1/identity-verifications/{attempt_id}/verify-face",
-                json={
-                    "reference_image": FAKE_JPEG_B64,
-                    "probe_image": FAKE_JPEG_B64,
-                },
-            )
-        assert resp.status_code == 201
+        _store_reference(attempt_id)
+        resp = client.post(
+            f"/api/v1/identity-verifications/{attempt_id}/verify-face",
+            json={
+                "reference_image": FAKE_JPEG_B64,
+                "probe_image": FAKE_JPEG_B64,
+            },
+        )
+        assert resp.status_code == 422
+        assert "client-supplied" in resp.json()["detail"].lower()
 
     def test_valid_png_accepted(self, client, sample_data):
         attempt_id = self._create_face_attempt(client, sample_data)
+        reference_url = "https://example.test/enrolled.png"
+        _store_reference(attempt_id, reference_url)
         provider = DeterministicProvider()
         with patch(
             "app.services.face_verification.get_face_verification_provider",
             return_value=provider,
-        ):
+        ), patch(
+            "app.api.v1.identity_verification._download_reference_image",
+            return_value=FAKE_PNG,
+        ) as download_reference:
             resp = client.post(
                 f"/api/v1/identity-verifications/{attempt_id}/verify-face",
                 json={
-                    "reference_image": FAKE_PNG_B64,
                     "probe_image": FAKE_PNG_B64,
+                    "reference_image_format": "image/png",
                 },
             )
         assert resp.status_code == 201
+        download_reference.assert_called_once_with(reference_url)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1210,20 +1225,25 @@ class TestAPIHappyPath:
         })
         attempt_id = resp.json()["id"]
         client.post(f"/api/v1/identity-verifications/{attempt_id}/start")
+        reference_url = "https://example.test/enrolled.jpg"
+        _store_reference(attempt_id, reference_url)
 
         provider = DeterministicProvider()
         with patch(
             "app.services.face_verification.get_face_verification_provider",
             return_value=provider,
-        ):
+        ), patch(
+            "app.api.v1.identity_verification._download_reference_image",
+            return_value=FAKE_JPEG,
+        ) as download_reference:
             resp = client.post(
                 f"/api/v1/identity-verifications/{attempt_id}/verify-face",
                 json={
-                    "reference_image": FAKE_JPEG_B64,
                     "probe_image": FAKE_JPEG_B64,
                 },
             )
         assert resp.status_code == 201
+        download_reference.assert_called_once_with(reference_url)
         body = resp.json()
         assert body["attempt_id"] == attempt_id
         assert isinstance(body["evidence"], list)
@@ -1237,16 +1257,20 @@ class TestAPIHappyPath:
         })
         attempt_id = resp.json()["id"]
         client.post(f"/api/v1/identity-verifications/{attempt_id}/start")
+        reference_url = "https://example.test/enrolled.jpg"
+        _store_reference(attempt_id, reference_url)
 
         provider = DeterministicProvider()
         with patch(
             "app.services.face_verification.get_face_verification_provider",
             return_value=provider,
+        ), patch(
+            "app.api.v1.identity_verification._download_reference_image",
+            return_value=FAKE_JPEG,
         ):
             resp = client.post(
                 f"/api/v1/identity-verifications/{attempt_id}/verify-face",
                 json={
-                    "reference_image": FAKE_JPEG_B64,
                     "probe_image": FAKE_JPEG_B64,
                 },
             )

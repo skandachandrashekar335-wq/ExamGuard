@@ -84,6 +84,7 @@ class TestProcessDocument:
              patch("app.services.processing.settings") as mock_settings:
             mock_settings.UPLOAD_DIR = str(tmp_path)
             mock_settings.USN_PATTERN = None
+            mock_settings.MIN_OCR_CONFIDENCE = 60.0
 
             result = processing.process_document(db_session, doc.id)
 
@@ -172,6 +173,7 @@ class TestProcessDocument:
              patch("app.services.processing.settings") as mock_settings:
             mock_settings.UPLOAD_DIR = str(tmp_path)
             mock_settings.USN_PATTERN = None
+            mock_settings.MIN_OCR_CONFIDENCE = 60.0
 
             result = processing.process_document(db_session, doc.id)
 

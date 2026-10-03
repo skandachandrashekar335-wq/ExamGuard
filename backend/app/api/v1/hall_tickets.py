@@ -1,10 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.auth import Role, require_role, get_invigilator_scope, check_invigilator_scope
+from app.auth import (
+    Role,
+    require_role,
+    get_invigilator_scope,
+    check_invigilator_scope,
+    constrain_scope_filters,
+)
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.models.exam_registration import ExamRegistration
 from app.schemas.hall_ticket import (
     HallTicketCreate,
     HallTicketDetailedResponse,
@@ -31,6 +38,37 @@ class ApproveRejectRequest(BaseModel):
     reason: str | None = Field(
         default=None, description="Rejection reason (required for reject)"
     )
+
+
+def _require_registration_in_scope(
+    db: Session, scope, exam_registration_id: int
+) -> None:
+    """Verify a registration belongs to the caller's assigned exam scope."""
+    if scope is None:
+        return
+    registration = (
+        db.query(ExamRegistration)
+        .filter(ExamRegistration.id == exam_registration_id)
+        .first()
+    )
+    if registration is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: registration is outside your assignment",
+        )
+    check_invigilator_scope(scope, registration.exam_id)
+
+
+def _require_hall_ticket_in_scope(db: Session, scope, ht) -> None:
+    """Verify a hall ticket's registration is inside the caller's scope."""
+    if scope is None:
+        return
+    if ht.exam_registration_id is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: hall ticket has no exam registration",
+        )
+    _require_registration_in_scope(db, scope, ht.exam_registration_id)
 
 
 @router.post(
@@ -66,11 +104,18 @@ def list_hall_tickets(
     db: Session = Depends(get_db),
 ):
     scope = get_invigilator_scope(_user, db)
+    exam_id = None
+    if scope is not None:
+        if exam_registration_id is not None:
+            _require_registration_in_scope(db, scope, exam_registration_id)
+        else:
+            exam_id, _hall_id = constrain_scope_filters(scope)
     result = ht_service.list_hall_tickets(
         db,
         page=page,
         page_size=page_size,
         exam_registration_id=exam_registration_id,
+        exam_id=exam_id,
         status=status,
     )
     return HallTicketListResponse(
@@ -96,6 +141,8 @@ def search_hall_tickets(
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
     db: Session = Depends(get_db),
 ):
+    scope = get_invigilator_scope(_user, db)
+    exam_id, _hall_id = constrain_scope_filters(scope, exam_id=exam_id)
     result = ht_service.search_hall_tickets(
         db,
         page=page,
@@ -126,6 +173,7 @@ def get_hall_ticket(
     ht = ht_service.get_hall_ticket(db, hall_ticket_id)
     if not ht:
         raise HTTPException(status_code=404, detail="Hall ticket not found")
+    _require_hall_ticket_in_scope(db, get_invigilator_scope(_user, db), ht)
     return ht
 
 
@@ -143,6 +191,7 @@ def get_hall_ticket_detailed(
     if not ctx:
         raise HTTPException(status_code=404, detail="Hall ticket not found")
     ht = ctx["hall_ticket"]
+    _require_hall_ticket_in_scope(db, get_invigilator_scope(_user, db), ht)
     student = ctx.get("student")
     exam = ctx.get("exam")
     document = ctx.get("document")
@@ -170,6 +219,7 @@ def get_hall_ticket_by_registration(
             status_code=404,
             detail=f"No hall ticket found for registration {exam_registration_id}",
         )
+    _require_hall_ticket_in_scope(db, get_invigilator_scope(_user, db), ht)
     return ht
 
 

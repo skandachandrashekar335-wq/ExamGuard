@@ -9,7 +9,11 @@ settings = get_settings()
 
 FIELD_LABELS = {
     "name": ["name", "student name", "candidate name", "student's name"],
-    "usn": ["usn", "university seat number", "seat number", "student id", "id number"],
+    "usn": [
+        "usn", "university seat number", "registration number",
+        "registration no", "roll number", "roll no", "student id", "id number",
+    ],
+    "seat_number": ["seat number", "seat no", "seat #", "assigned seat"],
     "exam_name": ["exam", "examination", "exam name", "examination name", "exam type"],
     "subject": ["subject", "paper", "course", "subject name"],
     "exam_date": ["date", "exam date", "examination date", "date of exam"],
@@ -63,6 +67,8 @@ class RuleBasedFieldExtractor(FieldExtractor):
                 if normalized:
                     df.extracted_value = normalized
                     df.pattern_match = True
+                else:
+                    df.pattern_match = False
 
         time_fields = [f for f in fields if "time" in f.field_name]
         for tf in time_fields:
@@ -71,6 +77,8 @@ class RuleBasedFieldExtractor(FieldExtractor):
                 if normalized:
                     tf.extracted_value = normalized
                     tf.pattern_match = True
+                else:
+                    tf.pattern_match = False
 
         return ExtractionOutput(fields=fields, raw_text=all_text)
 
@@ -82,11 +90,12 @@ class RuleBasedFieldExtractor(FieldExtractor):
         words: list[OCRWord],
     ) -> ExtractedFieldData:
         text_lower = full_text.lower()
+        ordered_labels = sorted(labels, key=len, reverse=True)
 
-        for label in labels:
+        for label in ordered_labels:
             pattern = re.compile(
-                rf"{re.escape(label)}\s*[:.\-=]\s*(.+?)(?:\n|$)",
-                re.IGNORECASE,
+                rf"^\s*{re.escape(label)}\s*[:.\-=]\s*(.+?)(?:\n|$)",
+                re.IGNORECASE | re.MULTILINE,
             )
             match = pattern.search(full_text)
             if match:
@@ -100,7 +109,7 @@ class RuleBasedFieldExtractor(FieldExtractor):
                     ocr_confidence=self._confidence_for_value(value, words),
                 )
 
-        for label in labels:
+        for label in ordered_labels:
             for i, word in enumerate(words):
                 if word.text.lower().rstrip(":.") == label.lower():
                     value_words = self._collect_following_words(words, i + 1, max_words=8)

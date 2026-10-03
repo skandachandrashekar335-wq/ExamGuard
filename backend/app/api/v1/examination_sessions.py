@@ -9,7 +9,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.auth import Role, require_role, get_invigilator_scope, check_invigilator_scope
+from app.auth import (
+    Role,
+    require_role,
+    get_invigilator_scope,
+    check_invigilator_scope,
+    constrain_scope_filters,
+)
 from app.core.database import get_db
 from app.schemas.examination_session import (
     EndSessionRequest,
@@ -57,6 +63,10 @@ def list_sessions(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ) -> ExaminationSessionListResponse:
+    """List examination sessions."""
+    scope = get_invigilator_scope(_user, db)
+    if scope:
+        exam_id, exam_hall_id = constrain_scope_filters(scope, exam_id, exam_hall_id)
     result = svc.list_examination_sessions(
         db,
         page=page,
@@ -108,14 +118,19 @@ def create_session(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ) -> ExaminationSessionResponse:
-    return svc.create_examination_session(
-        db,
-        exam_id=body.exam_id,
-        exam_hall_id=body.exam_hall_id,
-        expected_capacity=body.expected_capacity,
-        notes=body.notes,
-        created_by=body.created_by,
-    )
+    try:
+        return svc.create_examination_session(
+            db,
+            exam_id=body.exam_id,
+            exam_hall_id=body.exam_hall_id,
+            expected_capacity=body.expected_capacity,
+            notes=body.notes,
+            created_by=body.created_by,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
 
 @router.post(

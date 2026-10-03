@@ -15,7 +15,8 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.auth import Role, require_role
+from app.auth import Role, require_role, get_invigilator_scope
+from app.api.v1.entry_verification import _require_ev_in_scope
 from app.core.database import get_db
 from app.models.entry_verification import EntryVerification
 from app.models.proxy_risk import ProxyRiskAssessment, SecuritySignal
@@ -150,6 +151,7 @@ def list_security_signals(
 ):
     """Return security signals for an entry verification with pagination."""
     _get_entry_verification_or_404(db, entry_verification_id)
+    _require_ev_in_scope(db, get_invigilator_scope(_user, db), entry_verification_id)
 
     query = (
         db.query(SecuritySignal)
@@ -260,6 +262,7 @@ def list_risk_assessments(
 ):
     """Return historical risk assessments in chronological order."""
     _get_entry_verification_or_404(db, entry_verification_id)
+    _require_ev_in_scope(db, get_invigilator_scope(_user, db), entry_verification_id)
 
     query = (
         db.query(ProxyRiskAssessment)
@@ -297,6 +300,7 @@ def get_latest_risk_assessment(
     Returns 404 if no assessment exists — does not manufacture a result.
     """
     _get_entry_verification_or_404(db, entry_verification_id)
+    _require_ev_in_scope(db, get_invigilator_scope(_user, db), entry_verification_id)
 
     assessment = (
         db.query(ProxyRiskAssessment)

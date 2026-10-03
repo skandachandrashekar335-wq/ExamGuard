@@ -152,7 +152,7 @@ def _mk_env(db, *, usn="MRW001", exam_name="MRW Exam 1", decision="INCONCLUSIVE"
 
     attempt = IdentityVerificationAttempt(
         student_id=student.id, exam_registration_id=reg.id,
-        decision=decision,
+        status="COMPLETED", decision=decision,
     )
     db.add(attempt)
 
@@ -374,6 +374,67 @@ class TestStateMachine:
         assert resp.status_code == 409
         assert "not IN_PROGRESS" in resp.json()["detail"]
 
+    def test_manual_review_rejects_uncompleted_inconclusive_attempt(self, client, db):
+        env = _mk_env(db)
+        user, _ = _mk_invigilator(db, env.exam.id, env.hall.id)
+        env.attempt.status = "IN_PROGRESS"
+        db.commit()
+
+        with _claims(user):
+            response = _post(client, env.reg.id, "CHECK_IN")
+
+        assert response.status_code == 409
+        assert "not COMPLETED" in response.json()["detail"]
+
+    def test_manual_review_rejects_registration_in_unassigned_hall(self, client, db):
+        env = _mk_env(db)
+        other_hall = ExamHall(
+            building="MRW Other", room_number="202", capacity=20,
+        )
+        db.add(other_hall)
+        db.commit()
+        db.refresh(other_hall)
+        user, _ = _mk_invigilator(
+            db, env.exam.id, other_hall.id, email="mrw-other-hall@example.com"
+        )
+
+        with _claims(user):
+            response = _post(client, env.reg.id, "CHECK_IN")
+
+        assert response.status_code == 403
+        with _claims(user):
+            status = client.get(f"{REVIEW_URL}/{env.reg.id}")
+        assert status.status_code == 403
+        assert db.query(AttendanceEvent).filter(
+            AttendanceEvent.exam_registration_id == env.reg.id
+        ).count() == 0
+
+    def test_manual_review_rejects_same_hall_different_exam(self, client, db):
+        env = _mk_env(db)
+        other_exam = Exam(
+            subject_id=env.subject.id,
+            exam_name="MRW Other Exam",
+            exam_date=date(2026, 12, 2),
+            start_time=time(9, 0),
+            end_time=time(12, 0),
+            semester=6,
+            department="MRW Dept",
+        )
+        db.add(other_exam)
+        db.commit()
+        db.refresh(other_exam)
+        user, _ = _mk_invigilator(
+            db, other_exam.id, env.hall.id, email="mrw-other-exam@example.com"
+        )
+
+        with _claims(user):
+            response = _post(client, env.reg.id, "CHECK_IN")
+
+        assert response.status_code == 403
+        assert db.query(AttendanceEvent).filter(
+            AttendanceEvent.exam_registration_id == env.reg.id
+        ).count() == 0
+
     def test_reason_required(self, client, db):
         env = _mk_env(db)
         user, _ = _mk_invigilator(db, env.exam.id, env.hall.id)
@@ -581,11 +642,28 @@ class TestRBAC:
 
     @pytest.mark.parametrize("role", [Role.OPERATOR, Role.REVIEWER])
     def test_other_roles_forbidden(self, client, db, role):
+        """Test that permanent roles without invigilator assignment are denied."""
         env = _mk_env(db)
-        user, _ = _mk_invigilator(db, env.exam.id, env.hall.id)
+        # Create user with the given role but NO invigilator assignment
+        user = User(email=f"mrw-{role.lower()}@example.com", full_name=f"MRW {role}", role=role)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
         with _claims(user, role=role):
             resp = _post(client, env.reg.id, "CHECK_IN")
         assert resp.status_code == 403
+
+    def test_reviewer_with_assignment_allowed(self, client, db):
+        """REVIEWER with active invigilator assignment CAN perform manual review within scope."""
+        env = _mk_env(db)
+        user, _ = _mk_invigilator(db, env.exam.id, env.hall.id)
+        # User is REVIEWER in DB, assignment gives exam-scoped INVIGILATOR capability
+        # _claims defaults to Role.INVIGILATOR but we can override to REVIEWER
+        with _claims(user, role=Role.REVIEWER):
+            resp = _post(client, env.reg.id, "CHECK_IN")
+        # Should be allowed because user has active assignment for this exam/hall
+        assert resp.status_code == 200
 
     def test_invigilator_out_of_scope_exam_forbidden(self, client, db):
         env = _mk_env(db)

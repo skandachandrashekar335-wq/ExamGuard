@@ -83,7 +83,25 @@ def process_document(db: Session, document_id: int) -> ExtractionResult:
 
     for field_data in extraction_output.fields:
         review_status = ReviewStatus.AUTO_APPROVED
-        if field_data.extracted_value is None or not field_data.label_found:
+        is_optional_absent = (
+            field_data.field_name == "seat_number"
+            and field_data.extracted_value is None
+        )
+        low_confidence = (
+            field_data.ocr_confidence is not None
+            and field_data.ocr_confidence < getattr(settings, "MIN_OCR_CONFIDENCE", 60.0)
+        )
+        missing_confidence = (
+            field_data.extracted_value is not None
+            and field_data.ocr_confidence is None
+        )
+        if not is_optional_absent and (
+            field_data.extracted_value is None
+            or not field_data.label_found
+            or field_data.pattern_match is False
+            or low_confidence
+            or missing_confidence
+        ):
             review_status = ReviewStatus.REVIEW_REQUIRED
 
         extracted_field = ExtractedField(

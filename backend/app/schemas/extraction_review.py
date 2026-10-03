@@ -4,7 +4,10 @@ from pydantic import BaseModel, Field
 
 
 class ReviewFieldRequest(BaseModel):
-    corrected_value: str = Field(..., min_length=1, description="Corrected field value")
+    corrected_value: str | None = Field(
+        default=None,
+        description="Corrected value, or null when an absent field is confirmed",
+    )
     review_status: str = Field(
         default="REVIEWED",
         description="Review status: REVIEWED or REVIEW_REQUIRED",

@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.auth import Role, get_current_user, require_role
+from app.auth import Role, get_current_user, require_role_or_active_assignment
 from app.core.database import get_db
 from app.models.exam import Exam
 from app.models.exam_hall import ExamHall
@@ -83,6 +83,83 @@ class StartExamRequest(BaseModel):
 
 class EndExamRequest(BaseModel):
     performed_by: str | None = None
+
+
+class MyAssignmentResponse(BaseModel):
+    account_role: str
+    exam_role: str | None
+    exam_name: str | None
+    hall_name: str | None
+    assignment_status: str | None
+
+
+@router.get(
+    "/my-assignment",
+    response_model=MyAssignmentResponse,
+    summary="Permanent account role plus the caller's current exam assignment",
+)
+def my_assignment(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Report the account role from the database and any exam assignment.
+
+    Exam role is INVIGILATOR only while an assignment is active and the
+    session is IN_PROGRESS. The permanent role is never taken from the client.
+    """
+    from app.models.user import User
+
+    row = db.query(User).filter(User.id == int(user["sub"])).first()
+    account_role = row.role if row is not None else user.get("role", "REVIEWER")
+    assignment = (
+        db.query(InvigilatorAssignment)
+        .filter(InvigilatorAssignment.user_id == int(user["sub"]))
+        .order_by(InvigilatorAssignment.is_active.desc(), InvigilatorAssignment.created_at.desc())
+        .first()
+    )
+    if assignment is None:
+        return MyAssignmentResponse(
+            account_role=account_role,
+            exam_role=None,
+            exam_name=None,
+            hall_name=None,
+            assignment_status=None,
+        )
+
+    exam = db.query(Exam).filter(Exam.id == assignment.exam_id).first()
+    hall = db.query(ExamHall).filter(ExamHall.id == assignment.exam_hall_id).first()
+    session = (
+        db.query(ExaminationSession)
+        .filter(
+            ExaminationSession.exam_id == assignment.exam_id,
+            ExaminationSession.exam_hall_id == assignment.exam_hall_id,
+        )
+        .order_by(ExaminationSession.created_at.desc())
+        .first()
+    )
+    session_status = session.status if session is not None else None
+    if (not assignment.is_active) or session_status in (
+        SessionStatus.COMPLETED.value,
+        SessionStatus.CANCELLED.value,
+    ):
+        status_label = "COMPLETED"
+        exam_role = None
+    elif session_status == SessionStatus.IN_PROGRESS.value:
+        status_label = "ACTIVE"
+        exam_role = "INVIGILATOR"
+    else:
+        status_label = "SCHEDULED"
+        exam_role = None
+    hall_name = None
+    if hall is not None:
+        hall_name = hall.name or f"{hall.building} {hall.room_number}"
+    return MyAssignmentResponse(
+        account_role=account_role,
+        exam_role=exam_role,
+        exam_name=exam.exam_name if exam is not None else None,
+        hall_name=hall_name,
+        assignment_status=status_label,
+    )
 
 
 def _get_profile(db: Session, user_claims: dict) -> InvigilatorProfileResponse:
@@ -162,7 +239,7 @@ def _get_profile(db: Session, user_claims: dict) -> InvigilatorProfileResponse:
     summary="Get invigilator's assigned exam/hall/entry-point/camera",
 )
 def get_profile(
-    user: dict = Depends(require_role([Role.INVIGILATOR])),
+    user: dict = Depends(require_role_or_active_assignment([Role.INVIGILATOR])),
     db: Session = Depends(get_db),
 ):
     return _get_profile(db, user)
@@ -174,7 +251,7 @@ def get_profile(
     summary="Get invigilator dashboard with live stats",
 )
 def get_dashboard(
-    user: dict = Depends(require_role([Role.INVIGILATOR])),
+    user: dict = Depends(require_role_or_active_assignment([Role.INVIGILATOR])),
     db: Session = Depends(get_db),
 ):
     profile = _get_profile(db, user)
@@ -305,7 +382,7 @@ class RegisteredStudentsResponse(BaseModel):
     summary="List registered students for the invigilator's assigned exam with IV attempt status",
 )
 def get_registered_students(
-    user: dict = Depends(require_role([Role.INVIGILATOR])),
+    user: dict = Depends(require_role_or_active_assignment([Role.INVIGILATOR])),
     db: Session = Depends(get_db),
 ):
     """List all students registered for the invigilator's exam, with their
@@ -356,7 +433,7 @@ def get_registered_students(
 )
 def start_exam(
     body: StartExamRequest = StartExamRequest(),
-    user: dict = Depends(require_role([Role.INVIGILATOR])),
+    user: dict = Depends(require_role_or_active_assignment([Role.INVIGILATOR])),
     db: Session = Depends(get_db),
 ):
     profile = _get_profile(db, user)
@@ -402,7 +479,7 @@ def start_exam(
 )
 def end_exam(
     body: EndExamRequest = EndExamRequest(),
-    user: dict = Depends(require_role([Role.INVIGILATOR])),
+    user: dict = Depends(require_role_or_active_assignment([Role.INVIGILATOR])),
     db: Session = Depends(get_db),
 ):
     profile = _get_profile(db, user)

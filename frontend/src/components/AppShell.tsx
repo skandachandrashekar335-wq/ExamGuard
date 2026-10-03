@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { apiRequest } from "@/lib/api";
 import { isPublicRoute } from "@/lib/public-routes";
 
 interface NavLink {
@@ -168,6 +169,35 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, signOut, isAuthenticated: authed, loading } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [justSignedIn, setJustSignedIn] = useState(false);
+  const [examAssignment, setExamAssignment] = useState<{
+    account_role: string;
+    exam_role: string | null;
+    hall_name: string | null;
+    assignment_status: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!authed) {
+      setExamAssignment(null);
+      return;
+    }
+    let cancelled = false;
+    apiRequest<{
+      account_role: string;
+      exam_role: string | null;
+      hall_name: string | null;
+      assignment_status: string | null;
+    }>("/api/v1/invigilator/my-assignment")
+      .then((row) => {
+        if (!cancelled) setExamAssignment(row);
+      })
+      .catch(() => {
+        if (!cancelled) setExamAssignment(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authed, pathname]);
 
   useEffect(() => {
     if (justSignedIn && authed && !loading) {
@@ -180,7 +210,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (!group.roles) return true;
     if (!user) return false;
     return group.roles.includes(user.role);
-  });
+  }).map(group => ({
+    ...group,
+    links: group.links.filter(link => {
+      if (link.href !== "/invigilator") return true;
+      if (!user) return false;
+      if (user.role === "ADMIN" || user.role === "OPERATOR" || examAssignment?.exam_role === "INVIGILATOR") {
+        return true;
+      }
+      const status = examAssignment?.assignment_status;
+      return status === "SCHEDULED" || status === "ACTIVE";
+    }),
+  }));
 
   const publicRoute = isPublicRoute(pathname);
 
@@ -231,7 +272,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             {authed && user && (
               <div className="flex items-center gap-2">
                 <span className="eg-mono-sm text-[var(--text-muted)] eg-hide-mobile hidden md:block">
-                  {user.role}
+                  Role: {examAssignment?.account_role || user.role}
+                  {examAssignment?.assignment_status === "ACTIVE" && examAssignment.exam_role
+                    ? ` · Exam Role: ${examAssignment.exam_role}${examAssignment.hall_name ? ` — ${examAssignment.hall_name}` : ""}`
+                    : examAssignment?.assignment_status === "SCHEDULED"
+                      ? ` · Exam Assignment: INVIGILATOR${examAssignment.hall_name ? ` — ${examAssignment.hall_name}` : ""}`
+                      : examAssignment?.assignment_status === "COMPLETED"
+                        ? " · Exam Role: None"
+                        : ""}
                 </span>
                 {user.full_name && (
                   <span className="text-xs text-[var(--text-secondary)] eg-hide-mobile hidden md:block max-w-[120px] truncate">

@@ -5,11 +5,12 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import desc
+from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session
 
 from app.models.exam_registration import ExamRegistration, RegistrationStatus
 from app.models.hall_ticket import HallTicket
+from app.models.seat_assignment import SeatAssignment
 from app.models.identity_verification import (
     IdentityVerificationAttempt,
     IdentityVerificationDecision,
@@ -392,8 +393,37 @@ def list_attempts(
     exam_registration_id: int | None = None,
     status: str | None = None,
     decision: str | None = None,
+    scope_pairs: list[tuple[int, int]] | None = None,
 ) -> dict:
     query = db.query(IdentityVerificationAttempt)
+
+    if scope_pairs is not None:
+        if not scope_pairs:
+            query = query.filter(False)
+        else:
+            query = (
+                query.join(
+                    ExamRegistration,
+                    ExamRegistration.id
+                    == IdentityVerificationAttempt.exam_registration_id,
+                )
+                .join(
+                    SeatAssignment,
+                    SeatAssignment.exam_registration_id == ExamRegistration.id,
+                )
+                .filter(
+                    SeatAssignment.status == "ASSIGNED",
+                    or_(*[
+                        and_(
+                            ExamRegistration.exam_id == exam_id,
+                            SeatAssignment.exam_id == exam_id,
+                            SeatAssignment.exam_hall_id == hall_id,
+                        )
+                        for exam_id, hall_id in scope_pairs
+                    ]),
+                )
+                .distinct()
+            )
 
     if student_id is not None:
         query = query.filter(IdentityVerificationAttempt.student_id == student_id)

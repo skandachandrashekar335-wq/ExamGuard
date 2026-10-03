@@ -322,16 +322,21 @@ class TestVerifyFaceAPIAuthorization:
             f"/api/v1/identity-verifications/{attempt_id}/start"
         )
         assert start_resp.status_code == 200
+        attempt = db.get(IdentityVerificationAttempt, attempt_id)
+        attempt.reference_face_url = "https://example.test/candidate-reference.jpg"
+        db.commit()
 
         provider = DeterministicProvider()
         with patch(
             "app.services.face_verification.get_face_verification_provider",
             return_value=provider,
+        ), patch(
+            "app.api.v1.identity_verification._download_reference_image",
+            return_value=REF_BYTES,
         ):
             resp = client.post(
                 f"/api/v1/identity-verifications/{attempt_id}/verify-face",
                 json={
-                    "reference_image": base64.b64encode(REF_BYTES).decode(),
                     "probe_image": base64.b64encode(PROBE_BYTES).decode(),
                 },
             )
@@ -479,6 +484,7 @@ class TestInvigilatorScopeUnresolvedRegistration:
         from app.main import app
         from app.models.exam_hall import ExamHall
         from app.models.invigilator_assignment import InvigilatorAssignment
+        from app.models.seat_assignment import SeatAssignment
         from app.models.user import User
 
         _, exam, student, reg = _mk_subject_exam_student(db, "040")
@@ -486,7 +492,7 @@ class TestInvigilatorScopeUnresolvedRegistration:
         user = User(
             email="caa-invigilator2@example.com",
             full_name="CAA Invigilator 2",
-            role=Role.INVIGILATOR,
+            role=Role.REVIEWER,
         )
         db.add(user)
         db.commit()
@@ -496,12 +502,33 @@ class TestInvigilatorScopeUnresolvedRegistration:
         db.add(hall)
         db.commit()
         db.refresh(hall)
+        db.add(SeatAssignment(
+            exam_registration_id=reg.id,
+            exam_hall_id=hall.id,
+            exam_id=exam.id,
+            student_id=student.id,
+            seat_number="CAA-401",
+        ))
 
         assignment = InvigilatorAssignment(
             user_id=user.id, exam_id=exam.id, exam_hall_id=hall.id,
             is_active=True,
         )
         db.add(assignment)
+        db.commit()
+
+        # Create IN_PROGRESS session for the exam/hall (required for invigilator actions)
+        from app.models.examination_session import ExaminationSession, SessionStatus
+        session = ExaminationSession(
+            exam_id=exam.id,
+            exam_hall_id=hall.id,
+            status=SessionStatus.IN_PROGRESS.value,
+            gate_status="GATES_OPEN",
+            expected_capacity=30,
+            notes="Test session",
+            created_by="test",
+        )
+        db.add(session)
         db.commit()
 
         resp = client.post("/api/v1/identity-verifications", json={
@@ -515,7 +542,7 @@ class TestInvigilatorScopeUnresolvedRegistration:
         prev_override = app.dependency_overrides.get(get_current_user)
         app.dependency_overrides[get_current_user] = lambda: {
             "sub": str(user.id),
-            "role": Role.INVIGILATOR,
+            "role": Role.REVIEWER,
             "email": user.email,
             "full_name": user.full_name,
         }

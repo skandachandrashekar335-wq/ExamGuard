@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, String, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models import Base
@@ -41,6 +41,13 @@ class Document(Base):
         Enum(DocumentType, native_enum=False),
         nullable=False,
         index=True,
+    )
+    exam_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("exams.id"),
+        nullable=True,
+        index=True,
+        comment="Selected exam context for exam-specific documents",
     )
     status: Mapped[DocumentStatus] = mapped_column(
         Enum(DocumentStatus, native_enum=False),

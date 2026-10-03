@@ -233,6 +233,26 @@ class TestGetReviewData:
 
 
 class TestCorrectField:
+    def test_confirm_absent_field_without_inventing_value(self):
+        db = SessionLocal()
+        try:
+            doc = _create_document(db)
+            er = _create_extraction_result(db, doc.id)
+            field = _create_extracted_field(
+                db, er.id, "seat_number", None, ReviewStatus.REVIEW_REQUIRED.value
+            )
+            db.commit()
+
+            result = extraction_review.correct_field(
+                db, doc.id, field.id, None, ReviewStatus.REVIEWED.value
+            )
+
+            assert result.extracted_value is None
+            assert result.corrected_value is None
+            assert result.review_status == ReviewStatus.REVIEWED.value
+        finally:
+            db.close()
+
     def test_correct_field_success(self):
         db = SessionLocal()
         try:

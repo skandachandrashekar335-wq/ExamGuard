@@ -16,7 +16,9 @@ class Settings(BaseSettings):
 
     APP_NAME: str = "ExamGuard"
     APP_ENV: str = "development"
-    DEBUG: bool = True
+    # Never expose stack traces / frame locals in production responses. Opt in
+    # explicitly with DEBUG=true for local development.
+    DEBUG: bool = False
     # Placeholder default: never a real signing key. The validate_secret_key
     # model validator rejects this value whenever APP_ENV != "development",
     # so deployments must supply SECRET_KEY via environment. Signing JWTs
@@ -131,7 +133,11 @@ class Settings(BaseSettings):
     # If the user's email matches and they are not already ADMIN,
     # their role is promoted to ADMIN and a new JWT is issued.
     # This is server-side only — not exposed via NEXT_PUBLIC_* variables.
-    INITIAL_ADMIN_EMAILS: list[str] = ["skandachandrashekhar335@gmail.com"]
+    INITIAL_ADMIN_EMAILS: list[str] = [
+        "skandachandrashekhar335@gmail.com",
+        "skandamusic17@gmail.com",
+        "riziljaprel@gmail.com",
+    ]
 
     @model_validator(mode="after")
     def validate_secret_key(self) -> "Settings":

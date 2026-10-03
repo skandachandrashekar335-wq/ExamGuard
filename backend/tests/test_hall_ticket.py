@@ -960,10 +960,10 @@ class TestHallTicketSearch:
 
 
 class TestHallTicketApiLinkDocument:
-    def _create_doc(self, client):
+    def _create_doc(self, client, exam_id):
         import io
         response = client.post(
-            "/api/v1/documents?document_type=HALL_TICKET",
+            f"/api/v1/documents?document_type=HALL_TICKET&exam_id={exam_id}",
             files={"file": ("ht_test_ticket.pdf", b"%PDF-1.4 fake content", "application/pdf")},
         )
         return response.json()["id"]
@@ -978,7 +978,7 @@ class TestHallTicketApiLinkDocument:
         )
         ht_id = ht_resp.json()["id"]
 
-        doc_id = self._create_doc(client)
+        doc_id = self._create_doc(client, sample_data["exam_id"])
 
         response = client.post(
             f"/api/v1/hall-tickets/{ht_id}/link-document",

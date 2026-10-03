@@ -232,15 +232,11 @@ class TestDemoDataLoader:
         assert resp.json()["status"] == "assigned"
         assert resp.json()["email"] == "inv.demo@example.com"
 
-        # Assigned user must be able to open invigilator console
         db = SessionLocal()
         try:
             user = db.query(User).filter(User.email == "inv.demo@example.com").first()
-            assert user.role == "INVIGILATOR"
-            if original_role != "INVIGILATOR":
-                # restore for other tests
-                user.role = original_role
-                db.commit()
+            assert user.role == original_role
+            assert user.role == "REVIEWER"
         finally:
             db.close()
 

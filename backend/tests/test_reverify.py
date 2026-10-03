@@ -28,6 +28,7 @@ from app.models.identity_verification import (
     IdentityVerificationEvidence,
 )
 from app.models.invigilator_assignment import InvigilatorAssignment
+from app.models.seat_assignment import SeatAssignment
 from app.models.student import Student
 from app.models.subject import Subject
 from app.models.user import User
@@ -45,6 +46,7 @@ def cleanup():
     """Remove RVW-prefixed test data before each test."""
     db = SessionLocal()
     try:
+        from app.models.examination_session import ExaminationSession
         student_ids = db.query(Student.id).filter(Student.usn.ilike("RVW%"))
         reg_ids = db.query(ExamRegistration.id).filter(
             ExamRegistration.student_id.in_(student_ids)
@@ -61,6 +63,12 @@ def cleanup():
         ))
         db.execute(delete(InvigilatorAssignment).where(
             InvigilatorAssignment.exam_id.in_(exam_ids)
+        ))
+        db.execute(delete(SeatAssignment).where(
+            SeatAssignment.exam_registration_id.in_(reg_ids)
+        ))
+        db.execute(delete(ExaminationSession).where(
+            ExaminationSession.exam_id.in_(exam_ids)
         ))
         db.execute(delete(ExamRegistration).where(
             ExamRegistration.id.in_(reg_ids)
@@ -126,6 +134,14 @@ def _mk_env(
     db.add(reg)
     db.commit()
     db.refresh(reg)
+    db.add(SeatAssignment(
+        exam_registration_id=reg.id,
+        exam_hall_id=hall.id,
+        exam_id=exam.id,
+        student_id=student.id,
+        seat_number=f"RVW-{usn[-3:]}",
+    ))
+    db.commit()
 
     attempt = IdentityVerificationAttempt(
         student_id=student.id, exam_registration_id=reg.id,
@@ -137,9 +153,23 @@ def _mk_env(
     db.commit()
     db.refresh(attempt)
 
+    # Create IN_PROGRESS session for the exam/hall (required for invigilator actions)
+    from app.models.examination_session import ExaminationSession, SessionStatus
+    session = ExaminationSession(
+        exam_id=exam.id,
+        exam_hall_id=hall.id,
+        status=SessionStatus.IN_PROGRESS.value,
+        gate_status="GATES_OPEN",
+        expected_capacity=30,
+        notes="Test session",
+        created_by="test",
+    )
+    db.add(session)
+    db.commit()
+
     return SimpleNamespace(
         subject=subject, exam=exam, hall=hall, student=student,
-        reg=reg, attempt=attempt,
+        reg=reg, attempt=attempt, session=session,
     )
 
 

@@ -17,6 +17,26 @@ class HallTicketCreate(BaseModel):
     )
 
 
+class CandidateEnrollmentRequest(BaseModel):
+    exam_id: int = Field(..., gt=0)
+    confirmed: bool = Field(..., description="Admin confirmation after reviewing extracted fields")
+
+
+class CandidateEnrollmentResponse(BaseModel):
+    document_id: int
+    exam_id: int
+    student_id: int
+    registration_id: int
+    hall_ticket_id: int
+    seat_assignment_id: int | None
+    identity_attempt_id: int
+    student_created: bool
+    registration_created: bool
+    reference_photo_enrolled: bool
+    needs_seat_assignment: bool
+    already_enrolled: bool
+
+
 class HallTicketUpdate(BaseModel):
     """Update a hall ticket's linked resources or status."""
     document_id: int | None = Field(

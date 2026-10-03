@@ -2,11 +2,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
+import logging
 import threading
 import time
 import urllib.request
 
-from app.auth import Role, get_invigilator_scope, check_invigilator_scope, require_role
+from app.auth import (
+    Role,
+    check_invigilator_scope,
+    get_invigilator_scope,
+    require_role,
+    require_role_or_active_assignment,
+)
 from app.core.database import get_db
 from app.schemas.identity_verification import (
     IdentityVerificationContextResponse,
@@ -24,6 +31,8 @@ from app.services import identity_verification as iv_service
 from app.services import identity_verification_decision as iv_decision
 
 router = APIRouter(prefix="/identity-verifications", tags=["Identity Verifications"])
+
+logger = logging.getLogger(__name__)
 
 # Short-lived cache so live multi-frame verification does not re-download
 # the Cloudinary reference on every probe.
@@ -44,10 +53,11 @@ def _download_reference_image(url: str) -> bytes:
     try:
         with urllib.request.urlopen(url, timeout=30) as resp:
             data = resp.read()
-    except Exception as e:
+    except Exception:
+        logger.exception("Failed to download stored reference face")
         raise HTTPException(
             status_code=502,
-            detail=f"Failed to download stored reference face: {e}",
+            detail="Failed to download stored reference face",
         )
 
     with _reference_cache_lock:
@@ -74,21 +84,28 @@ def invalidate_reference_cache(url: str | None = None) -> None:
             _reference_cache.pop(url, None)
 
 
-def _enforce_attempt_scope(db: Session, user: dict, attempt) -> None:
-    """Enforce INVIGILATOR scope on an attempt. No-op for other roles."""
-    if user.get("role") != Role.INVIGILATOR:
+def _enforce_attempt_scope(
+    db: Session,
+    user: dict,
+    attempt,
+    *,
+    require_live_session: bool = False,
+) -> None:
+    """Scope assigned invigilators to their exams. ADMIN and OPERATOR stay unrestricted."""
+    if user.get("role") in (Role.ADMIN, Role.OPERATOR):
+        return
+    scope = get_invigilator_scope(user, db)
+    if scope is None:
         return
     from app.models.exam_registration import ExamRegistration
+    from app.models.seat_assignment import SeatAssignment, SeatAssignmentStatus
 
-    scope = get_invigilator_scope(user, db)
-    exam_id = None
-    if attempt.exam_registration_id:
-        reg = db.query(ExamRegistration).filter(
-            ExamRegistration.id == attempt.exam_registration_id
-        ).first()
-        if reg:
-            exam_id = reg.exam_id
-    if exam_id is None:
+    registration = (
+        db.query(ExamRegistration)
+        .filter(ExamRegistration.id == attempt.exam_registration_id)
+        .first()
+    )
+    if registration is None:
         # Do not silently skip the exam check when the registration cannot
         # be resolved — that would grant an invigilator access to an
         # orphaned attempt outside their assignment.
@@ -96,7 +113,48 @@ def _enforce_attempt_scope(db: Session, user: dict, attempt) -> None:
             status_code=403,
             detail="Access denied: attempt is not linked to an assigned exam",
         )
-    check_invigilator_scope(scope, resource_exam_id=exam_id, resource_hall_id=None)
+    pairs = scope.scopes or [(scope.exam_id, scope.hall_id)]
+    assigned_halls = [
+        hall_id for exam_id, hall_id in pairs if exam_id == registration.exam_id
+    ]
+    if not assigned_halls:
+        check_invigilator_scope(scope, resource_exam_id=registration.exam_id)
+    seat = (
+        db.query(SeatAssignment)
+        .filter(
+            SeatAssignment.exam_registration_id == registration.id,
+            SeatAssignment.exam_id == registration.exam_id,
+            SeatAssignment.exam_hall_id.in_(assigned_halls),
+            SeatAssignment.status == SeatAssignmentStatus.ASSIGNED.value,
+        )
+        .first()
+    )
+    if seat is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: attempt is outside your assigned exam and hall",
+        )
+    check_invigilator_scope(
+        scope, resource_exam_id=registration.exam_id,
+        resource_hall_id=seat.exam_hall_id,
+    )
+    if require_live_session:
+        from app.models.examination_session import ExaminationSession, SessionStatus
+
+        session = (
+            db.query(ExaminationSession)
+            .filter(
+                ExaminationSession.exam_id == registration.exam_id,
+                ExaminationSession.exam_hall_id == seat.exam_hall_id,
+                ExaminationSession.status == SessionStatus.IN_PROGRESS.value,
+            )
+            .first()
+        )
+        if session is None:
+            raise HTTPException(
+                status_code=403,
+                detail="The assigned exam and hall session is not in progress",
+            )
 
 
 class CompleteRequest(BaseModel):
@@ -273,10 +331,11 @@ def save_reference_face(
     key = f"face-references/attempt-{attempt_id}{ext}"
     try:
         url = storage.save(key, ref_bytes)
-    except Exception as e:
+    except Exception:
+        logger.exception("Failed to save reference face for attempt %s", attempt_id)
         raise HTTPException(
             status_code=502,
-            detail=f"Failed to save reference face: {e}",
+            detail="Failed to save reference face",
         )
 
     if not isinstance(url, str) or not url.lower().startswith(("http://", "https://")):
@@ -304,7 +363,9 @@ def save_reference_face(
 def get_reference_face(
     attempt_id: int,
     db: Session = Depends(get_db),
-    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
+    _user: dict = Depends(
+        require_role_or_active_assignment([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])
+    ),
 ):
     """Retrieve the stored reference face URL for an attempt.
 
@@ -361,7 +422,7 @@ def reverify_attempt(
     attempt_id: int,
     db: Session = Depends(get_db),
     _user: dict = Depends(
-        require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])
+        require_role_or_active_assignment([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])
     ),
 ):
     """Create a fresh attempt after a NO_MATCH or INCONCLUSIVE result.
@@ -376,7 +437,7 @@ def reverify_attempt(
         raise HTTPException(
             status_code=404, detail="Identity verification attempt not found"
         )
-    _enforce_attempt_scope(db, _user, prev)
+    _enforce_attempt_scope(db, _user, prev, require_live_session=True)
     try:
         return iv_service.create_reverify_attempt(db, attempt_id)
     except LookupError as e:
@@ -402,23 +463,22 @@ def list_attempts(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
-    # INVIGILATOR may only list attempts for their assigned exam
-    if _user.get("role") == Role.INVIGILATOR:
-        from app.models.exam_registration import ExamRegistration as _ER
+    scope = get_invigilator_scope(_user, db)
+    scope_pairs = scope.scopes if scope is not None else None
+    if scope is not None and exam_registration_id is not None:
+        from app.models.exam_registration import ExamRegistration
 
-        scope = get_invigilator_scope(_user, db)
-        if scope is not None:
-            allowed_reg_ids = [
-                r.id for r in db.query(_ER).filter(_ER.exam_id == scope.exam_id).all()
-            ]
-            if exam_registration_id is not None:
-                if exam_registration_id not in allowed_reg_ids:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="Access denied: resource outside your assigned exam",
-                    )
-            else:
-                exam_registration_id = allowed_reg_ids[0] if allowed_reg_ids else -1
+        registration = (
+            db.query(ExamRegistration)
+            .filter(ExamRegistration.id == exam_registration_id)
+            .first()
+        )
+        if registration is not None:
+            scoped_attempt = type("AttemptScope", (), {
+                "exam_registration_id": registration.id,
+                "student_id": registration.student_id,
+            })()
+            _enforce_attempt_scope(db, _user, scoped_attempt)
 
     result = iv_service.list_attempts(
         db,
@@ -428,6 +488,7 @@ def list_attempts(
         exam_registration_id=exam_registration_id,
         status=status,
         decision=decision,
+        scope_pairs=scope_pairs,
     )
     return IdentityVerificationListResponse(
         items=[
@@ -551,7 +612,9 @@ def verify_face(
     attempt_id: int,
     body: VerifyFaceRequest,
     db: Session = Depends(get_db),
-    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
+    _user: dict = Depends(
+        require_role_or_active_assignment([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])
+    ),
 ):
     """Run face verification and persist evidence signals.
 
@@ -560,9 +623,8 @@ def verify_face(
 
     INVIGILATOR may only verify attempts within their assigned exam scope.
 
-    If reference_image is provided, it is used directly.
-    If omitted, the stored reference_face_url on the attempt is fetched
-    and downloaded for comparison.
+    The reference is always loaded from the attempt's trusted persisted
+    reference_face_url. Client-supplied reference bytes are rejected.
     """
     import base64
 
@@ -579,7 +641,7 @@ def verify_face(
     attempt = iv_service.get_attempt(db, attempt_id)
     if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
-    _enforce_attempt_scope(db, _user, attempt)
+    _enforce_attempt_scope(db, _user, attempt, require_live_session=True)
 
     # Authoritative candidate / reference-ownership / enrollment checks
     # BEFORE downloading any reference image or invoking the provider.
@@ -588,24 +650,18 @@ def verify_face(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
-    # Resolve reference image bytes
     if body.reference_image is not None:
-        try:
-            ref_bytes = base64.b64decode(body.reference_image, validate=True)
-        except Exception:
-            raise HTTPException(
-                status_code=422,
-                detail="Invalid base64 encoding in reference_image",
-            )
-    else:
-        # Fetch stored reference from attempt (short TTL cache for live capture)
-        if not attempt.reference_face_url:
-            raise HTTPException(
-                status_code=422,
-                detail="No reference_image provided and no stored reference face for this attempt. "
-                       "Upload a reference face first via /reference-face endpoint.",
-            )
-        ref_bytes = _download_reference_image(attempt.reference_face_url)
+        raise HTTPException(
+            status_code=422,
+            detail="Client-supplied reference images are not accepted; use the stored enrolled reference",
+        )
+
+    if not attempt.reference_face_url:
+        raise HTTPException(
+            status_code=422,
+            detail="No stored enrolled reference face for this attempt. Upload a reference face first via /reference-face endpoint.",
+        )
+    ref_bytes = _download_reference_image(attempt.reference_face_url)
 
     try:
         probe_bytes = base64.b64decode(body.probe_image, validate=True)
@@ -686,14 +742,16 @@ def complete_attempt(
 def evaluate_and_complete(
     attempt_id: int,
     db: Session = Depends(get_db),
-    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])),
+    _user: dict = Depends(
+        require_role_or_active_assignment([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR])
+    ),
 ):
     attempt = iv_service.get_attempt(db, attempt_id)
     if not attempt:
         raise HTTPException(
             status_code=404, detail="Identity verification attempt not found"
         )
-    _enforce_attempt_scope(db, _user, attempt)
+    _enforce_attempt_scope(db, _user, attempt, require_live_session=True)
     if attempt.status not in (
         iv_service.IdentityVerificationStatus.CREATED.value,
         iv_service.IdentityVerificationStatus.IN_PROGRESS.value,

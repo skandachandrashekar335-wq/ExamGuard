@@ -95,7 +95,7 @@ export default function IdentityVerificationDetailPage() {
 
   const handleVerify = async () => {
     if (!probeImage) return;
-    if (!referenceImage && !attempt?.reference_face_url) return;
+    if (!attempt?.reference_face_url) return;
     setVerifyError("");
     setActionMsg("");
     setUiState("SUBMITTING");
@@ -104,9 +104,7 @@ export default function IdentityVerificationDetailPage() {
 
       setUiState("VERIFYING");
       await verifyFace(id, {
-        reference_image: referenceImage ? await fileToBase64(referenceImage) : undefined,
         probe_image: probeBase64,
-        reference_image_format: referenceImage?.type || "image/jpeg",
         probe_image_format: probeImage.type || "image/jpeg",
       });
 
@@ -371,7 +369,7 @@ export default function IdentityVerificationDetailPage() {
               <div className="flex items-center gap-4">
                 <button
                   onClick={handleVerify}
-                  disabled={!probeImage || (!referenceImage && !attempt?.reference_face_url) || uiState !== "READY"}
+                  disabled={!probeImage || !attempt?.reference_face_url || uiState !== "READY"}
                   className="eg-btn eg-btn-primary px-6 py-2 disabled:opacity-30"
                 >
                   {uiState === "READY" ? "Verify Identity" : "Processing..."}
@@ -384,6 +382,11 @@ export default function IdentityVerificationDetailPage() {
                 {!referenceImage && !attempt?.reference_face_url && (
                   <span className="text-xs text-[var(--text-muted)]">
                     Upload or save a reference face first
+                  </span>
+                )}
+                {referenceImage && !attempt?.reference_face_url && (
+                  <span className="text-xs text-[var(--warning)]">
+                    Save the reference photo before verifying; verification uses the stored image.
                   </span>
                 )}
                 {referenceImage && !probeImage && (

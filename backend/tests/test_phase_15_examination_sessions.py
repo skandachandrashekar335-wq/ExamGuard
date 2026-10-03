@@ -618,6 +618,29 @@ class TestCreateSessionAPI:
         )
         assert resp.status_code == 422
 
+    def test_duplicate_exam_hall_session_returns_conflict(self, client, seed_data):
+        payload = {
+            "exam_id": seed_data["exam"].id,
+            "exam_hall_id": seed_data["hall"].id,
+        }
+        first = client.post("/api/v1/examination-sessions", json=payload)
+        assert first.status_code == 201
+        second = client.post("/api/v1/examination-sessions", json=payload)
+        assert second.status_code == 409
+
+    def test_missing_exam_or_hall_returns_not_found(self, client, seed_data):
+        missing_exam = client.post(
+            "/api/v1/examination-sessions",
+            json={"exam_id": 999999, "exam_hall_id": seed_data["hall"].id},
+        )
+        assert missing_exam.status_code == 404
+
+        missing_hall = client.post(
+            "/api/v1/examination-sessions",
+            json={"exam_id": seed_data["exam"].id, "exam_hall_id": 999999},
+        )
+        assert missing_hall.status_code == 404
+
 
 class TestListSessionsAPI:
     """GET /api/v1/examination-sessions."""

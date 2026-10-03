@@ -1,11 +1,18 @@
+from datetime import date, time
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import delete
 
+from app.auth import Role, get_current_user
 from app.core.database import SessionLocal
 from app.main import app
 from app.models.exam import Exam
+from app.models.exam_hall import ExamHall
+from app.models.examination_session import ExaminationSession
+from app.models.invigilator_assignment import InvigilatorAssignment
 from app.models.subject import Subject
+from app.models.user import User
 
 
 @pytest.fixture(autouse=True)
@@ -13,11 +20,28 @@ def clean_test_data():
     """Remove test data before each test to avoid conflicts."""
     db = SessionLocal()
     try:
+        test_exam_ids = db.query(Exam.id).filter(
+            Exam.exam_name.ilike("EXAM%")
+            | Exam.exam_name.ilike("Test%")
+            | Exam.exam_name.ilike("Dup%")
+            | Exam.exam_name.ilike("Filter%")
+            | Exam.exam_name.ilike("Search%")
+        )
+        db.execute(delete(InvigilatorAssignment).where(
+            InvigilatorAssignment.exam_id.in_(test_exam_ids)
+        ))
+        db.execute(delete(ExaminationSession).where(
+            ExaminationSession.exam_id.in_(test_exam_ids)
+        ))
         db.execute(delete(Exam).where(Exam.exam_name.ilike("EXAM%")))
         db.execute(delete(Exam).where(Exam.exam_name.ilike("Test%")))
         db.execute(delete(Exam).where(Exam.exam_name.ilike("Dup%")))
         db.execute(delete(Exam).where(Exam.exam_name.ilike("Filter%")))
         db.execute(delete(Exam).where(Exam.exam_name.ilike("Search%")))
+        db.execute(delete(ExamHall).where(
+            ExamHall.building.ilike("EXAMSETUP%")
+        ))
+        db.execute(delete(User).where(User.email.ilike("examsetup-%")))
         db.execute(delete(Subject).where(Subject.code.ilike("EXSUB%")))
         db.commit()
     finally:
@@ -67,6 +91,143 @@ class TestExamAPI:
         assert data["semester"] == 5
         assert data["is_active"] is True
         assert "id" in data
+
+    def test_operator_can_create_exam(self, client, test_subject, monkeypatch):
+        monkeypatch.setitem(
+            app.dependency_overrides,
+            get_current_user,
+            lambda: {
+                "sub": "operator-setup",
+                "role": Role.OPERATOR,
+                "email": "operator@example.com",
+            },
+        )
+        response = client.post(
+            "/api/v1/exams",
+            json={
+                "subject_id": test_subject["id"],
+                "exam_name": "EXAM Operator Create",
+                "exam_date": "2026-11-01",
+                "start_time": "10:00",
+                "end_time": "12:00",
+                "semester": 5,
+                "department": "Computer Science",
+            },
+        )
+        assert response.status_code == 201, response.text
+
+    def test_reviewer_with_active_assignment_cannot_create_exam(
+        self, client, test_subject, monkeypatch
+    ):
+        db = SessionLocal()
+        try:
+            exam = Exam(
+                subject_id=test_subject["id"],
+                exam_name="EXAMSETUP Assigned Reviewer's Existing Exam",
+                exam_date=date(2026, 11, 2),
+                start_time=time(10, 0),
+                end_time=time(12, 0),
+                semester=5,
+                department="Computer Science",
+            )
+            hall = ExamHall(
+                building="EXAMSETUP Block A",
+                room_number="101",
+                capacity=40,
+            )
+            user = User(
+                email="examsetup-reviewer@example.com",
+                full_name="Assigned Reviewer",
+                role=Role.REVIEWER,
+                is_active=True,
+            )
+            db.add_all([exam, hall, user])
+            db.commit()
+            db.refresh(exam)
+            db.refresh(hall)
+            db.refresh(user)
+            db.add(InvigilatorAssignment(
+                user_id=user.id,
+                exam_id=exam.id,
+                exam_hall_id=hall.id,
+                is_active=True,
+            ))
+            db.commit()
+            user_id = user.id
+        finally:
+            db.close()
+
+        monkeypatch.setitem(
+            app.dependency_overrides,
+            get_current_user,
+            lambda: {
+                "sub": str(user_id),
+                "role": Role.REVIEWER,
+                "email": "examsetup-reviewer@example.com",
+            },
+        )
+        response = client.post(
+            "/api/v1/exams",
+            json={
+                "subject_id": test_subject["id"],
+                "exam_name": "EXAM Reviewer Must Not Create",
+                "exam_date": "2026-11-03",
+                "start_time": "10:00",
+                "end_time": "12:00",
+                "semester": 5,
+                "department": "Computer Science",
+            },
+        )
+        assert response.status_code == 403
+
+    def test_exam_can_be_persisted_with_hall_and_not_started_session(
+        self, client, test_subject
+    ):
+        exam_response = client.post(
+            "/api/v1/exams",
+            json={
+                "subject_id": test_subject["id"],
+                "exam_name": "EXAM Setup Persistence",
+                "exam_date": "2026-11-04",
+                "start_time": "09:30",
+                "end_time": "12:30",
+                "semester": 5,
+                "department": "Computer Science",
+            },
+        )
+        assert exam_response.status_code == 201, exam_response.text
+        exam = exam_response.json()
+        hall_response = client.post(
+            "/api/v1/exam-halls",
+            json={
+                "building": "EXAMSETUP Block B",
+                "room_number": "202",
+                "capacity": 50,
+            },
+        )
+        assert hall_response.status_code == 201, hall_response.text
+
+        session_response = client.post(
+            "/api/v1/examination-sessions",
+            json={
+                "exam_id": exam["id"],
+                "exam_hall_id": hall_response.json()["id"],
+                "expected_capacity": 50,
+            },
+        )
+        assert session_response.status_code == 201, session_response.text
+        session = session_response.json()
+        assert session["exam_id"] == exam["id"]
+        assert session["exam_hall_id"] == hall_response.json()["id"]
+        assert session["status"] == "NOT_STARTED"
+        assert session["gate_status"] == "GATES_CLOSED"
+
+        details = client.get(f"/api/v1/exams/{exam['id']}")
+        assert details.status_code == 200
+        assert details.json()["exam_name"] == "EXAM Setup Persistence"
+        assert details.json()["exam_date"] == "2026-11-04"
+        assert details.json()["start_time"].startswith("09:30")
+        assert details.json()["end_time"].startswith("12:30")
 
     def test_get_exam(self, client, test_subject):
         create = client.post(
@@ -359,6 +520,41 @@ class TestExamAPI:
             },
         )
         assert response.status_code == 422
+
+    def test_invalid_exam_date_rejected(self, client, test_subject):
+        response = client.post(
+            "/api/v1/exams",
+            json={
+                "subject_id": test_subject["id"],
+                "exam_name": "Test Invalid Date",
+                "exam_date": "not-a-date",
+                "start_time": "10:00",
+                "end_time": "13:00",
+                "semester": 5,
+                "department": "Computer Science",
+            },
+        )
+        assert response.status_code == 422
+
+    def test_partial_time_update_cannot_invert_exam_range(self, client, test_subject):
+        created = client.post(
+            "/api/v1/exams",
+            json={
+                "subject_id": test_subject["id"],
+                "exam_name": "EXAM Invalid Partial Time Update",
+                "exam_date": "2026-11-05",
+                "start_time": "10:00",
+                "end_time": "13:00",
+                "semester": 5,
+                "department": "Computer Science",
+            },
+        )
+        response = client.patch(
+            f"/api/v1/exams/{created.json()['id']}",
+            json={"start_time": "14:00"},
+        )
+        assert response.status_code == 409
+        assert "start_time must be before end_time" in response.json()["detail"]
 
     def test_equal_start_end_time_rejected(self, client, test_subject):
         response = client.post(

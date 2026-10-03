@@ -13,8 +13,17 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.auth import Role, require_role, get_invigilator_scope, check_invigilator_scope
+from app.auth import (
+    Role,
+    check_invigilator_scope,
+    get_invigilator_scope,
+    require_role,
+    require_role_or_active_assignment,
+)
+from app.api.v1.entry_verification import _require_ev_in_scope
 from app.core.database import get_db
+from app.models.seat_assignment import SeatAssignment, SeatAssignmentStatus
+from app.models.exam_registration import ExamRegistration
 from app.schemas.attendance import (
     AttendanceCorrectionRequest,
     AttendanceEventListResponse,
@@ -35,6 +44,39 @@ from app.services.monitoring.publisher import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/attendance", tags=["Attendance"])
+
+
+def _assigned_registration_seat(
+    db: Session, scope, registration: ExamRegistration
+) -> SeatAssignment:
+    assigned_pairs = scope.scopes or [(scope.exam_id, scope.hall_id)]
+    assigned_halls = [
+        hall_id for exam_id, hall_id in assigned_pairs
+        if exam_id == registration.exam_id
+    ]
+    if not assigned_halls:
+        check_invigilator_scope(scope, registration.exam_id)
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: registration is outside your assigned exam",
+        )
+    seat = (
+        db.query(SeatAssignment)
+        .filter(
+            SeatAssignment.exam_registration_id == registration.id,
+            SeatAssignment.exam_id == registration.exam_id,
+            SeatAssignment.exam_hall_id.in_(assigned_halls),
+            SeatAssignment.status == SeatAssignmentStatus.ASSIGNED.value,
+        )
+        .first()
+    )
+    if seat is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: registration has no seat in your assigned hall",
+        )
+    check_invigilator_scope(scope, registration.exam_id, seat.exam_hall_id)
+    return seat
 
 
 # ---------------------------------------------------------------------------
@@ -62,6 +104,7 @@ def record_attendance(
     Does NOT authorize entry. EntryVerification is the sole source
     of authorization.
     """
+    _require_ev_in_scope(db, get_invigilator_scope(_user, db), entry_verification_id)
     try:
         result = att_service.record_attendance(db, entry_verification_id)
     except LookupError as e:
@@ -140,12 +183,25 @@ def get_exam_summary(
 ):
     """Get attendance summary with by-hall breakdown."""
     scope = get_invigilator_scope(_user, db)
+    assigned_halls: set[int] | None = None
     if scope:
         check_invigilator_scope(scope, exam_id)
+        assigned_halls = {
+            hall_id
+            for assigned_exam, hall_id in (
+                scope.scopes or [(scope.exam_id, scope.hall_id)]
+            )
+            if assigned_exam == exam_id
+        }
     try:
         result = att_service.get_exam_summary(db, exam_id)
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    by_hall = result["by_hall"]
+    if assigned_halls is not None:
+        by_hall = [
+            hall_row for hall_row in by_hall if hall_row["hall_id"] in assigned_halls
+        ]
     return AttendanceSummaryResponse(
         exam_id=result["exam_id"],
         total_registered=result["total_registered"],
@@ -153,7 +209,7 @@ def get_exam_summary(
         total_absent=result["total_absent"],
         total_excused=result["total_excused"],
         attendance_rate=result["attendance_rate"],
-        by_hall=result["by_hall"],
+        by_hall=by_hall,
     )
 
 
@@ -287,12 +343,7 @@ def list_entry_events(
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ):
     """List attendance events for an entry verification with pagination."""
-    scope = get_invigilator_scope(_user, db)
-    if scope:
-        from app.services import entry_verification as ev_svc
-        ev = ev_svc.get_entry_verification(db, entry_verification_id)
-        if ev:
-            check_invigilator_scope(scope, ev.exam_id, ev.exam_hall_id)
+    _require_ev_in_scope(db, get_invigilator_scope(_user, db), entry_verification_id)
     result = att_service.get_entry_events(
         db,
         entry_verification_id,
@@ -323,7 +374,7 @@ def list_entry_events(
 def get_manual_review_status(
     exam_registration_id: int,
     db: Session = Depends(get_db),
-    _user: dict = Depends(require_role([Role.INVIGILATOR])),
+    _user: dict = Depends(require_role_or_active_assignment([Role.INVIGILATOR])),
 ):
     """Current manual review state for a registration.
 
@@ -340,11 +391,11 @@ def get_manual_review_status(
         reg = att_service.get_registration(db, exam_registration_id)
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    check_invigilator_scope(scope, reg.exam_id)
+    seat = _assigned_registration_seat(db, scope, reg)
 
     try:
         status = att_service.get_manual_review_status(
-            db, exam_registration_id, hall_id=scope.hall_id
+            db, exam_registration_id, hall_id=seat.exam_hall_id
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -371,7 +422,7 @@ def get_manual_review_status(
 def submit_manual_review(
     body: ManualReviewRequest,
     db: Session = Depends(get_db),
-    _user: dict = Depends(require_role([Role.INVIGILATOR])),
+    _user: dict = Depends(require_role_or_active_assignment([Role.INVIGILATOR])),
 ):
     """Record an invigilator manual review decision (CHECK_IN / CHECK_OUT).
 
@@ -394,17 +445,19 @@ def submit_manual_review(
         reg = att_service.get_registration(db, body.exam_registration_id)
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    check_invigilator_scope(scope, reg.exam_id)
+
+    seat = _assigned_registration_seat(db, scope, reg)
 
     recorded_by = _user.get("email") or _user.get("sub") or "unknown"
     try:
         event, record = att_service.record_manual_review(
             db,
             body.exam_registration_id,
+            exam_id=reg.exam_id,
             action=body.action,
             reason=body.reason,
             recorded_by=recorded_by,
-            hall_id=scope.hall_id,
+            hall_id=seat.exam_hall_id,
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))

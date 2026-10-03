@@ -202,6 +202,18 @@ def _b64(data: bytes) -> str:
     return base64.b64encode(data).decode()
 
 
+def _store_reference(attempt_id: int) -> str:
+    url = f"https://example.test/integration-reference-{attempt_id}.jpg"
+    db = SessionLocal()
+    try:
+        attempt = db.get(IdentityVerificationAttempt, attempt_id)
+        attempt.reference_face_url = url
+        db.commit()
+    finally:
+        db.close()
+    return url
+
+
 def _create_attempt(db, sample_data, *, method="FACE"):
     data = IdentityVerificationCreate(
         student_id=sample_data["student_id"],
@@ -350,13 +362,17 @@ class TestFullPipelineE2E:
         # Verify face
         ref_b64 = _b64(_make_jpeg())
         probe_b64 = _b64(_make_jpeg())
+        reference_url = _store_reference(attempt_id)
         provider = _StubProvider(match_score=0.92, liveness_passed=True)
-        with patch("app.services.face_verification.get_face_verification_provider", return_value=provider):
+        with patch("app.services.face_verification.get_face_verification_provider", return_value=provider), patch(
+            "app.api.v1.identity_verification._download_reference_image",
+            return_value=_make_jpeg(),
+        ) as download_reference:
             res = client.post(f"/api/v1/identity-verifications/{attempt_id}/verify-face", json={
-                "reference_image": ref_b64,
                 "probe_image": probe_b64,
             })
         assert res.status_code == 201
+        download_reference.assert_called_once_with(reference_url)
 
         # Evaluate
         res = client.post(f"/api/v1/identity-verifications/{attempt_id}/evaluate")
@@ -458,10 +474,13 @@ class TestProviderAbstractionIntegration:
 
         ref_b64 = _b64(_make_jpeg())
         probe_b64 = _b64(_make_jpeg())
+        _store_reference(attempt_id)
         with patch("app.services.face_verification.get_face_verification_provider",
-                    return_value=DeterministicProvider()):
+                    return_value=DeterministicProvider()), patch(
+            "app.api.v1.identity_verification._download_reference_image",
+            return_value=_make_jpeg(),
+        ):
             res = client.post(f"/api/v1/identity-verifications/{attempt_id}/verify-face", json={
-                "reference_image": ref_b64,
                 "probe_image": probe_b64,
             })
         assert res.status_code == 201
@@ -1745,10 +1764,13 @@ class TestAPIContractValidation:
 
         ref_b64 = _b64(_make_jpeg())
         probe_b64 = _b64(_make_jpeg())
+        _store_reference(aid)
         provider = _StubProvider()
-        with patch("app.services.face_verification.get_face_verification_provider", return_value=provider):
+        with patch("app.services.face_verification.get_face_verification_provider", return_value=provider), patch(
+            "app.api.v1.identity_verification._download_reference_image",
+            return_value=_make_jpeg(),
+        ):
             res = client.post(f"/api/v1/identity-verifications/{aid}/verify-face", json={
-                "reference_image": ref_b64,
                 "probe_image": probe_b64,
             })
         assert res.status_code == 201
@@ -1895,9 +1917,12 @@ class TestErrorSanitization:
 
         ref_b64 = _b64(_make_jpeg())
         probe_b64 = _b64(_make_jpeg())
-        with patch("app.services.face_verification.get_face_verification_provider", return_value=bad_provider):
+        _store_reference(aid)
+        with patch("app.services.face_verification.get_face_verification_provider", return_value=bad_provider), patch(
+            "app.api.v1.identity_verification._download_reference_image",
+            return_value=_make_jpeg(),
+        ):
             res = client.post(f"/api/v1/identity-verifications/{aid}/verify-face", json={
-                "reference_image": ref_b64,
                 "probe_image": probe_b64,
             })
 
@@ -1941,10 +1966,13 @@ class TestPrivacyIntegration:
 
         ref_b64 = _b64(_make_jpeg())
         probe_b64 = _b64(_make_jpeg())
+        _store_reference(aid)
         provider = _StubProvider()
-        with patch("app.services.face_verification.get_face_verification_provider", return_value=provider):
+        with patch("app.services.face_verification.get_face_verification_provider", return_value=provider), patch(
+            "app.api.v1.identity_verification._download_reference_image",
+            return_value=_make_jpeg(),
+        ):
             res = client.post(f"/api/v1/identity-verifications/{aid}/verify-face", json={
-                "reference_image": ref_b64,
                 "probe_image": probe_b64,
             })
 

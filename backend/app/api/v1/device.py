@@ -9,6 +9,7 @@ is derived from the authenticated credential.
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
+from app.auth import Role, require_role
 from app.core.database import get_db
 from app.schemas.device_credential import (
     DeviceCredentialCreate,
@@ -31,6 +32,7 @@ router = APIRouter(prefix="/device", tags=["Device Communication"])
 def provision_credential(
     data: DeviceCredentialCreate,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     """Provision a new device credential for a camera.
 
@@ -66,6 +68,7 @@ def provision_credential(
 def list_credentials(
     camera_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     """List all credentials for a camera (without secrets)."""
     return device_credential.list_device_credentials(db, camera_id)
@@ -79,6 +82,7 @@ def list_credentials(
 def get_credential(
     credential_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     """Get a device credential by ID (without secret)."""
     credential = device_credential.get_device_credential(db, credential_id)
@@ -95,6 +99,7 @@ def get_credential(
 def revoke_credential(
     credential_id: int,
     db: Session = Depends(get_db),
+    _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR])),
 ):
     """Revoke a device credential. The credential can no longer be used."""
     try:

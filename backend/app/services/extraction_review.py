@@ -58,7 +58,7 @@ def correct_field(
     db: Session,
     document_id: int,
     field_id: int,
-    corrected_value: str,
+    corrected_value: str | None,
     review_status: str = ReviewStatus.REVIEWED.value,
 ) -> ExtractedField:
     extraction_result = (

@@ -129,3 +129,10 @@ class ExamListResponse(BaseModel):
     page: int
     page_size: int
     total: int
+
+
+class ExamEnrollmentReadiness(BaseModel):
+    exam_id: int
+    candidates_enrolled: int
+    reference_photos_enrolled: int
+    candidates_needing_review: int

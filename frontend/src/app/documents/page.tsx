@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { apiRequest, qs, getAuthHeaders } from "@/lib/api";
@@ -11,9 +12,32 @@ interface Document {
   content_type: string;
   file_size: number;
   document_type: string;
+  exam_id: number | null;
   status: string;
   created_at: string;
   updated_at: string;
+}
+
+interface ExamOption {
+  id: number;
+  exam_name: string;
+  exam_date: string;
+  subject_name: string | null;
+}
+
+interface CandidateEnrollment {
+  document_id: number;
+  exam_id: number;
+  student_id: number;
+  registration_id: number;
+  hall_ticket_id: number;
+  seat_assignment_id: number | null;
+  identity_attempt_id: number;
+  student_created: boolean;
+  registration_created: boolean;
+  reference_photo_enrolled: boolean;
+  needs_seat_assignment: boolean;
+  already_enrolled: boolean;
 }
 
 interface ExtractedField {
@@ -127,6 +151,8 @@ interface VerificationOutcome {
 }
 
 export default function DocumentsPage() {
+  const [exams, setExams] = useState<ExamOption[]>([]);
+  const [selectedExamId, setSelectedExamId] = useState("");
   const [documents, setDocuments] = useState<Document[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -150,24 +176,43 @@ export default function DocumentsPage() {
   const [verifyingId, setVerifyingId] = useState<number | null>(null);
   const [verificationOutcome, setVerificationOutcome] = useState<VerificationOutcome | null>(null);
   const [showVerification, setShowVerification] = useState(false);
+  const [reviewedDocumentIds, setReviewedDocumentIds] = useState<number[]>([]);
+  const [enrollingId, setEnrollingId] = useState<number | null>(null);
+  const [enrollment, setEnrollment] = useState<CandidateEnrollment | null>(null);
 
   const fetchDocuments = async () => {
     const data = await apiRequest<{ items: Document[]; total: number }>(
       `/api/v1/documents${qs({
         page: String(page),
         page_size: "10",
+        ...(selectedExamId ? { exam_id: selectedExamId } : {}),
       })}`
     );
     setDocuments(data.items);
     setTotal(data.total);
   };
 
+  const fetchExams = async () => {
+    const data = await apiRequest<{ items: ExamOption[] }>(
+      `/api/v1/exams${qs({ page: 1, page_size: 100 })}`
+    );
+    setExams(data.items || []);
+  };
+
   useEffect(() => {
-    fetchDocuments();
-  }, [page]);
+    void fetchExams();
+  }, []);
+
+  useEffect(() => {
+    if (selectedExamId) void fetchDocuments();
+    else {
+      setDocuments([]);
+      setTotal(0);
+    }
+  }, [page, selectedExamId]);
 
   const handleUpload = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile || !selectedExamId) return;
     setUploading(true);
     setMessage("");
     setError("");
@@ -178,11 +223,12 @@ export default function DocumentsPage() {
     try {
       const { API_BASE } = await import("@/lib/api");
       const res = await fetch(
-        `${API_BASE}/api/v1/documents?document_type=${docType}`,
+        `${API_BASE}/api/v1/documents?document_type=${docType}&exam_id=${selectedExamId}`,
         { method: "POST", body: formData, headers: getAuthHeaders() }
       );
       if (res.ok) {
         setMessage("Document uploaded successfully");
+        setEnrollment(null);
         setSelectedFile(null);
         fetchDocuments();
       } else {
@@ -237,6 +283,11 @@ export default function DocumentsPage() {
       const data = await apiRequest<ReviewData>(
         `/api/v1/documents/${docId}/review`
       );
+      if (data.reviewed_at) {
+        setReviewedDocumentIds((current) =>
+          current.includes(docId) ? current : [...current, docId]
+        );
+      }
       setReviewData(data);
       setShowReview(true);
     } catch (err) {
@@ -286,6 +337,35 @@ export default function DocumentsPage() {
     }
   };
 
+  const handleConfirmFieldAbsent = async (fieldId: number) => {
+    if (!reviewData) return;
+    try {
+      const updated = await apiRequest<ReviewField>(
+        `/api/v1/documents/${reviewData.document_id}/review/fields/${fieldId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ corrected_value: null, review_status: "REVIEWED" }),
+        }
+      );
+      setReviewData((previous) => {
+        if (!previous) return previous;
+        const fields = previous.fields.map((field) => field.id === fieldId ? updated : field);
+        return {
+          ...previous,
+          fields,
+          progress: {
+            ...previous.progress,
+            reviewed_count: fields.filter((field) => field.review_status === "REVIEWED").length,
+            review_required_count: fields.filter((field) => field.review_status === "REVIEW_REQUIRED").length,
+          },
+        };
+      });
+      setMessage("Field absence confirmed");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to confirm absent field");
+    }
+  };
+
   const handleCompleteReview = async () => {
     if (!reviewData) return;
     setCompletingReview(true);
@@ -297,6 +377,10 @@ export default function DocumentsPage() {
         `/api/v1/documents/${reviewData.document_id}/review/complete`,
         { method: "POST" }
       );
+      const documentId = reviewData.document_id;
+      setReviewedDocumentIds((current) =>
+        current.includes(documentId) ? current : [...current, documentId]
+      );
       setMessage("Review completed successfully");
       setShowReview(false);
       setReviewData(null);
@@ -305,6 +389,33 @@ export default function DocumentsPage() {
       setError(err instanceof Error ? err.message : "Failed to complete review");
     }
     setCompletingReview(false);
+  };
+
+  const handleEnrollCandidate = async (docId: number) => {
+    if (!selectedExamId || !reviewedDocumentIds.includes(docId)) return;
+    setEnrollingId(docId);
+    setMessage("");
+    setError("");
+    try {
+      const result = await apiRequest<CandidateEnrollment>(
+        `/api/v1/documents/${docId}/enroll-candidate`,
+        {
+          method: "POST",
+          body: JSON.stringify({ exam_id: Number(selectedExamId), confirmed: true }),
+        }
+      );
+      setEnrollment(result);
+      setMessage(
+        result.already_enrolled
+          ? "This candidate is already enrolled for the selected exam."
+          : `Candidate ${result.student_id} enrolled for the selected exam.`
+      );
+      await fetchDocuments();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Candidate enrollment failed");
+    } finally {
+      setEnrollingId(null);
+    }
   };
 
   const handleVerify = async (docId: number) => {
@@ -478,15 +589,27 @@ export default function DocumentsPage() {
                     </td>
                     <td>
                       {editingFieldId !== f.id && (
-                        <button
-                          onClick={() => {
-                            setEditingFieldId(f.id);
-                            setEditValue(f.corrected_value || f.extracted_value || "");
-                          }}
-                          className="eg-btn text-xs"
-                        >
-                          Correct
-                        </button>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingFieldId(f.id);
+                              setEditValue(f.corrected_value || f.extracted_value || "");
+                            }}
+                            className="eg-btn text-xs"
+                          >
+                            Correct
+                          </button>
+                          {f.review_status === "REVIEW_REQUIRED" &&
+                            !f.extracted_value &&
+                            !f.corrected_value && (
+                              <button
+                                onClick={() => void handleConfirmFieldAbsent(f.id)}
+                                className="eg-btn text-xs"
+                              >
+                                Confirm absent
+                              </button>
+                            )}
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -832,7 +955,50 @@ export default function DocumentsPage() {
           <h2 className="eg-page-title text-lg mb-4">Upload Document</h2>
           {message && <p className="eg-alert eg-alert-success mb-4">{message}</p>}
           {error && <p className="eg-alert eg-alert-danger mb-4">{error}</p>}
+          <p className="text-sm mb-3" style={{ color: "var(--text-muted)" }}>
+            Candidate portraits are not extracted from admit cards yet; reference photos must be enrolled manually after candidate confirmation.
+          </p>
+          {enrollment && (
+            <div className="eg-alert mb-4" role="status">
+              <p>Candidate ID: {enrollment.student_id} · Registration: {enrollment.registration_id}</p>
+              <p>
+                Reference photo: {enrollment.reference_photo_enrolled
+                  ? "Enrolled"
+                  : "NOT ENROLLED — admit-card portraits are not extracted yet. Enroll a reference photo manually."}
+              </p>
+              {!enrollment.reference_photo_enrolled && (
+                <Link
+                  className="eg-btn eg-btn-sm mt-2"
+                  href={`/identity-verifications/${enrollment.identity_attempt_id}`}
+                >
+                  Enroll reference photo
+                </Link>
+              )}
+              {enrollment.needs_seat_assignment && (
+                <p>Seat assignment is still required for this candidate.</p>
+              )}
+            </div>
+          )}
           <div className="flex gap-4 items-center">
+            <select
+              aria-label="Exam for admit card"
+              value={selectedExamId}
+              onChange={(e) => {
+                setSelectedExamId(e.target.value);
+                setPage(1);
+                setEnrollment(null);
+                setReviewedDocumentIds([]);
+              }}
+              className="eg-select"
+              required
+            >
+              <option value="">Select exam</option>
+              {exams.map((exam) => (
+                <option key={exam.id} value={exam.id}>
+                  {exam.exam_name} · {exam.exam_date}
+                </option>
+              ))}
+            </select>
             <select
               value={docType}
               onChange={(e) => setDocType(e.target.value)}
@@ -848,7 +1014,7 @@ export default function DocumentsPage() {
             />
             <button
               onClick={handleUpload}
-              disabled={!selectedFile || uploading}
+              disabled={!selectedFile || !selectedExamId || uploading}
               className="eg-btn eg-btn-primary"
             >
               {uploading ? "Uploading..." : "Upload"}
@@ -862,6 +1028,7 @@ export default function DocumentsPage() {
               <tr>
                 <th>Filename</th>
                 <th>Type</th>
+                <th>Exam</th>
                 <th>Size</th>
                 <th>Status</th>
                 <th>Uploaded</th>
@@ -875,6 +1042,7 @@ export default function DocumentsPage() {
                   <td style={{ color: "var(--text-muted)" }}>
                     {d.document_type.replace("_", " ")}
                   </td>
+                  <td>{exams.find((exam) => exam.id === d.exam_id)?.exam_name || "—"}</td>
                   <td style={{ color: "var(--text-muted)" }}>
                     {formatSize(d.file_size)}
                   </td>
@@ -896,16 +1064,27 @@ export default function DocumentsPage() {
                           >
                             View Extraction
                           </button>
-                          {d.status === "REVIEW_REQUIRED" && (
+                          {(d.status === "REVIEW_REQUIRED" || d.status === "PROCESSED") && (
                             <button
                               onClick={() => handleStartReview(d.id)}
                               disabled={reviewingId === d.id}
                               className="eg-btn eg-btn-warning text-xs"
                               style={{ opacity: reviewingId === d.id ? 0.3 : 1 }}
                             >
-                              {reviewingId === d.id ? "Loading..." : "Review"}
+                              {reviewingId === d.id ? "Loading..." : "Review fields"}
                             </button>
                           )}
+                          {d.document_type === "HALL_TICKET" &&
+                            d.status === "PROCESSED" &&
+                            reviewedDocumentIds.includes(d.id) && (
+                              <button
+                                onClick={() => void handleEnrollCandidate(d.id)}
+                                disabled={enrollingId === d.id}
+                                className="eg-btn eg-btn-primary text-xs"
+                              >
+                                {enrollingId === d.id ? "Enrolling..." : "Confirm candidate"}
+                              </button>
+                            )}
                           <button
                             onClick={() => handleMatch(d.id)}
                             disabled={matchingId === d.id}
@@ -939,7 +1118,7 @@ export default function DocumentsPage() {
               ))}
               {documents.length === 0 && (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={7}>
                     <div className="eg-empty">
                       <p className="eg-empty-title">No documents uploaded</p>
                     </div>

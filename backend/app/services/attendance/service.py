@@ -681,6 +681,7 @@ def record_manual_review(
     db: Session,
     exam_registration_id: int,
     *,
+    exam_id: int,
     action: str,
     reason: str,
     recorded_by: str,
@@ -737,8 +738,29 @@ def record_manual_review(
         raise ValueError("recorded_by is required for a manual review decision")
 
     reg = _get_registration(db, exam_registration_id)
+    if reg.exam_id != exam_id:
+        raise ManualReviewConflict(
+            f"Registration {exam_registration_id} belongs to exam {reg.exam_id}, "
+            f"not assigned exam {exam_id}"
+        )
     if reg.status == RegistrationStatus.CANCELLED.value:
         raise ValueError(f"Registration {exam_registration_id} is cancelled")
+
+    seat = (
+        db.query(SeatAssignment)
+        .filter(
+            SeatAssignment.exam_registration_id == exam_registration_id,
+            SeatAssignment.exam_id == exam_id,
+            SeatAssignment.exam_hall_id == hall_id,
+            SeatAssignment.status == SeatAssignmentStatus.ASSIGNED.value,
+        )
+        .first()
+    )
+    if seat is None:
+        raise ManualReviewConflict(
+            f"Registration {exam_registration_id} has no active seat assignment "
+            f"in exam {exam_id}, hall {hall_id}"
+        )
 
     attempt = _get_latest_attempt(db, exam_registration_id)
     if attempt is None:
@@ -761,8 +783,13 @@ def record_manual_review(
             f"Latest identity verification decision is {attempt.decision}, "
             f"not INCONCLUSIVE — manual review does not apply"
         )
+    if attempt.status != "COMPLETED":
+        raise ManualReviewConflict(
+            f"Latest identity verification attempt is {attempt.status}, "
+            "not COMPLETED — manual review is not eligible"
+        )
 
-    session = _get_session(db, reg.exam_id, hall_id)
+    session = _get_session(db, exam_id, hall_id)
     if session is None:
         raise ManualReviewConflict(
             f"No examination session found for exam {reg.exam_id} in "

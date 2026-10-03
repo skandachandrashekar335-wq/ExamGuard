@@ -12,6 +12,7 @@ class DocumentResponse(BaseModel):
     content_type: str
     file_size: int
     document_type: str
+    exam_id: int | None = None
     status: str
     created_at: datetime
     updated_at: datetime

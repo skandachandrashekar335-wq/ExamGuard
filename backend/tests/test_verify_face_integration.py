@@ -236,6 +236,18 @@ FAKE_REF_IMAGE = base64.b64encode(FAKE_REF_IMAGE_BYTES).decode()
 FAKE_PROBE_IMAGE = base64.b64encode(FAKE_PROBE_IMAGE_BYTES).decode()
 
 
+def _store_reference(attempt_id: int) -> str:
+    url = f"https://example.test/face-reference-{attempt_id}.jpg"
+    db = SessionLocal()
+    try:
+        attempt = db.get(IdentityVerificationAttempt, attempt_id)
+        attempt.reference_face_url = url
+        db.commit()
+    finally:
+        db.close()
+    return url
+
+
 # ─── Service: Happy Path ────────────────────────────────────────────────
 
 class TestVerifyFaceHappyPath:
@@ -724,19 +736,23 @@ class TestVerifyFaceAPIHappyPath:
             f"/api/v1/identity-verifications/{attempt_id}/start"
         )
         assert start_resp.status_code == 200
+        reference_url = _store_reference(attempt_id)
 
         with patch(
             "app.services.face_verification.get_face_verification_provider",
             return_value=default_provider,
-        ):
+        ), patch(
+            "app.api.v1.identity_verification._download_reference_image",
+            return_value=FAKE_REF_IMAGE_BYTES,
+        ) as download_reference:
             resp = client.post(
                 f"/api/v1/identity-verifications/{attempt_id}/verify-face",
                 json={
-                    "reference_image": FAKE_REF_IMAGE,
                     "probe_image": FAKE_PROBE_IMAGE,
                 },
             )
         assert resp.status_code == 201
+        download_reference.assert_called_once_with(reference_url)
         body = resp.json()
         assert body["attempt_id"] == attempt_id
         assert isinstance(body["evidence"], list)
@@ -752,15 +768,18 @@ class TestVerifyFaceAPIHappyPath:
         })
         attempt_id = create_resp.json()["id"]
         client.post(f"/api/v1/identity-verifications/{attempt_id}/start")
+        _store_reference(attempt_id)
 
         with patch(
             "app.services.face_verification.get_face_verification_provider",
             return_value=default_provider,
+        ), patch(
+            "app.api.v1.identity_verification._download_reference_image",
+            return_value=FAKE_REF_IMAGE_BYTES,
         ):
             resp = client.post(
                 f"/api/v1/identity-verifications/{attempt_id}/verify-face",
                 json={
-                    "reference_image": FAKE_REF_IMAGE,
                     "probe_image": FAKE_PROBE_IMAGE,
                 },
             )

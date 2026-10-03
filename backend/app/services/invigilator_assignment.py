@@ -26,12 +26,10 @@ def create_assignment(
     notes: str | None = None,
 ) -> InvigilatorAssignment:
     """Create an invigilator assignment."""
-    # Validate user exists and has INVIGILATOR role
+    # The account keeps its permanent role. Assignment is the exam capability.
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise LookupError(f"User {user_id} not found")
-    if user.role != "INVIGILATOR":
-        raise ValueError(f"User {user_id} has role '{user.role}', expected 'INVIGILATOR'")
 
     # Check for duplicate active assignment
     existing = (
@@ -111,6 +109,26 @@ def list_assignments(
         "page": page,
         "page_size": page_size,
     }
+
+
+def deactivate_assignments_for_hall(
+    db: Session,
+    exam_id: int,
+    exam_hall_id: int,
+) -> int:
+    """Mark active assignments for a finished session inactive. Records stay for audit."""
+    rows = (
+        db.query(InvigilatorAssignment)
+        .filter(
+            InvigilatorAssignment.exam_id == exam_id,
+            InvigilatorAssignment.exam_hall_id == exam_hall_id,
+            InvigilatorAssignment.is_active == True,  # noqa: E712
+        )
+        .all()
+    )
+    for row in rows:
+        row.is_active = False
+    return len(rows)
 
 
 def deactivate_assignment(db: Session, assignment_id: int) -> InvigilatorAssignment:

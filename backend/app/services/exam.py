@@ -134,6 +134,10 @@ def update_exam(db: Session, exam_id: int, data: ExamUpdate) -> Exam:
     new_subject_id = update_data.get("subject_id", exam.subject_id)
     new_exam_date = update_data.get("exam_date", exam.exam_date)
     new_start_time = update_data.get("start_time", exam.start_time)
+    new_end_time = update_data.get("end_time", exam.end_time)
+
+    if new_start_time >= new_end_time:
+        raise ValueError("start_time must be before end_time")
 
     _check_duplicate(
         db,

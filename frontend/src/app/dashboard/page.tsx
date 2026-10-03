@@ -757,10 +757,17 @@ export default function DashboardPage() {
                   {assignMessage.startsWith("Assigned") ? `✓ ${assignMessage}` : assignMessage}
                 </p>
               )}
-              {sessionStatus?.invigilator_email && !assignMessage && (
-                <p className="text-xs mt-2" style={{ color: "var(--success)" }}>
-                  ✓ Assigned to: {sessionStatus.invigilator_email}
-                </p>
+              {(sessionStatus?.invigilator_emails?.length || sessionStatus?.invigilator_email) && (
+                <div className="text-xs mt-3" style={{ color: "var(--text-secondary)" }}>
+                  <p style={{ color: "var(--success)" }}>
+                    ✓ Assigned to {(sessionStatus.invigilator_emails && sessionStatus.invigilator_emails.length > 0)
+                      ? sessionStatus.invigilator_emails.join(", ")
+                      : sessionStatus.invigilator_email}
+                  </p>
+                  <p className="mt-1">Assignment: {sessionStatus?.exam_name || examName}</p>
+                  <p>Hall: {sessionStatus?.hall_name || hallName}</p>
+                  <p>Status: {sessionStatus?.assignment_status || "SCHEDULED"}</p>
+                </div>
               )}
             </div>
 

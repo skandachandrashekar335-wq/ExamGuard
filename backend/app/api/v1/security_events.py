@@ -9,7 +9,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.auth import Role, require_role
+from app.auth import (
+    Role,
+    require_role,
+    get_invigilator_scope,
+    check_invigilator_scope,
+    constrain_scope_filters,
+)
 from app.core.database import get_db
 from app.schemas.security_event import (
     SecurityEventListResponse,
@@ -44,6 +50,9 @@ def list_security_events(
     db: Session = Depends(get_db),
     _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.INVIGILATOR, Role.REVIEWER])),
 ) -> SecurityEventListResponse:
+    exam_id, hall_id = constrain_scope_filters(
+        get_invigilator_scope(_user, db), exam_id, hall_id
+    )
     result = svc.list_security_events(
         db,
         page=page,
@@ -74,4 +83,12 @@ def get_security_event(
         event = svc.get_security_event(db, event_id)
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    scope = get_invigilator_scope(_user, db)
+    if scope is not None:
+        if event.exam_id is None:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: security event is outside your assigned exam",
+            )
+        check_invigilator_scope(scope, event.exam_id, event.hall_id)
     return event

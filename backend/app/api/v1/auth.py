@@ -170,16 +170,22 @@ async def firebase_token_exchange(
             user.role = "ADMIN"
             db.commit()
 
-    # Step 5: Issue ExamGuard JWT token
+    # Step 5: Issue ExamGuard JWT token. INVIGILATOR is never a permanent
+    # User.role; active assignment records are the source of that capability.
     from datetime import timedelta
-    from app.auth import create_access_token
+    from app.auth import Role, create_access_token
+
+    token_role = user.role if user.role in {Role.ADMIN, Role.OPERATOR, Role.REVIEWER} else Role.REVIEWER
+    if user.role == Role.INVIGILATOR:
+        user.role = Role.REVIEWER
+        db.commit()
 
     # Token expires in 30 minutes (existing architecture)
     expires_delta = timedelta(minutes=30)
     examguard_token = create_access_token(
         data={
             "sub": str(user.id),
-            "role": user.role,
+            "role": token_role,
             "email": user.email,
             "full_name": user.full_name,
         }
@@ -190,10 +196,10 @@ async def firebase_token_exchange(
             "id": user.id,
             "email": user.email,
             "full_name": user.full_name,
-            "role": user.role,
+            "role": token_role,
             "is_active": user.is_active,
             "firebase_uid": user.firebase_uid,
         },
         "token": examguard_token,
-        "requires_onboarding": user.role != "ADMIN",
+        "requires_onboarding": token_role != "ADMIN",
     }

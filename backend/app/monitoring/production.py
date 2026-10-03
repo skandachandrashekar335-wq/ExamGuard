@@ -121,7 +121,8 @@ def check_storage() -> dict:
     except Exception as e:
         return {
             "status": HealthStatus.DEGRADED,
-            "details": f"Storage check error: {str(e)[:100]}",
+            # Exception class only — raw messages can embed filesystem paths.
+            "details": f"Storage check error: {type(e).__name__}",
             "timestamp": datetime.now().isoformat(),
         }
 
@@ -140,7 +141,7 @@ def check_monitoring() -> dict:
         details = "Monitoring queue check passed"
     except Exception as e:
         status = "degraded"
-        details = f"Monitoring check error: {str(e)[:100]}"
+        details = f"Monitoring check error: {type(e).__name__}"
 
     return {
         "status": status,

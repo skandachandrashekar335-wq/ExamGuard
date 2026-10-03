@@ -127,6 +127,7 @@ def _match_exam(
     db: Session,
     fields: list[ExtractedField],
     match_result_id: int,
+    expected_exam_id: int | None = None,
 ) -> tuple[Exam | None, list[HallTicketMatchSignal]]:
     signals = []
     exam_name_value = _get_extracted_value(fields, "exam_name")
@@ -135,6 +136,8 @@ def _match_exam(
     start_time_value = _get_extracted_value(fields, "start_time")
 
     query = db.query(Exam).filter(Exam.is_active == True)
+    if expected_exam_id is not None:
+        query = query.filter(Exam.id == expected_exam_id)
 
     if exam_name_value:
         query = query.filter(Exam.exam_name.ilike(f"%{exam_name_value.strip()}%"))
@@ -516,7 +519,9 @@ def match_hall_ticket(
     student, student_signals = _match_student(db, fields, match_result.id)
     all_signals.extend(student_signals)
 
-    exam, exam_signals = _match_exam(db, fields, match_result.id)
+    exam, exam_signals = _match_exam(
+        db, fields, match_result.id, expected_exam_id=document.exam_id
+    )
     all_signals.extend(exam_signals)
 
     registration, reg_signals = _match_registration(db, student, exam, match_result.id)

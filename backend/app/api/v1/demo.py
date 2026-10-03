@@ -2140,9 +2140,11 @@ def demo_upload_reference_face(
 
         url = storage.save(key, ref_bytes)
 
-    except Exception as e:
+    except Exception:
 
-        raise HTTPException(status_code=502, detail=f"Failed to save image: {e}")
+        logger.exception("Failed to save demo reference image for attempt %s", body.attempt_id)
+
+        raise HTTPException(status_code=502, detail="Failed to save image")
 
 
 

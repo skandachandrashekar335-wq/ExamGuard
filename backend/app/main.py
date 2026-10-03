@@ -78,7 +78,9 @@ def create_app() -> FastAPI:
 
     application = FastAPI(
         title=settings.APP_NAME,
-        debug=settings.DEBUG,
+        # Never serve debug tracebacks in a production deployment, even if
+        # DEBUG was left enabled in the environment.
+        debug=settings.DEBUG and settings.APP_ENV != "production",
     )
 
     # Always include known production origins alongside any env-configured ones

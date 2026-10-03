@@ -33,6 +33,8 @@ export interface DemoSessionStatus {
   exam_date: string | null;
   hall_name: string | null;
   invigilator_email: string | null;
+  invigilator_emails?: string[];
+  assignment_status?: string | null;
   started_at: string | null;
 }
 
@@ -76,7 +78,15 @@ export async function uploadDemoReferenceFace(
 
 export async function assignDemoInvigilator(
   email: string
-): Promise<{ status: string; assignment_id: number; email: string }> {
+): Promise<{
+  status: string;
+  assignment_id: number;
+  email: string;
+  account_role?: string;
+  exam_name?: string | null;
+  hall_name?: string | null;
+  assignment_status?: string;
+}> {
   return apiRequest("/api/v1/demo/assign-invigilator", {
     method: "POST",
     headers: getAuthHeaders(),
