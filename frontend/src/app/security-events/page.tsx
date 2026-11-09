@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import {
   listSecurityEvents,
@@ -42,7 +42,7 @@ export default function SecurityEventsPage() {
   const [filterSeverity, setFilterSeverity] = useState("");
   const [filterSource, setFilterSource] = useState("");
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -60,11 +60,14 @@ export default function SecurityEventsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize, filterType, filterSeverity, filterSource]);
 
   useEffect(() => {
-    fetchData();
-  }, [page, filterType, filterSeverity, filterSource]);
+    const timer = setTimeout(() => {
+      void fetchData();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchData]);
 
   const totalPages = Math.ceil(total / pageSize);
 

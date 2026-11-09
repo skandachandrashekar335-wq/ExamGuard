@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { apiRequest, qs, getAuthHeaders } from "@/lib/api";
 
@@ -180,36 +180,51 @@ export default function DocumentsPage() {
   const [enrollingId, setEnrollingId] = useState<number | null>(null);
   const [enrollment, setEnrollment] = useState<CandidateEnrollment | null>(null);
 
-  const fetchDocuments = async () => {
-    const data = await apiRequest<{ items: Document[]; total: number }>(
-      `/api/v1/documents${qs({
-        page: String(page),
-        page_size: "10",
-        ...(selectedExamId ? { exam_id: selectedExamId } : {}),
-      })}`
-    );
-    setDocuments(data.items);
-    setTotal(data.total);
-  };
+  const fetchDocuments = useCallback(async () => {
+    try {
+      const data = await apiRequest<{ items: Document[]; total: number }>(
+        `/api/v1/documents${qs({
+          page: String(page),
+          page_size: "10",
+          ...(selectedExamId ? { exam_id: selectedExamId } : {}),
+        })}`
+      );
+      setDocuments(data.items);
+      setTotal(data.total);
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to load documents");
+    }
+  }, [page, selectedExamId]);
 
-  const fetchExams = async () => {
-    const data = await apiRequest<{ items: ExamOption[] }>(
-      `/api/v1/exams${qs({ page: 1, page_size: 100 })}`
-    );
-    setExams(data.items || []);
-  };
-
-  useEffect(() => {
-    void fetchExams();
+  const fetchExams = useCallback(async () => {
+    try {
+      const data = await apiRequest<{ items: ExamOption[] }>(
+        `/api/v1/exams${qs({ page: 1, page_size: 100 })}`
+      );
+      setExams(data.items || []);
+    } catch {
+      // Fallback silently if exams fail
+    }
   }, []);
 
   useEffect(() => {
-    if (selectedExamId) void fetchDocuments();
-    else {
-      setDocuments([]);
-      setTotal(0);
-    }
-  }, [page, selectedExamId]);
+    const timer = setTimeout(() => {
+      void fetchExams();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchExams]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (selectedExamId) {
+        void fetchDocuments();
+      } else {
+        setDocuments([]);
+        setTotal(0);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [selectedExamId, fetchDocuments]);
 
   const handleUpload = async () => {
     if (!selectedFile || !selectedExamId) return;

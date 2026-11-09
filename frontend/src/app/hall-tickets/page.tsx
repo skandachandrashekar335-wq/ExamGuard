@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import { apiRequest, qs } from "@/lib/api";
@@ -42,35 +42,43 @@ export default function HallTicketsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [usnSearch, setUsnSearch] = useState("");
   const [useSearch, setUseSearch] = useState(false);
+  const [error, setError] = useState("");
 
-  const fetchTickets = async () => {
-    if (useSearch && usnSearch) {
-      const data = await apiRequest<ListResponse>(
-        `/api/v1/hall-tickets/search${qs({
-          page: String(page),
-          page_size: String(pageSize),
-          usn: usnSearch,
-          ...(statusFilter ? { status: statusFilter } : {}),
-        })}`
-      );
-      setTickets(data.items);
-      setTotal(data.total);
-    } else {
-      const data = await apiRequest<ListResponse>(
-        `/api/v1/hall-tickets${qs({
-          page: String(page),
-          page_size: String(pageSize),
-          ...(statusFilter ? { status: statusFilter } : {}),
-        })}`
-      );
-      setTickets(data.items);
-      setTotal(data.total);
+  const fetchTickets = useCallback(async () => {
+    try {
+      if (useSearch && usnSearch) {
+        const data = await apiRequest<ListResponse>(
+          `/api/v1/hall-tickets/search${qs({
+            page: String(page),
+            page_size: String(pageSize),
+            usn: usnSearch,
+            ...(statusFilter ? { status: statusFilter } : {}),
+          })}`
+        );
+        setTickets(data.items);
+        setTotal(data.total);
+      } else {
+        const data = await apiRequest<ListResponse>(
+          `/api/v1/hall-tickets${qs({
+            page: String(page),
+            page_size: String(pageSize),
+            ...(statusFilter ? { status: statusFilter } : {}),
+          })}`
+        );
+        setTickets(data.items);
+        setTotal(data.total);
+      }
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to load hall tickets");
     }
-  };
+  }, [page, pageSize, statusFilter, useSearch, usnSearch]);
 
   useEffect(() => {
-    fetchTickets();
-  }, [page, statusFilter, useSearch, usnSearch]);
+    const timer = setTimeout(() => {
+      fetchTickets();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchTickets]);
 
   const totalPages = Math.ceil(total / pageSize);
 
@@ -84,6 +92,12 @@ export default function HallTicketsPage() {
             or reject
           </p>
         </div>
+
+        {error && (
+          <div className="eg-alert eg-alert-danger mb-4" role="alert">
+            {error}
+          </div>
+        )}
 
         <div className="eg-filter-bar">
           <input

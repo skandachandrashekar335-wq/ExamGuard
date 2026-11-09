@@ -92,12 +92,18 @@ export default function EntryVerificationDetailPage() {
   }, [id]);
 
   useEffect(() => {
-    fetchEntry();
+    const timer = setTimeout(() => {
+      fetchEntry();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [fetchEntry]);
 
   useEffect(() => {
     if (!loading && !error && ev) {
-      fetchRiskData();
+      const timer = setTimeout(() => {
+        fetchRiskData();
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [loading, error, ev, fetchRiskData]);
 

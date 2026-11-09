@@ -73,7 +73,10 @@ export default function ImportHistoryPage() {
   }, [page, pageSize, filterType, filterStatus]);
 
   useEffect(() => {
-    fetchLogs();
+    const timer = setTimeout(() => {
+      fetchLogs();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [fetchLogs]);
 
   const handleDetail = async (id: number) => {

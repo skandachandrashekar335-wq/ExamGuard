@@ -15,7 +15,7 @@ function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }
 
-function HallTicketVizInner({ progress, subProgress }: HallTicketVizProps) {
+function HallTicketVizInner({ subProgress }: HallTicketVizProps) {
   const scanY = lerp(20, 200, subProgress * 0.8);
   const scanOpacity = subProgress < 0.05 ? 0 : subProgress > 0.9 ? 0 : 0.3;
 

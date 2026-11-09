@@ -11,9 +11,15 @@ test.use({
   actionTimeout: 15000,
 });
 
+function getPythonBin(backend: string): string {
+  return process.platform === "win32"
+    ? path.join(backend, ".venv", "Scripts", "python.exe")
+    : path.join(backend, ".venv", "bin", "python");
+}
+
 function adminToken(): string {
   const backend = path.resolve(__dirname, "../../backend");
-  const python = path.join(backend, ".venv", "Scripts", "python.exe");
+  const python = getPythonBin(backend);
   const code = [
     "from datetime import timedelta",
     "from app.auth import create_access_token",
@@ -24,7 +30,7 @@ function adminToken(): string {
 
 function writeShapes(dir: string) {
   const backend = path.resolve(__dirname, "../../backend");
-  const python = path.join(backend, ".venv", "Scripts", "python.exe");
+  const python = getPythonBin(backend);
   const code = `
 import os, struct, zlib, sys
 out = sys.argv[1]

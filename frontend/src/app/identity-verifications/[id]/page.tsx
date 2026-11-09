@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   getAttemptContext,
   startAttempt,
@@ -16,7 +17,6 @@ import {
 } from "@/lib/iv-api";
 import type {
   VerificationContext,
-  IdentityVerificationEvidence,
 } from "@/lib/types";
 import CameraCapture from "@/components/CameraCapture";
 import ImageUpload from "@/components/ImageUpload";
@@ -57,7 +57,6 @@ export default function IdentityVerificationDetailPage() {
 
   const [referenceImage, setReferenceImage] = useState<Blob | null>(null);
   const [probeImage, setProbeImage] = useState<Blob | null>(null);
-  const [probeDataUrl, setProbeDataUrl] = useState<string | null>(null);
 
   const [verifyError, setVerifyError] = useState("");
   const [actionMsg, setActionMsg] = useState("");
@@ -81,7 +80,10 @@ export default function IdentityVerificationDetailPage() {
   }, [id]);
 
   useEffect(() => {
-    fetchContext();
+    const timer = setTimeout(() => {
+      fetchContext();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [fetchContext]);
 
   const attempt = ctx?.attempt;
@@ -268,9 +270,12 @@ export default function IdentityVerificationDetailPage() {
                     <span className="eg-mono-sm text-[var(--text-muted)] block">REFERENCE FACE</span>
                     {attempt?.reference_face_url && !referenceImage && (
                       <div className="glass-surface p-2">
-                        <img
+                        <Image
                           src={attempt.reference_face_url}
                           alt="Stored reference face"
+                          width={320}
+                          height={160}
+                          unoptimized
                           className="w-full h-40 object-cover rounded"
                         />
                         <p className="text-[10px] text-[var(--accent)] mt-1">Stored reference face loaded</p>
@@ -329,13 +334,11 @@ export default function IdentityVerificationDetailPage() {
 
                     {probeMode === "camera" ? (
                       <CameraCapture
-                        onCapture={(blob, url) => {
+                        onCapture={(blob) => {
                           setProbeImage(blob);
-                          setProbeDataUrl(url);
                         }}
                         onRetake={() => {
                           setProbeImage(null);
-                          setProbeDataUrl(null);
                         }}
                         disabled={uiState !== "READY"}
                       />
@@ -345,11 +348,9 @@ export default function IdentityVerificationDetailPage() {
                           label="Test Photo (different photo of your face)"
                           onImage={(blob) => {
                             setProbeImage(blob);
-                            setProbeDataUrl(URL.createObjectURL(blob));
                           }}
                           onClear={() => {
                             setProbeImage(null);
-                            setProbeDataUrl(null);
                           }}
                           disabled={uiState !== "READY"}
                         />

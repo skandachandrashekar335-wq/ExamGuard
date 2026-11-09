@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 import {
   getInvigilatorDashboard,
   startExam,
@@ -152,6 +154,7 @@ const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
 };
 
 export default function InvigilatorPage() {
+  const { isAuthenticated } = useAuth();
   const [data, setData] = useState<InvigilatorDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -249,6 +252,7 @@ export default function InvigilatorPage() {
   }, [stopVerificationLoop]);
 
   const load = useCallback(async () => {
+    if (!isAuthenticated) return;
     try {
       setLoading(true);
       setError(null);
@@ -287,9 +291,16 @@ export default function InvigilatorPage() {
     } finally {
       setLoading(false);
     }
-  }, [handleCloseVerify]);
+  }, [handleCloseVerify, isAuthenticated]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (isAuthenticated) {
+      const timer = setTimeout(() => {
+        void load();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated, load]);
 
   const handleStart = async () => {
     if (!data || actionLoading) return;
@@ -758,10 +769,35 @@ export default function InvigilatorPage() {
     );
   }
   if (error) {
+    const isAssignmentError =
+      error.toLowerCase().includes("not assigned") ||
+      error.toLowerCase().includes("no assignment") ||
+      error.toLowerCase().includes("forbidden") ||
+      error.toLowerCase().includes("403") ||
+      error.toLowerCase().includes("not found");
+
     return (
       <AppShell>
         <div className="eg-page">
-          <div className="eg-alert eg-alert-danger">Error: {error}</div>
+          <div className="glass p-8 max-w-lg mx-auto text-center mt-8 rounded-xl border border-[var(--border-subtle)]">
+            <div className="text-3xl mb-3">📋</div>
+            <h2 className="eg-section__title text-lg mb-2">
+              {isAssignmentError ? "No Active Assignment" : "Invigilator Dashboard"}
+            </h2>
+            <p className="text-sm text-[var(--text-secondary)] mb-6 leading-relaxed">
+              {isAssignmentError
+                ? "You are not currently assigned to an active examination session. Contact the examination administrator to assign you to an exam hall."
+                : error}
+            </p>
+            <div className="flex justify-center gap-3">
+              <Link href="/dashboard" className="eg-btn eg-btn-primary">
+                Go to Dashboard
+              </Link>
+              <button onClick={() => void load()} className="eg-btn eg-btn-ghost">
+                Retry
+              </button>
+            </div>
+          </div>
         </div>
       </AppShell>
     );

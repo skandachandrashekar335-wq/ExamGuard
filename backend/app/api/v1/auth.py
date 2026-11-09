@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from typing import Optional
+from pydantic import BaseModel
 
 router = APIRouter(
     prefix="/auth",
@@ -202,4 +203,71 @@ async def firebase_token_exchange(
         },
         "token": examguard_token,
         "requires_onboarding": token_role != "ADMIN",
+    }
+
+
+class DevLoginRequest(BaseModel):
+    role: str = "ADMIN"
+    email: Optional[str] = None
+
+
+@router.post("/dev/login", response_model=dict)
+def dev_token_login(
+    payload: DevLoginRequest,
+    db: Session = Depends(get_db),
+):
+    """Generate a development JWT token. Strictly prohibited in production."""
+    settings = get_settings()
+    if settings.APP_ENV == "production":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Development login is prohibited in production.",
+        )
+
+    from app.auth import Role, create_access_token
+    from datetime import timedelta
+
+    target_role = payload.role.upper()
+    if target_role not in {Role.ADMIN, Role.OPERATOR, Role.REVIEWER}:
+        target_role = Role.ADMIN
+
+    email = payload.email or f"dev.{target_role.lower()}@dscasc.edu.in"
+
+    # Find or create dev user
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        user = User(
+            email=email,
+            full_name=f"Dev {target_role.capitalize()}",
+            role=target_role,
+            is_active=True,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    elif user.role != target_role:
+        user.role = target_role
+        db.commit()
+
+    token = create_access_token(
+        data={
+            "sub": str(user.id),
+            "role": target_role,
+            "email": user.email,
+            "full_name": user.full_name,
+        },
+        expires_delta=timedelta(hours=24),
+    )
+
+    return {
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": target_role,
+            "is_active": user.is_active,
+            "firebase_uid": None,
+        },
+        "token": token,
+        "requires_onboarding": False,
     }

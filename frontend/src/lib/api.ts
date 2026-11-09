@@ -40,6 +40,10 @@ export function getAuthHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+export function getAuthToken(): string | null {
+  return _tokenGetter?.() || null;
+}
+
 export async function apiRequest<T>(
   path: string,
   init?: RequestInit,

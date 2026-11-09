@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { apiRequest, qs } from "@/lib/api";
 
@@ -41,19 +41,26 @@ export default function SubjectsPage() {
   });
   const [error, setError] = useState("");
 
-  const fetchSubjects = async () => {
-    const params: Record<string, string | number> = { page, page_size: pageSize };
-    if (search) params.search = search;
-    if (showInactive) params.include_inactive = "true";
+  const fetchSubjects = useCallback(async () => {
+    try {
+      const params: Record<string, string | number> = { page, page_size: pageSize };
+      if (search) params.search = search;
+      if (showInactive) params.include_inactive = "true";
 
-    const data = await apiRequest<ListResponse>(`/api/v1/subjects${qs(params)}`);
-    setSubjects(data.items);
-    setTotal(data.total);
-  };
+      const data = await apiRequest<ListResponse>(`/api/v1/subjects${qs(params)}`);
+      setSubjects(data.items);
+      setTotal(data.total);
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to load subjects");
+    }
+  }, [page, pageSize, search, showInactive]);
 
   useEffect(() => {
-    fetchSubjects();
-  }, [page, search, showInactive]);
+    const timer = setTimeout(() => {
+      void fetchSubjects();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchSubjects]);
 
   const resetForm = () => {
     setForm({ code: "", name: "", department: "", semester: 1, credits: "" });
@@ -92,9 +99,9 @@ export default function SubjectsPage() {
       await apiRequest(url, { method, body: JSON.stringify(body) });
       setShowForm(false);
       resetForm();
-      fetchSubjects();
-    } catch (err: any) {
-      setError(err.message || "Failed to save subject");
+      void fetchSubjects();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save subject");
     }
   };
 

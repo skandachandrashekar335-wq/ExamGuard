@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 interface SystemTerminalProps {
   stage: "ready" | "detect" | "verify" | "decide" | "authorize";
@@ -38,27 +38,25 @@ const STAGE_LINES: Record<string, LogLine[]> = {
 };
 
 function SystemTerminalInner({ stage }: SystemTerminalProps) {
-  const linesRef = useRef<LogLine[]>([]);
+  const [lines, setLines] = useState<LogLine[]>(() => STAGE_LINES[stage] || []);
   const containerRef = useRef<HTMLDivElement>(null);
-  const prevStageRef = useRef<string>("");
+  const prevStageRef = useRef<string>(stage);
 
   useEffect(() => {
     if (stage !== prevStageRef.current) {
       prevStageRef.current = stage;
       const newLines = STAGE_LINES[stage] || [];
-      linesRef.current = [...linesRef.current, ...newLines];
+      setLines((prev: LogLine[]) => [...prev, ...newLines]);
       if (containerRef.current) {
         containerRef.current.scrollTop = containerRef.current.scrollHeight;
       }
     }
   }, [stage]);
 
-  const lines = linesRef.current;
-
   return (
     <div className="font-[var(--font-mono)] text-[0.5rem] sm:text-[0.55rem] leading-relaxed tracking-wide">
       <div ref={containerRef} className="max-h-[120px] overflow-hidden space-y-0.5">
-        {lines.map((line, i) => (
+        {lines.map((line: LogLine, i: number) => (
           <div
             key={`${line.stage}-${i}`}
             className="flex gap-2"

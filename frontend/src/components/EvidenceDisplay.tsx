@@ -36,8 +36,8 @@ const SIGNAL_META: Record<
 };
 
 const CATEGORY_STYLE: Record<string, { color: string; bg: string }> = {
-  IDENTITY: { color: "var(--accent)", bg: "rgba(107,78,255,0.12)" },
-  LIVENESS: { color: "var(--success)", bg: "rgba(45,159,111,0.12)" },
+  IDENTITY: { color: "var(--accent)", bg: "var(--accent-soft)" },
+  LIVENESS: { color: "var(--success)", bg: "var(--success-bg)" },
   SUPPORTING: { color: "var(--text-muted)", bg: "rgba(255,255,255,0.05)" },
 };
 

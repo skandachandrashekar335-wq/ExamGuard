@@ -47,6 +47,7 @@ export function useScrollProgress(ref: React.RefObject<HTMLElement | null>) {
   const currentRef = useRef(0);
   const tickingRef = useRef(false);
   const scrollFrameRef = useRef<number>(0);
+  const tickRef = useRef<() => void>(() => {});
 
   const subscribe = useCallback((cb: (state: ScrollState) => void) => {
     callbacksRef.current.push(cb);
@@ -78,8 +79,12 @@ export function useScrollProgress(ref: React.RefObject<HTMLElement | null>) {
       callbacksRef.current.forEach((cb) => cb(state));
     }
 
-    rafRef.current = requestAnimationFrame(tick);
+    rafRef.current = requestAnimationFrame(() => tickRef.current());
   }, []);
+
+  useEffect(() => {
+    tickRef.current = tick;
+  }, [tick]);
 
   const startTicking = useCallback(() => {
     if (!tickingRef.current) {
@@ -132,6 +137,7 @@ export function useMouseCSS() {
   const currentRef = useRef({ x: 0, y: 0 });
   const rafRef = useRef<number>(0);
   const tickingRef = useRef(false);
+  const tickRef = useRef<() => void>(() => {});
 
   const tick = useCallback(() => {
     const dx = targetRef.current.x - currentRef.current.x;
@@ -152,8 +158,12 @@ export function useMouseCSS() {
     document.documentElement.style.setProperty("--mouse-x", String(currentRef.current.x));
     document.documentElement.style.setProperty("--mouse-y", String(currentRef.current.y));
 
-    rafRef.current = requestAnimationFrame(tick);
+    rafRef.current = requestAnimationFrame(() => tickRef.current());
   }, []);
+
+  useEffect(() => {
+    tickRef.current = tick;
+  }, [tick]);
 
   const startTicking = useCallback(() => {
     if (!tickingRef.current) {

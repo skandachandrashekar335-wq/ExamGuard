@@ -247,7 +247,7 @@ const CameraCapture = forwardRef<CameraCaptureHandle, CameraCaptureProps>(
                     width: "58%",
                     height: "78%",
                     borderRadius: "50%",
-                    border: "2px solid rgba(107, 78, 255, 0.75)",
+                    border: "2px solid rgba(74, 144, 217, 0.85)",
                     boxShadow: "0 0 0 9999px rgba(16, 23, 19, 0.35)",
                   }}
                 />

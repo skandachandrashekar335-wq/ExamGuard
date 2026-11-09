@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   listSessions,
@@ -38,7 +38,7 @@ export default function ExaminationSessionsPage() {
 
   const [filterStatus, setFilterStatus] = useState("");
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -54,11 +54,14 @@ export default function ExaminationSessionsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize, filterStatus]);
 
   useEffect(() => {
-    fetchData();
-  }, [page, filterStatus]);
+    const timer = setTimeout(() => {
+      fetchData();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchData]);
 
   const handleStart = async (id: number) => {
     const current = sessions.find((s) => s.id === id);

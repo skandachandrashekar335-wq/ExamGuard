@@ -16,7 +16,9 @@ test.use({
 
 function adminToken(): string {
   const backend = path.resolve(__dirname, "../../backend");
-  const python = path.join(backend, ".venv", "Scripts", "python.exe");
+  const python = process.platform === "win32"
+    ? path.join(backend, ".venv", "Scripts", "python.exe")
+    : path.join(backend, ".venv", "bin", "python");
   const code = [
     "from datetime import timedelta",
     "from app.auth import create_access_token",

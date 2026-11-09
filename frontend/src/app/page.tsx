@@ -40,6 +40,7 @@ export default function Home() {
         <a href="#features">Features</a>
         <a href="#security">Security</a>
         <a href="#architecture">Architecture</a>
+        <Link href="/chatbot">Admission Guide</Link>
         <Link href="/examination-sessions" className="eg-nav-cta">Access System</Link>
       </nav>
 
@@ -51,6 +52,7 @@ export default function Home() {
           <a href="#features" onClick={() => setMobileOpen(false)}>Features</a>
           <a href="#security" onClick={() => setMobileOpen(false)}>Security</a>
           <a href="#architecture" onClick={() => setMobileOpen(false)}>Architecture</a>
+          <Link href="/chatbot" onClick={() => setMobileOpen(false)}>Admission Guide</Link>
           <Link href="/examination-sessions" onClick={() => setMobileOpen(false)} className="eg-btn eg-btn-primary" style={{marginTop:"1rem",justifyContent:"center"}}>Access System</Link>
         </div>
       )}
@@ -79,6 +81,7 @@ export default function Home() {
             </p>
             <div className="eg-hero__actions">
               <Link href="/examination-sessions" className="eg-btn eg-btn--lg eg-btn-primary">Access System</Link>
+              <Link href="/chatbot" className="eg-btn eg-btn--lg">Admission Guide</Link>
               <a href="#pipeline" className="eg-btn eg-btn--lg">Explore Verification</a>
             </div>
           </div>

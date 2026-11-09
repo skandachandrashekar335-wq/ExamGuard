@@ -1003,42 +1003,30 @@ def demo_reference_image(
 
 
 @router.post("/load", response_model=DemoLoadResponse)
-
 def demo_load(
-
     db: Session = Depends(get_db),
-
     claims: dict = Depends(get_current_user),
-
 ):
-
     """Load (or reload) the deterministic demo scenario.
 
-
-
     Idempotent: calling multiple times produces the same records.
-
     Creates subject → exam → student → registration → hall → seat
-
     assignment → examination session → identity verification attempt.
 
-
-
     The identity verification attempt is created in CREATED status
-
     with method=FACE, ready for the real face verification pipeline.
 
-
-
     Any authenticated ExamGuard user may load the demo scenario.
-
     The endpoint is restricted to creating only the fixed demo
-
     scenario — no arbitrary exams, students, or records are
-
     permitted, and no frontend-controlled payload is accepted.
-
     """
+    settings = get_settings()
+    if settings.APP_ENV == "production":
+        raise HTTPException(
+            status_code=403,
+            detail="Demo scenario loading is strictly disabled in production environments.",
+        )
 
     # ── Subject ──
 
@@ -1439,26 +1427,22 @@ def demo_load(
 
 
 @router.post("/reset")
-
 def demo_reset(
-
     db: Session = Depends(get_db),
-
     _user: dict = Depends(get_current_user),
-
 ):
-
     """Reset demo data by soft-deleting demo records.
 
-
-
     Only deletes records with deterministic demo identifiers.
-
     Never touches real examination data.
-
     Any authenticated user may reset demo data.
-
     """
+    settings = get_settings()
+    if settings.APP_ENV == "production":
+        raise HTTPException(
+            status_code=403,
+            detail="Demo data reset is strictly disabled in production environments.",
+        )
 
     deleted = 0
 

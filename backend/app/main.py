@@ -83,8 +83,10 @@ def create_app() -> FastAPI:
         debug=settings.DEBUG and settings.APP_ENV != "production",
     )
 
-    # Always include known production origins alongside any env-configured ones
+    # Always include known production and local development origins
     _production_origins = {
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
         "https://exam-guardian-management.vercel.app",
         "https://exam-guard-liard.vercel.app",
         "https://exam-guard-59g16u2rx-skc5.vercel.app",

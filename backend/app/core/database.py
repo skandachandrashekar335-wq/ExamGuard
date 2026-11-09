@@ -10,8 +10,9 @@ settings = get_settings()
 # Ensure Neon PostgreSQL SSL is always enabled.
 # Railway may provide a DATABASE_URL without sslmode; require it here.
 _engine_ssl_args = {}
-if settings.DATABASE_URL:
-    _engine_ssl_args["sslmode"] = "require"
+if settings.DATABASE_URL and "postgres" in settings.DATABASE_URL.lower():
+    if not ("localhost" in settings.DATABASE_URL.lower() or "127.0.0.1" in settings.DATABASE_URL.lower() or "sslmode=disable" in settings.DATABASE_URL.lower()):
+        _engine_ssl_args["sslmode"] = "require"
 
 engine = create_engine(
     settings.DATABASE_URL,

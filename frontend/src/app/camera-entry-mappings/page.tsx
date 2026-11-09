@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import AppShell from "@/components/AppShell";
 import {
   listMappings,
@@ -37,7 +37,7 @@ export default function CameraEntryMappingsPage() {
 
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
 
-  async function loadRefs() {
+  const loadRefs = useCallback(async () => {
     try {
       const [c, e, h] = await Promise.all([
         listCameras({ page_size: 100, include_inactive: true }),
@@ -50,9 +50,9 @@ export default function CameraEntryMappingsPage() {
     } catch {
       // Non-critical
     }
-  }
+  }, []);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -68,15 +68,21 @@ export default function CameraEntryMappingsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [page, pageSize, showDisabled]);
 
   useEffect(() => {
-    load();
-  }, [page, showDisabled]);
+    const timer = setTimeout(() => {
+      load();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [load]);
 
   useEffect(() => {
-    loadRefs();
-  }, []);
+    const timer = setTimeout(() => {
+      loadRefs();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [loadRefs]);
 
   function cameraName(id: number): string {
     const c = cameras.find((c) => c.id === id);

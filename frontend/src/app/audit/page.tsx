@@ -3,18 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
-import { apiRequest, qs } from "@/lib/api";
-
-interface AuditEntry {
-  id: number;
-  action: string;
-  entity_type: string;
-  entity_id: number | null;
-  user_id: number | null;
-  details: string | null;
-  ip_address: string | null;
-  created_at: string;
-}
+import { apiRequest } from "@/lib/api";
 
 interface SecurityEvent {
   id: number;
@@ -48,8 +37,8 @@ export default function AuditPage() {
         "/api/v1/security-events?page_size=100"
       );
       setSecurityEvents(data.items || []);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError((err as Error).message);
     }
   }, []);
 
@@ -59,14 +48,16 @@ export default function AuditPage() {
         "/api/v1/import/audit?page_size=100"
       );
       setImportLogs(data.items || []);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError((err as Error).message);
     }
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    Promise.all([loadSecurityEvents(), loadImportLogs()]).finally(() => setLoading(false));
+    const timer = setTimeout(() => {
+      Promise.all([loadSecurityEvents(), loadImportLogs()]).finally(() => setLoading(false));
+    }, 0);
+    return () => clearTimeout(timer);
   }, [loadSecurityEvents, loadImportLogs]);
 
   const severityColor = (s: string) => {

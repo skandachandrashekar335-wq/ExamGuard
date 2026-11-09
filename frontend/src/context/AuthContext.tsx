@@ -50,6 +50,7 @@ export interface AuthState {
   isAuthenticated: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  signInAsDev?: (role?: UserRole) => Promise<void>;
   authPhase: AuthPhase;
   authError: string | null;
   clearAuthError: () => void;
@@ -65,6 +66,7 @@ const AuthStateDefault: AuthState = {
   isAuthenticated: false,
   signInWithGoogle: async () => {},
   signOut: async () => {},
+  signInAsDev: async () => {},
   authPhase: "initializing",
   authError: null,
   clearAuthError: () => {},
@@ -81,7 +83,16 @@ export const useAuth = (): AuthState => {
 };
 
 function getDevToken(): string | null {
-  if (process.env.NODE_ENV === "development" && typeof window !== "undefined") {
+  // In production builds, development authentication bypass is strictly forbidden
+  // regardless of any client-side or public environment variables.
+  if (process.env.NODE_ENV === "production") {
+    return null;
+  }
+  if (
+    (process.env.NODE_ENV === "development" ||
+      process.env.NEXT_PUBLIC_ENABLE_DEV_AUTH === "true") &&
+    typeof window !== "undefined"
+  ) {
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get("eg_token");
     if (urlToken) {
@@ -97,9 +108,10 @@ function getDevToken(): string | null {
 function devTokenToUser(token: string): AuthUser | null {
   try {
     const payload = JSON.parse(atob(token.split(".")[1]));
+    const parsedId = parseInt(payload.sub, 10);
     return {
-      id: parseInt(payload.sub),
-      email: payload.email || null,
+      id: Number.isFinite(parsedId) ? parsedId : 1,
+      email: payload.email || (payload.sub && payload.sub.includes("@") ? payload.sub : null),
       full_name: payload.full_name || null,
       role: payload.role as UserRole,
       is_active: true,
@@ -108,19 +120,6 @@ function devTokenToUser(token: string): AuthUser | null {
   } catch {
     return null;
   }
-}
-
-function makeAuthStateUpdate(overrides: Partial<AuthState>): AuthState {
-  return {
-    ...AuthStateDefault,
-    loading: false,
-    authPhase: "idle",
-    authError: null,
-    clearAuthError: () => {},
-    signInWithGoogle: async () => {},
-    signOut: async () => {},
-    ...overrides,
-  };
 }
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({
@@ -163,9 +162,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         signOut: signOutRef.current,
         clearAuthError: () => setAuthState(prev => ({ ...prev, authError: null })),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[ExamGuard] Auth exchange failed:", error);
-      const msg = error?.message || "Authentication failed. Please try again.";
+      const errObj = error as { message?: string };
+      const msg = errObj?.message || "Authentication failed. Please try again.";
       setAuthState(prev => ({
         ...prev,
         user: null,
@@ -210,8 +210,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
     if (devTokenUsed.current) return;
 
+    const fallbackTimer = setTimeout(() => {
+      setAuthState(prev => {
+        if (prev.loading && !prev.isAuthenticated) {
+          return { ...prev, loading: false, authPhase: "idle" };
+        }
+        return prev;
+      });
+    }, 1200);
+
     const unsubscribe = onAuthStateChangedCallback(
       (firebaseUser, idToken) => {
+        clearTimeout(fallbackTimer);
         if (devTokenUsed.current) return;
         if (exchangeInProgress.current) return;
 
@@ -237,7 +247,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(fallbackTimer);
+      unsubscribe();
+    };
   }, [doExchange]);
 
   const signInWithGoogle = useCallback(async () => {
@@ -247,15 +260,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       const idToken = await result.user.getIdToken();
       setAuthState(prev => ({ ...prev, authPhase: "exchanging" }));
       await doExchange(idToken);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[ExamGuard] Google sign-in failed:", error);
       let msg = "Sign-in was cancelled or failed. Please try again.";
-      if (error?.code === "auth/popup-closed-by-user") {
+      const errObj = error as { code?: string; message?: string };
+      if (errObj?.code === "auth/popup-closed-by-user") {
         msg = "Sign-in popup was closed. Please try again.";
-      } else if (error?.code === "auth/network-request-failed") {
+      } else if (errObj?.code === "auth/network-request-failed") {
         msg = "Network error. Please check your connection and try again.";
-      } else if (error?.message && !error.message.includes("popup")) {
-        msg = error.message;
+      } else if (errObj?.message && !errObj.message.includes("popup")) {
+        msg = errObj.message;
       }
       setAuthState(prev => ({
         ...prev,
@@ -269,7 +283,55 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     }
   }, [doExchange]);
 
+  const signInAsDev = useCallback(async (role: UserRole = "ADMIN") => {
+    if (process.env.NODE_ENV === "production") return;
+    try {
+      setAuthState(prev => ({ ...prev, loading: true, authPhase: "exchanging" }));
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/api/v1/auth/dev/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      if (!res.ok) {
+        throw new Error("Dev login request failed");
+      }
+      const data = await res.json();
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("eg_dev_token", data.token);
+      }
+      devTokenUsed.current = true;
+      setTokenGetter(() => data.token);
+      setAuthState({
+        ...AuthStateDefault,
+        user: data.user,
+        loading: false,
+        examGuardToken: data.token,
+        requiresOnboarding: false,
+        displayName: data.user.email || `Dev ${role}`,
+        isAuthenticated: true,
+        authPhase: "authenticated",
+        signInWithGoogle: signInWithGoogleRef.current,
+        signOut: signOutRef.current,
+        signInAsDev,
+        clearAuthError: () => setAuthState(prev => ({ ...prev, authError: null })),
+      });
+    } catch (err: unknown) {
+      setAuthState(prev => ({
+        ...prev,
+        loading: false,
+        authPhase: "error",
+        authError: (err as Error).message || "Dev sign in failed",
+      }));
+    }
+  }, []);
+
   const handleSignOut = useCallback(async () => {
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("eg_dev_token");
+    }
+    devTokenUsed.current = false;
+    setTokenGetter(() => null);
     try {
       await firebaseSignOut();
     } catch (error) {
@@ -281,12 +343,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       authPhase: "idle",
       signInWithGoogle: signInWithGoogleRef.current,
       signOut: signOutRef.current,
+      signInAsDev,
       clearAuthError: () => setAuthState(p => ({ ...p, authError: null })),
     });
-  }, []);
+  }, [signInAsDev]);
 
-  signInWithGoogleRef.current = signInWithGoogle;
-  signOutRef.current = handleSignOut;
+  useEffect(() => {
+    signInWithGoogleRef.current = signInWithGoogle;
+    signOutRef.current = handleSignOut;
+  }, [signInWithGoogle, handleSignOut]);
 
   // Set the token during render so child effects (dashboard fetches) see it.
   // A later effect would run after those children and the first request would
@@ -311,6 +376,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         isAuthenticated: authState.isAuthenticated,
         signInWithGoogle,
         signOut: handleSignOut,
+        signInAsDev,
         authPhase: authState.authPhase,
         authError: authState.authError,
         clearAuthError: () => setAuthState(p => ({ ...p, authError: null })),

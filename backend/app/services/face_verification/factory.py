@@ -30,6 +30,11 @@ def get_face_verification_provider() -> FaceVerificationProvider:
     provider_name = settings.FACE_VERIFICATION_PROVIDER.lower()
 
     if provider_name == "deterministic":
+        if settings.APP_ENV == "production":
+            raise RuntimeError(
+                "FACE_VERIFICATION_PROVIDER='deterministic' is strictly prohibited in production. "
+                "Set FACE_VERIFICATION_PROVIDER='uniface' for real biometric neural inference."
+            )
         return DeterministicProvider()
 
     if provider_name == "uniface":

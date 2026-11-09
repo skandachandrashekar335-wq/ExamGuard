@@ -13,6 +13,7 @@ Core principles:
 - Never log secrets, credentials, or biometric data.
 """
 
+import os
 import re
 import time
 import hashlib
@@ -98,7 +99,7 @@ def validate_seat_number(value: str) -> Optional[str]:
 
 _rate_limits: Dict[str, List[float]] = {}
 RATE_LIMIT_WINDOW = 60  # seconds
-RATE_LIMIT_MAX = 100  # requests per window
+RATE_LIMIT_MAX = int(os.environ.get("RATE_LIMIT_MAX", "100"))  # requests per window
 
 
 def _client_id(request: Request) -> str:

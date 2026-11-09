@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { apiRequest, qs } from "@/lib/api";
 
@@ -33,19 +33,26 @@ export default function StudentsPage() {
   const [formName, setFormName] = useState("");
   const [error, setError] = useState("");
 
-  const fetchStudents = async () => {
-    const params: Record<string, string | number> = { page, page_size: pageSize };
-    if (search) params.search = search;
-    if (showInactive) params.include_inactive = "true";
+  const fetchStudents = useCallback(async () => {
+    try {
+      const params: Record<string, string | number> = { page, page_size: pageSize };
+      if (search) params.search = search;
+      if (showInactive) params.include_inactive = "true";
 
-    const data = await apiRequest<ListResponse>(`/api/v1/students${qs(params)}`);
-    setStudents(data.items);
-    setTotal(data.total);
-  };
+      const data = await apiRequest<ListResponse>(`/api/v1/students${qs(params)}`);
+      setStudents(data.items);
+      setTotal(data.total);
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to load students");
+    }
+  }, [page, pageSize, search, showInactive]);
 
   useEffect(() => {
-    fetchStudents();
-  }, [page, search, showInactive]);
+    const timer = setTimeout(() => {
+      void fetchStudents();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchStudents]);
 
   const handleCreate = async () => {
     setError("");
@@ -57,9 +64,9 @@ export default function StudentsPage() {
       setShowForm(false);
       setFormUsn("");
       setFormName("");
-      fetchStudents();
-    } catch (err: any) {
-      setError(err.message || "Failed to create student");
+      void fetchStudents();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create student");
     }
   };
 
@@ -74,9 +81,9 @@ export default function StudentsPage() {
       setEditStudent(null);
       setFormUsn("");
       setFormName("");
-      fetchStudents();
-    } catch (err: any) {
-      setError(err.message || "Failed to update student");
+      void fetchStudents();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update student");
     }
   };
 

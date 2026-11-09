@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import path from "path";
 
 const ADMIN_TOKEN = process.env.EG_ADMIN_TOKEN || "";
 
@@ -194,7 +195,7 @@ test.describe("Exams CRUD", () => {
     const formStillVisible = await page
       .locator('text="New Exam"')
       .isVisible();
-    
+
     if (formStillVisible) {
       // Form still open = error occurred, check if form closed
       const bodyText = await getPageText(page);
@@ -291,8 +292,14 @@ test.describe("Documents Upload and Process", () => {
 
     await expect(page.locator('button:has-text("Upload")')).toBeVisible();
 
+    const examSelect = page.locator('select[aria-label="Exam for admit card"]');
+    if (await examSelect.isVisible()) {
+      await examSelect.selectOption({ index: 1 });
+    }
+
     const fileInput = page.locator('input[type="file"]');
-    await fileInput.setInputFiles("D:\\ExamGuard\\test_hall_ticket.png");
+    const sampleTicketPath = path.resolve(process.cwd(), "..", "test_hall_ticket.png");
+    await fileInput.setInputFiles(sampleTicketPath);
 
     await page.click('button:has-text("Upload")');
     await page.waitForTimeout(3000);

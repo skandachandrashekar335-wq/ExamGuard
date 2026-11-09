@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import {
   listSecurityAlerts,
@@ -40,7 +40,7 @@ export default function SecurityAlertsPage() {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterSeverity, setFilterSeverity] = useState("");
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -57,11 +57,14 @@ export default function SecurityAlertsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize, filterStatus, filterSeverity]);
 
   useEffect(() => {
-    fetchData();
-  }, [page, filterStatus, filterSeverity]);
+    const timer = setTimeout(() => {
+      void fetchData();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchData]);
 
   const handleAcknowledge = async (id: number) => {
     setActionLoading(id);

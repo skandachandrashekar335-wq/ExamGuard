@@ -268,7 +268,7 @@ export default function MonitoringPage() {
   // Alert filters
   const [alertSeverity, setAlertSeverity] = useState<EventSeverity | "">("");
   const [alertEventType, setAlertEventType] = useState<EventType | "">("");
-  const [alertLimit, setAlertLimit] = useState("50");
+  const [alertLimit] = useState("50");
 
   // Expanded event
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -400,10 +400,13 @@ export default function MonitoringPage() {
   // Initial load
   useEffect(() => {
     mountedRef.current = true;
-    loadStatus();
-    loadEvents();
-    loadAlerts();
+    const timer = setTimeout(() => {
+      loadStatus();
+      loadEvents();
+      loadAlerts();
+    }, 0);
     return () => {
+      clearTimeout(timer);
       mountedRef.current = false;
     };
   }, [loadStatus, loadEvents, loadAlerts]);

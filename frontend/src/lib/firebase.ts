@@ -19,15 +19,12 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
   GoogleAuthProvider,
+  User as FirebaseUser,
 } from "firebase/auth";
 import {
   getFirestore,
-  doc,
-  getDoc,
-  setDoc,
-  onSnapshot,
 } from "firebase/firestore";
-import { app, analytics } from "./firebase_init";
+import { app } from "./firebase_init";
 import { API_BASE } from "./api";
 
 export {
@@ -57,7 +54,7 @@ googleProvider.setCustomParameters({
  * @throws Error if sign-in is cancelled or fails
  */
 export async function signInWithGoogle(): Promise<{
-  user: any;
+  user: FirebaseUser;
   idToken: string;
 }> {
   const provider = googleProvider;
@@ -108,13 +105,13 @@ export async function getCurrentIdToken(): Promise<string | null> {
  * @returns Unsubscribe function
  */
 export function onAuthStateChangedCallback(
-  callback: (user: any | null, idToken: string | null) => void
+  callback: (user: FirebaseUser | null, idToken: string | null) => void
 ) {
   return onAuthStateChanged(auth, (user) => {
     if (user) {
       user.getIdToken()
         .then((token) => callback(user, token))
-        .catch((err) => callback(user, null));
+        .catch(() => callback(user, null));
     } else {
       callback(user, null);
     }

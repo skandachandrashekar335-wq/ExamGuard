@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
@@ -65,18 +65,21 @@ export default function HallTicketDetailPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [actionMsg, setActionMsg] = useState("");
 
-  const fetchDetail = async () => {
+  const fetchDetail = useCallback(async () => {
     try {
       const json = await apiRequest<DetailedResponse>(`/api/v1/hall-tickets/${id}/detailed`);
       setData(json);
     } catch {
       setError("Hall ticket not found");
     }
-  };
+  }, [id]);
 
   useEffect(() => {
-    fetchDetail();
-  }, [id]);
+    const timer = setTimeout(() => {
+      fetchDetail();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchDetail]);
 
   const approve = async () => {
     setActionMsg("");

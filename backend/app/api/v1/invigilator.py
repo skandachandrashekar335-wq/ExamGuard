@@ -109,14 +109,24 @@ def my_assignment(
     """
     from app.models.user import User
 
-    row = db.query(User).filter(User.id == int(user["sub"])).first()
+    sub_val = str(user.get("sub", ""))
+    row = None
+    if sub_val.isdigit():
+        row = db.query(User).filter(User.id == int(sub_val)).first()
+    elif sub_val:
+        row = db.query(User).filter(User.email == sub_val).first()
+
     account_role = row.role if row is not None else user.get("role", "REVIEWER")
-    assignment = (
-        db.query(InvigilatorAssignment)
-        .filter(InvigilatorAssignment.user_id == int(user["sub"]))
-        .order_by(InvigilatorAssignment.is_active.desc(), InvigilatorAssignment.created_at.desc())
-        .first()
-    )
+    user_id = row.id if row is not None else (int(sub_val) if sub_val.isdigit() else None)
+
+    assignment = None
+    if user_id is not None:
+        assignment = (
+            db.query(InvigilatorAssignment)
+            .filter(InvigilatorAssignment.user_id == user_id)
+            .order_by(InvigilatorAssignment.is_active.desc(), InvigilatorAssignment.created_at.desc())
+            .first()
+        )
     if assignment is None:
         return MyAssignmentResponse(
             account_role=account_role,
@@ -255,7 +265,8 @@ def get_dashboard(
     db: Session = Depends(get_db),
 ):
     profile = _get_profile(db, user)
-    user_id = int(user["sub"])
+    sub_val = str(user.get("sub", ""))
+    user_id = int(sub_val) if sub_val.isdigit() else 1
 
     # Find session
     session = None

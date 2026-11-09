@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import { listAttempts } from "@/lib/iv-api";
@@ -32,7 +32,7 @@ export default function IdentityVerificationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -50,11 +50,14 @@ export default function IdentityVerificationsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize, statusFilter, decisionFilter, studentFilter]);
 
   useEffect(() => {
-    fetchData();
-  }, [page, statusFilter, decisionFilter, studentFilter]);
+    const timer = setTimeout(() => {
+      fetchData();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchData]);
 
   const totalPages = Math.ceil(total / pageSize);
 

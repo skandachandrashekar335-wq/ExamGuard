@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -28,7 +28,7 @@ export default function SessionDetailPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [endConfirm, setEndConfirm] = useState(false);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -43,11 +43,16 @@ export default function SessionDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
-    if (id) fetchData();
-  }, [id]);
+    if (id) {
+      const timer = setTimeout(() => {
+        fetchData();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [id, fetchData]);
 
   const handleAction = async (action: () => Promise<unknown>) => {
     setActionLoading(true);

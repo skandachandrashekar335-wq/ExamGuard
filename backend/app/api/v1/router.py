@@ -36,6 +36,7 @@ from app.api.v1.invigilator import router as invigilator_router
 from app.api.v1.hall_ticket_mappings import router as hall_ticket_mappings_router
 from app.api.v1.demo import router as demo_router
 from app.api.v1.users import router as users_router
+from app.api.v1.chatbot import router as chatbot_router
 
 router = APIRouter()
 
@@ -75,8 +76,15 @@ router.include_router(invigilator_router)
 router.include_router(hall_ticket_mappings_router)
 router.include_router(demo_router)
 router.include_router(users_router)
+router.include_router(chatbot_router)
 
 
 @router.get("/ping")
 def ping() -> dict[str, str]:
     return {"message": "pong"}
+
+
+@router.get("/health/readiness")
+def readiness() -> dict:
+    from app.monitoring.production import check_readiness
+    return check_readiness()

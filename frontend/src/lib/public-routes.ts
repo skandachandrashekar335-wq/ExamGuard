@@ -3,6 +3,7 @@ export const PUBLIC_ROUTES: string[] = [
   "/privacy",
   "/terms",
   "/how-it-works",
+  "/chatbot",
   "/api",
 ];
 

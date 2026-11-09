@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import { apiRequest, qs } from "@/lib/api";
@@ -63,7 +64,6 @@ export default function VerifyPage() {
       );
       const session = data.items?.[0];
       if (!session) {
-        setLoading(false);
         return;
       }
       setActiveSession(session);
@@ -74,8 +74,10 @@ export default function VerifyPage() {
       ]);
       setSessionExam(exam);
       setSessionHall(hall);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load active session");
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -110,21 +112,31 @@ export default function VerifyPage() {
         else pending++;
       }
       setStats({ verified, rejected, review, pending });
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load verifications");
     }
   }, [students]);
 
-  useEffect(() => { loadActiveSession(); }, [loadActiveSession]);
   useEffect(() => {
-    if (activeSession) {
-      loadVerifications(activeSession.id);
-      const interval = setInterval(() => loadVerifications(activeSession.id), 10000);
-      return () => clearInterval(interval);
-    }
-  }, [activeSession, loadVerifications]);
+    const timer = setTimeout(() => {
+      void loadActiveSession();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [loadActiveSession]);
 
-  useEffect(() => { setLoading(false); }, []);
+  useEffect(() => {
+    if (!activeSession) return;
+    const timer = setTimeout(() => {
+      void loadVerifications(activeSession.id);
+    }, 0);
+    const interval = setInterval(() => {
+      void loadVerifications(activeSession.id);
+    }, 10000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
+  }, [activeSession, loadVerifications]);
 
   if (loading) return <AppShell><div className="eg-page"><p style={{ color: "var(--text-muted)" }}>Loading...</p></div></AppShell>;
 
@@ -142,7 +154,7 @@ export default function VerifyPage() {
             <p style={{ color: "var(--text-muted)", marginBottom: "1.5rem" }}>
               Start an examination session to begin verification.
             </p>
-            <a href="/examination-sessions" className="eg-btn eg-btn-primary">Go to Sessions</a>
+            <Link href="/examination-sessions" className="eg-btn eg-btn-primary">Go to Sessions</Link>
           </div>
         </div>
       </AppShell>
@@ -257,9 +269,9 @@ export default function VerifyPage() {
 
       {/* Quick Actions */}
       <div style={{ marginTop: "1.5rem", display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-        <a href="/entry-verifications" className="eg-btn">All Verifications</a>
-        <a href="/security-events" className="eg-btn">Security Events</a>
-        <a href="/security-alerts" className="eg-btn">Alerts</a>
+        <Link href="/entry-verifications" className="eg-btn">All Verifications</Link>
+        <Link href="/security-events" className="eg-btn">Security Events</Link>
+        <Link href="/security-alerts" className="eg-btn">Alerts</Link>
       </div>
     </div>
     </AppShell>

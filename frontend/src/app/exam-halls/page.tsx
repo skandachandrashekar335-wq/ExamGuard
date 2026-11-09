@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import { apiRequest, qs } from "@/lib/api";
@@ -44,19 +44,26 @@ export default function ExamHallsPage() {
   });
   const [error, setError] = useState("");
 
-  const fetchHalls = async () => {
-    const params: Record<string, string | number> = { page, page_size: pageSize };
-    if (search) params.search = search;
-    if (showInactive) params.include_inactive = "true";
+  const fetchHalls = useCallback(async () => {
+    try {
+      const params: Record<string, string | number> = { page, page_size: pageSize };
+      if (search) params.search = search;
+      if (showInactive) params.include_inactive = "true";
 
-    const data = await apiRequest<ListResponse>(`/api/v1/exam-halls${qs(params)}`);
-    setHalls(data.items);
-    setTotal(data.total);
-  };
+      const data = await apiRequest<ListResponse>(`/api/v1/exam-halls${qs(params)}`);
+      setHalls(data.items);
+      setTotal(data.total);
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to load exam halls");
+    }
+  }, [page, pageSize, search, showInactive]);
 
   useEffect(() => {
-    fetchHalls();
-  }, [page, search, showInactive]);
+    const timer = setTimeout(() => {
+      fetchHalls();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchHalls]);
 
   const resetForm = () => {
     setForm({
@@ -105,8 +112,8 @@ export default function ExamHallsPage() {
       setShowForm(false);
       resetForm();
       fetchHalls();
-    } catch (err: any) {
-      setError(err.message || "Failed to save hall");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to save hall");
     }
   };
 

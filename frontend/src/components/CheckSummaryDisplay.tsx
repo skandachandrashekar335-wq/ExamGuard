@@ -43,7 +43,7 @@ export default function CheckSummaryDisplay({ evidence }: Props) {
             className="eg-mono-sm"
             style={{
               color: "var(--accent)",
-              background: "rgba(107,78,255,0.12)",
+              background: "var(--accent-soft)",
               borderRadius: "4px",
               padding: "1px 6px",
               fontSize: "0.5625rem",

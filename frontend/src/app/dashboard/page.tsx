@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import { useAuth } from "@/context/AuthContext";
@@ -229,9 +230,9 @@ function CandidateFaceCard({
         <>
           <div className="eg-ref-photo">
             {student.preview ? (
-              <img src={student.preview} alt={`Selected photo for ${student.student_name}, ${student.student_usn}`} />
+              <Image src={student.preview} alt={`Selected photo for ${student.student_name}, ${student.student_usn}`} width={120} height={120} unoptimized />
             ) : student.reference_face_url ? (
-              <img src={student.reference_face_url} alt={`Reference photo for ${student.student_name}, ${student.student_usn}`} />
+              <Image src={student.reference_face_url} alt={`Reference photo for ${student.student_name}, ${student.student_usn}`} width={120} height={120} unoptimized />
             ) : (
               <div className="eg-ref-photo-empty">NO PHOTO</div>
             )}
@@ -309,7 +310,7 @@ export default function DashboardPage() {
   const [selectedExamId, setSelectedExamId] = useState<number | null>(null);
   const { user, isAuthenticated } = useAuth();
 
-  const [demoStatus, setDemoStatus] = useState<DemoStatusResponse | null>(null);
+  const [, setDemoStatus] = useState<DemoStatusResponse | null>(null);
   const [demoLoading, setDemoLoading] = useState(false);
   const [demoMessage, setDemoMessage] = useState("");
   const [demoStudents, setDemoStudents] = useState<DemoStudent[]>([]);
@@ -381,7 +382,12 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated) refreshDemoState();
+    if (isAuthenticated) {
+      const timer = setTimeout(() => {
+        void refreshDemoState();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
   }, [isAuthenticated, refreshDemoState]);
 
   const handleLoadDemo = async () => {
@@ -399,8 +405,8 @@ export default function DashboardPage() {
       // no previous reference photos and a NOT_STARTED session.
       setSessionStatus(null);
       await refreshDemoState();
-    } catch (e: any) {
-      setDemoMessage(e.message || "Failed to load demo data");
+    } catch (e: unknown) {
+      setDemoMessage(e instanceof Error ? e.message : "Failed to load demo data");
     } finally {
       setDemoLoading(false);
     }
@@ -420,8 +426,8 @@ export default function DashboardPage() {
       setInvigilatorEmail("");
       setAssignMessage("");
       setSessionMessage("");
-    } catch (e: any) {
-      setDemoMessage(e.message || "Failed to delete demo data");
+    } catch (e: unknown) {
+      setDemoMessage(e instanceof Error ? e.message : "Failed to delete demo data");
     } finally {
       setDeleteLoading(false);
     }
@@ -528,8 +534,8 @@ export default function DashboardPage() {
           };
         })
       );
-    } catch (e: any) {
-      const errorMsg = e.message || "Upload failed";
+    } catch (e: unknown) {
+      const errorMsg = e instanceof Error ? e.message : "Upload failed";
       setDemoStudents((prev) =>
         prev.map((s) =>
           s.attempt_id === attemptId
@@ -566,8 +572,8 @@ export default function DashboardPage() {
         const sess = await getDemoSessionStatus();
         setSessionStatus(sess);
       } catch {}
-    } catch (e: any) {
-      setAssignMessage(e.message || "Failed to assign invigilator");
+    } catch (e: unknown) {
+      setAssignMessage(e instanceof Error ? e.message : "Failed to assign invigilator");
     } finally {
       setAssignLoading(false);
     }
@@ -594,12 +600,14 @@ export default function DashboardPage() {
               started_at: null,
             }
       );
-    } catch (e: any) {
-      setSessionMessage(e.message || "Failed to start session");
+    } catch (e: unknown) {
+      setSessionMessage(e instanceof Error ? e.message : "Failed to start session");
     } finally {
       setSessionStartLoading(false);
     }
   };
+
+  const isProduction = process.env.NODE_ENV === "production";
 
   const sessionActive = sessionStatus?.session_status === "IN_PROGRESS";
 
@@ -616,8 +624,8 @@ export default function DashboardPage() {
         </div>
 
         {/* Section 0: Demo Environment - Load / Reload */}
-        {!demoLoaded && (
-          <div className="glass-surface p-4 mb-6" style={{ borderColor: "rgba(107,78,255,0.2)" }}>
+        {!isProduction && !demoLoaded && (
+          <div className="glass-surface p-4 mb-6" style={{ borderColor: "rgba(201,169,110,0.3)" }}>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
@@ -641,7 +649,7 @@ export default function DashboardPage() {
         {demoLoaded && (
           <div className="mb-6">
             {/* ── Section 1: Demo Data Status ── */}
-            <div className="glass-surface p-4 mb-4" style={{ borderColor: "rgba(107,78,255,0.2)" }}>
+            <div className="glass-surface p-4 mb-4" style={{ borderColor: "rgba(201,169,110,0.3)" }}>
               <div className="flex items-center gap-2 mb-3">
                 <span className="eg-eyebrow" style={{ color: "var(--accent)" }}>Demo Presentation Control Center</span>
                 {sessionActive && (
@@ -863,6 +871,21 @@ export default function DashboardPage() {
             ))}
           </select>
         </div>
+
+        {/* Real-data operational empty state */}
+        {exams.length === 0 && (
+          <div className="glass-surface p-8 text-center my-6" style={{ borderColor: "var(--border)" }}>
+            <div className="text-3xl mb-2">📋</div>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-1">No Active Examinations Scheduled</h3>
+            <p className="text-sm text-[var(--text-secondary)] max-w-md mx-auto mb-4">
+              There are currently no examinations scheduled in the persistent database. Import subjects, halls, and candidate schedules to begin verification.
+            </p>
+            <div className="flex justify-center gap-3">
+              <Link href="/import" className="eg-btn eg-btn-primary text-xs">Import Exam Data →</Link>
+              <Link href="/students" className="eg-btn text-xs">Manage Candidates →</Link>
+            </div>
+          </div>
+        )}
       </div>
     </AppShell>
   );

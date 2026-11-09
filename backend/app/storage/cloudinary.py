@@ -123,6 +123,7 @@ class CloudinaryStorage(StorageBackend):
                     data,
                     public_id=cloud_key,
                     resource="raw",
+                    resource_type="auto",
                     folder="examguard",
                     # Deterministic keys (e.g. face-references/attempt-N) are
                     # re-used on every replace. Cloudinary's default is
@@ -156,9 +157,20 @@ class CloudinaryStorage(StorageBackend):
                 ) from e
 
         # No Cloudinary credentials - local development fallback.
+        from app.core.config import get_settings
+        settings = get_settings()
+        if settings.APP_ENV == "production":
+            raise RuntimeError(
+                "Production file storage requires configured Cloudinary credentials. "
+                "Silent fallback to ephemeral local storage is strictly prohibited in production."
+            )
+
         local_backend = self.local
         if local_backend is not None:
-            return local_backend.save(cloud_key, data)
+            saved_path = local_backend.save(cloud_key, data)
+            if os.environ.get("MOCK_CLOUDINARY") == "1":
+                return f"https://res.cloudinary.com/mock-examguard/image/upload/{cloud_key}"
+            return saved_path
         raise RuntimeError(
             "Neither Cloudinary nor LocalStorage is available for save operation"
         )
@@ -170,6 +182,7 @@ class CloudinaryStorage(StorageBackend):
         If using LocalStorage, returns the filesystem path.
         Raises if not found.
         """
+        cloud_key = self._cloudinary_key(key)
         if self._using_cloudinary:
             # Return the Cloudinary secure URL
             # The URL format is: https://res.cloudinary.com/{cloud_name}/image/{upload_timestamp}/{public_id}{format}
@@ -181,7 +194,6 @@ class CloudinaryStorage(StorageBackend):
             return f"https://res.cloudinary.com/{cloud_name}/image/upload/{cloud_key}"
 
         # LocalStorage path
-        cloud_key = self._cloudinary_key(key)
         try:
             return self.local.get_path(cloud_key)
         except FileNotFoundError:

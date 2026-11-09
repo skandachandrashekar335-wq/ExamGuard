@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import AppShell from "@/components/AppShell";
 import {
   listCameras,
@@ -56,16 +56,16 @@ export default function CamerasPage() {
   const [halls, setHalls] = useState<ExamHall[]>([]);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
 
-  async function loadHalls() {
+  const loadHalls = useCallback(async () => {
     try {
       const data = await listExamHalls({ page_size: 100, include_inactive: true });
       setHalls(data.items);
     } catch {
       // Non-critical — selectors will be empty
     }
-  }
+  }, []);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -83,15 +83,21 @@ export default function CamerasPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [page, pageSize, search, statusFilter, showInactive]);
 
   useEffect(() => {
-    load();
-  }, [page, showInactive, statusFilter]);
+    const timer = setTimeout(() => {
+      load();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [load]);
 
   useEffect(() => {
-    loadHalls();
-  }, []);
+    const timer = setTimeout(() => {
+      loadHalls();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [loadHalls]);
 
   function hallLabel(id: number | null): string {
     if (!id) return "—";

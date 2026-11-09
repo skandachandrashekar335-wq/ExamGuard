@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MonitoringEvent } from "@/lib/monitoring-api";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, getAuthToken } from "@/lib/api";
 
 export type ConnectionStatus =
   | "INITIALIZING"
@@ -35,11 +35,17 @@ export function useMonitoringSocket(opts: UseMonitoringSocketOptions) {
   const mountedRef = useRef(true);
   const connectingRef = useRef(false);
   const optsRef = useRef(opts);
-  optsRef.current = opts;
+  const connectRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    optsRef.current = opts;
+  }, [opts]);
 
   const buildWsUrl = useCallback(() => {
     const base = API_BASE.replace(/^http/, "ws");
     const sp = new URLSearchParams();
+    const token = getAuthToken();
+    if (token) sp.set("token", token);
     if (optsRef.current.examId) sp.set("exam_id", String(optsRef.current.examId));
     if (optsRef.current.hallId) sp.set("hall_id", String(optsRef.current.hallId));
     if (optsRef.current.category) sp.set("category", optsRef.current.category);
@@ -72,9 +78,8 @@ export function useMonitoringSocket(opts: UseMonitoringSocketOptions) {
     reconnectAttempts.current += 1;
     reconnectTimer.current = setTimeout(() => {
       reconnectTimer.current = null;
-      connect();
+      connectRef.current();
     }, delay);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const connect = useCallback(() => {
@@ -88,10 +93,6 @@ export function useMonitoringSocket(opts: UseMonitoringSocketOptions) {
       wsRef.current = null;
     }
 
-    setStatus((prev) =>
-      prev === "INITIALIZING" ? "CONNECTING" : "RECONNECTING"
-    );
-
     let ws: WebSocket;
     try {
       ws = new WebSocket(buildWsUrl());
@@ -102,6 +103,14 @@ export function useMonitoringSocket(opts: UseMonitoringSocketOptions) {
       return;
     }
     wsRef.current = ws;
+
+    queueMicrotask(() => {
+      if (mountedRef.current) {
+        setStatus((prev) =>
+          prev === "INITIALIZING" ? "CONNECTING" : "RECONNECTING"
+        );
+      }
+    });
 
     ws.onopen = () => {
       if (!mountedRef.current) return;
@@ -142,8 +151,11 @@ export function useMonitoringSocket(opts: UseMonitoringSocketOptions) {
       connectingRef.current = false;
       setStatus("ERROR");
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [buildWsUrl, addEvent]);
+  }, [buildWsUrl, addEvent, scheduleReconnect]);
+
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimer.current) {
@@ -175,9 +187,12 @@ export function useMonitoringSocket(opts: UseMonitoringSocketOptions) {
 
   useEffect(() => {
     mountedRef.current = true;
-    connect();
+    const timer = setTimeout(() => {
+      connect();
+    }, 0);
     return () => {
       mountedRef.current = false;
+      clearTimeout(timer);
       disconnect();
     };
   }, [connect, disconnect]);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -28,7 +28,7 @@ export default function AttendanceEventsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const fetchEvents = async () => {
+  const fetchEvents = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -43,11 +43,14 @@ export default function AttendanceEventsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [entryVerificationId, page, pageSize]);
 
   useEffect(() => {
-    fetchEvents();
-  }, [entryVerificationId, page]);
+    const timer = setTimeout(() => {
+      fetchEvents();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchEvents]);
 
   const totalPages = Math.ceil(total / pageSize);
 

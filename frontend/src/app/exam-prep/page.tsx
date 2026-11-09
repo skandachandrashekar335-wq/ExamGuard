@@ -100,8 +100,8 @@ export default function ExamPrepPage() {
     try {
       const data = await apiRequest<{ items: Exam[] }>("/api/v1/exams?page_size=100");
       setExams(data.items || []);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError((err as Error).message);
     }
   }, []);
 
@@ -110,7 +110,7 @@ export default function ExamPrepPage() {
     setError(null);
     try {
       const [regData, hallData, ticketData, seatData, epData, camData, docData] = await Promise.all([
-        apiRequest<{ items: Student[] }>(`/api/v1/exam-registrations${qs({ exam_id: examId, page_size: 500 })}`).catch(() => ({ items: [] })),
+        apiRequest<{ items: Array<{ student_id: number }> }>(`/api/v1/exam-registrations${qs({ exam_id: examId, page_size: 500 })}`).catch(() => ({ items: [] })),
         apiRequest<{ items: ExamHall[] }>("/api/v1/exam-halls?page_size=100").catch(() => ({ items: [] })),
         apiRequest<{ items: HallTicket[] }>(`/api/v1/hall-tickets${qs({ exam_id: examId, page_size: 500 })}`).catch(() => ({ items: [] })),
         apiRequest<{ items: SeatAssignment[] }>(`/api/v1/seat-assignments${qs({ exam_id: examId, page_size: 500 })}`).catch(() => ({ items: [] })),
@@ -126,22 +126,35 @@ export default function ExamPrepPage() {
       setCameras(camData.items || []);
       setDocuments(docData.items || []);
 
-      const studentIds = new Set((regData.items || []).map((r: any) => r.student_id));
+      const studentIds = new Set((regData.items || []).map((r) => r.student_id));
       if (studentIds.size > 0) {
         const studentData = await apiRequest<{ items: Student[] }>(
           `/api/v1/students?page_size=500`
         ).catch(() => ({ items: [] }));
         setStudents(studentData.items.filter((s) => studentIds.has(s.id)));
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError((err as Error).message);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { loadExams(); }, [loadExams]);
-  useEffect(() => { if (selectedExamId) loadExamData(selectedExamId); }, [selectedExamId, loadExamData]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadExams();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [loadExams]);
+
+  useEffect(() => {
+    if (selectedExamId) {
+      const timer = setTimeout(() => {
+        loadExamData(selectedExamId);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedExamId, loadExamData]);
 
   const examStudents = students;
   const examTickets = tickets.filter((t) => t.exam_id === selectedExamId);
@@ -150,7 +163,7 @@ export default function ExamPrepPage() {
 
   const validatedHalls = halls.filter((h) => {
     const hallEPs = entryPoints.filter((ep) => ep.exam_hall_id === h.id);
-    const hallCameras = cameras.filter((c) => hallEPs.some((ep) => ep.id));
+    const hallCameras = cameras.filter((cam) => hallEPs.some((ep) => ep.id === cam.id || ep.exam_hall_id === h.id));
     return hallEPs.length > 0 && hallCameras.length > 0;
   });
 
@@ -170,7 +183,10 @@ export default function ExamPrepPage() {
     <div className="eg-page">
       <div className="eg-page-header">
         <Link href="/exams" className="eg-breadcrumb">← Back to Examinations</Link>
-        <h1 className="eg-page-title">Prepare Examination</h1>
+        <h1 className="eg-page-title">
+          Prepare Examination
+          {loading && <span className="ml-2 text-xs text-[var(--text-secondary)] font-normal font-mono">(Loading...)</span>}
+        </h1>
         <p className="eg-page-desc">
           Configure an examination step by step. Each step must be completed before the exam is ready.
         </p>

@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
     CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
+        "http://127.0.0.1:3000",
         "https://exam-guardian-management.vercel.app",
         "https://exam-guard-liard.vercel.app",
         "https://exam-guard-59g16u2rx-skc5.vercel.app",
@@ -147,6 +148,32 @@ class Settings(BaseSettings):
                 "SECRET_KEY must be set to a real secret in non-development environments. "
                 "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
             )
+        return self
+
+    @model_validator(mode="after")
+    def validate_environment(self) -> "Settings":
+        """Validate APP_ENV is one of the recognized operational tiers."""
+        valid_envs = ("development", "test", "staging", "production")
+        if self.APP_ENV not in valid_envs:
+            raise ValueError(
+                f"APP_ENV must be one of {valid_envs!r}, got {self.APP_ENV!r}"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def validate_production_boundaries(self) -> "Settings":
+        """Enforce strict production boundaries — no silent mocks or sqlite in production."""
+        if self.APP_ENV == "production":
+            if self.DATABASE_URL.startswith("sqlite"):
+                raise ValueError(
+                    "SQLite is strictly prohibited in production. "
+                    "DATABASE_URL must point to a persistent PostgreSQL database."
+                )
+            if self.FACE_VERIFICATION_PROVIDER == "deterministic":
+                raise ValueError(
+                    "FACE_VERIFICATION_PROVIDER='deterministic' is strictly prohibited in production. "
+                    "Configure a real neural inference provider ('uniface')."
+                )
         return self
 
     @model_validator(mode="after")

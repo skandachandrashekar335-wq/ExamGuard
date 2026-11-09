@@ -17,8 +17,9 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
+    url = settings.DATABASE_URL or config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=settings.DATABASE_URL,
+        url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -29,7 +30,12 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = create_engine(settings.DATABASE_URL)
+    url = settings.DATABASE_URL or config.get_main_option("sqlalchemy.url")
+    connect_args = {}
+    if "postgres" in url.lower():
+        if not ("localhost" in url.lower() or "127.0.0.1" in url.lower() or "sslmode=disable" in url.lower()):
+            connect_args["sslmode"] = "require"
+    connectable = create_engine(url, connect_args=connect_args)
 
     with connectable.connect() as connection:
         context.configure(

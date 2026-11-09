@@ -6,12 +6,18 @@ export default defineConfig({
   expect: { timeout: 10000 },
   use: {
     baseURL: process.env.EG_BASE_URL || "https://exam-guardian-management.vercel.app",
-    headless: false,
+    headless: process.env.HEADLESS !== "false",
     screenshot: "only-on-failure",
     trace: "on-first-retry",
   },
   workers: 1,
   projects: [
-    { name: "chromium", use: { browserName: "chromium" } },
+    {
+      name: "chromium",
+      use: {
+        browserName: "chromium",
+        ...(process.env.PLAYWRIGHT_CHANNEL ? { channel: process.env.PLAYWRIGHT_CHANNEL } : process.env.CI ? {} : { channel: "msedge" }),
+      },
+    },
   ],
 });

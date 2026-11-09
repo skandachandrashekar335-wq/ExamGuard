@@ -59,7 +59,6 @@ export default function ExamAttendancePage() {
   }, [examId]);
 
   const fetchRecords = useCallback(async () => {
-    setLoading(true);
     setError("");
     try {
       const data = await listExamAttendance(examId, {
@@ -78,12 +77,12 @@ export default function ExamAttendancePage() {
   }, [examId, hallFilter, statusFilter, page, pageSize]);
 
   useEffect(() => {
-    fetchSummary();
-  }, [fetchSummary]);
-
-  useEffect(() => {
-    fetchRecords();
-  }, [fetchRecords]);
+    const timer = setTimeout(() => {
+      fetchSummary();
+      fetchRecords();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchSummary, fetchRecords]);
 
   const totalPages = Math.ceil(total / pageSize);
 

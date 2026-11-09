@@ -29,3 +29,4 @@ from app.models.attendance import AttendanceRecord, AttendanceEvent  # noqa: E40
 from app.models.security_event import SecurityEvent, SecurityAlert  # noqa: E402, F401
 from app.models.examination_session import ExaminationSession, GateEvent  # noqa: E402, F401
 from app.models.invigilator_assignment import InvigilatorAssignment  # noqa: E402, F401
+from app.models.chatbot import KnowledgeBaseItem, ChatQueryLog  # noqa: E402, F401

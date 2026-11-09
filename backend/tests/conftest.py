@@ -1,3 +1,7 @@
+import os
+os.environ.setdefault("APP_ENV", "test")
+os.environ.setdefault("SECRET_KEY", "test-secret-key-for-unit-testing-purposes-only-32b")
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine

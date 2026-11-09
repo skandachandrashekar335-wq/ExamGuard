@@ -19,7 +19,7 @@ const DECISION_HINTS: Record<string, string> = {
 };
 
 interface Props {
-  decision: string;
+  decision: VerificationDecision | string;
   failureReason: string | null;
 }
 

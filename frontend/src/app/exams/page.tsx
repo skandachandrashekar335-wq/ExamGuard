@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import AppShell from "@/components/AppShell";
 import { apiRequest, qs } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -98,27 +98,39 @@ export default function ExamsPage() {
   });
   const [error, setError] = useState("");
 
-  const fetchExams = async () => {
-    const params: Record<string, string | number> = { page, page_size: pageSize };
-    if (search) params.search = search;
-    if (showInactive) params.include_inactive = "true";
+  const fetchExams = useCallback(async () => {
+    try {
+      const params: Record<string, string | number> = { page, page_size: pageSize };
+      if (search) params.search = search;
+      if (showInactive) params.include_inactive = "true";
 
-    const data = await apiRequest<ListResponse>(`/api/v1/exams${qs(params)}`);
-    setExams(data.items);
-    setTotal(data.total);
-  };
+      const data = await apiRequest<ListResponse>(`/api/v1/exams${qs(params)}`);
+      setExams(data.items);
+      setTotal(data.total);
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to load exams");
+    }
+  }, [page, pageSize, search, showInactive]);
 
-  const fetchSubjects = async () => {
-    const data = await apiRequest<SubjectListResponse>(`/api/v1/subjects${qs({ page: 1, page_size: 100 })}`);
-    setSubjects(data.items || []);
-  };
+  const fetchSubjects = useCallback(async () => {
+    try {
+      const data = await apiRequest<SubjectListResponse>(`/api/v1/subjects${qs({ page: 1, page_size: 100 })}`);
+      setSubjects(data.items || []);
+    } catch {
+      // Fallback silently if subjects fail
+    }
+  }, []);
 
-  const fetchHalls = async () => {
-    const data = await apiRequest<{ items: HallOption[] }>(
-      `/api/v1/exam-halls${qs({ page: 1, page_size: 100 })}`
-    );
-    setHalls(data.items.filter((hall) => hall.is_active));
-  };
+  const fetchHalls = useCallback(async () => {
+    try {
+      const data = await apiRequest<{ items: HallOption[] }>(
+        `/api/v1/exam-halls${qs({ page: 1, page_size: 100 })}`
+      );
+      setHalls(data.items.filter((hall) => hall.is_active));
+    } catch {
+      // Fallback silently if halls fail
+    }
+  }, []);
 
   const openDetails = async (exam: Exam, message = "") => {
     setSelectedDetails(exam);
@@ -173,13 +185,19 @@ export default function ExamsPage() {
   };
 
   useEffect(() => {
-    fetchExams();
-  }, [page, search, showInactive]);
+    const timer = setTimeout(() => {
+      fetchExams();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchExams]);
 
   useEffect(() => {
-    fetchSubjects();
-    fetchHalls();
-  }, []);
+    const timer = setTimeout(() => {
+      fetchSubjects();
+      fetchHalls();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchSubjects, fetchHalls]);
 
   const resetForm = () => {
     setForm({
@@ -261,8 +279,8 @@ export default function ExamsPage() {
       if (selectedDetails?.id === saved.id || !editExam) {
         await openDetails(saved, sessionError);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to save exam");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to save exam");
     }
   };
 

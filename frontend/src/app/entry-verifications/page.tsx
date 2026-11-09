@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -50,7 +50,7 @@ export default function EntryVerificationsPage() {
   const [formError, setFormError] = useState("");
   const [formLoading, setFormLoading] = useState(false);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -68,11 +68,14 @@ export default function EntryVerificationsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize, statusFilter, entryPointFilter, studentFilter]);
 
   useEffect(() => {
-    fetchData();
-  }, [page, statusFilter, entryPointFilter, studentFilter]);
+    const timer = setTimeout(() => {
+      fetchData();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchData]);
 
   const totalPages = Math.ceil(total / pageSize);
 

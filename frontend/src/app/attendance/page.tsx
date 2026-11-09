@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   getAttendanceSummary,
@@ -39,7 +39,7 @@ export default function AttendancePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const fetchExams = async () => {
+  const fetchExams = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -65,11 +65,14 @@ export default function AttendancePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize]);
 
   useEffect(() => {
-    fetchExams();
-  }, [page]);
+    const timer = setTimeout(() => {
+      fetchExams();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchExams]);
 
   const totalPages = Math.ceil(total / pageSize);
 
