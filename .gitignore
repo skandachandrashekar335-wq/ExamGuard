@@ -47,6 +47,10 @@ docker-compose.override.yml
 # Database
 *.db
 
+# Test artifacts
+playwright-screenshots/
+test-results/
+
 # Uploaded files (development)
 uploads/
 local_storage/

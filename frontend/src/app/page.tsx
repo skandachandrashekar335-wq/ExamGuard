@@ -36,11 +36,11 @@ export default function Home() {
           <img src="/icon.svg" alt="" className="w-5 h-5" />
           ExamGuard
         </Link>
-        <a href="#pipeline">Pipeline</a>
-        <a href="#features">Features</a>
-        <a href="#security">Security</a>
-        <a href="#architecture">Architecture</a>
-        <Link href="/chatbot">Admission Guide</Link>
+        <a href="#pipeline" className="eg-hide-mobile">Pipeline</a>
+        <a href="#features" className="eg-hide-mobile">Features</a>
+        <a href="#security" className="eg-hide-mobile">Security</a>
+        <a href="#architecture" className="eg-hide-mobile">Architecture</a>
+        <Link href="/chatbot" className="eg-hide-mobile">Admission Guide</Link>
         <Link href="/examination-sessions" className="eg-nav-cta">Access System</Link>
       </nav>
 

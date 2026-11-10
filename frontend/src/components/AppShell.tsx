@@ -344,86 +344,93 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* ── Main Application Column ── */}
       <div className="flex-1 flex flex-col min-w-0 lg:pl-64">
-        {/* Continuous Acid Marquee Ticker */}
-        <div className="bg-black border-b border-[#CCFF00]/25 overflow-hidden py-1 select-none flex items-center sticky top-0 z-30">
-          <div className="animate-acid-marquee flex items-center gap-8 text-[10px] font-mono font-bold tracking-widest text-[#CCFF00]">
-            <span>⚡ EXAMGUARD PROTOCOL // LIQUID CHROME CORE // ONNX AI BIOMETRIC INFERENCE</span>
-            <span className="text-[#FF00FF]">✦ ZERO-TRUST ADMISSION GATE ✦</span>
-            <span className="text-[#00F0FF]">⬡ HIGH-FREQUENCY IDENTITY VERIFICATION ACTIVE</span>
-            <span>⚡ CRYPTOGRAPHIC ATTENDANCE LEDGER ON-CHAIN VERIFIED</span>
-            <span className="text-[#CCFF00]">⚡ EXAMGUARD PROTOCOL // LIQUID CHROME CORE // ONNX AI BIOMETRIC INFERENCE</span>
-            <span className="text-[#FF00FF]">✦ ZERO-TRUST ADMISSION GATE ✦</span>
-            <span className="text-[#00F0FF]">⬡ HIGH-FREQUENCY IDENTITY VERIFICATION ACTIVE</span>
-            <span>⚡ CRYPTOGRAPHIC ATTENDANCE LEDGER ON-CHAIN VERIFIED</span>
-          </div>
-        </div>
-
-        {/* ── Persistent Top Header ── */}
-        <header className="h-16 bg-[var(--bg-secondary)]/95 backdrop-blur-md border-b border-[var(--border)] px-4 lg:px-8 flex items-center justify-between sticky top-[25px] z-20">
-          <div className="flex items-center gap-3">
-            {/* Mobile Hamburger */}
-            <button
-              type="button"
-              className="lg:hidden p-2 rounded-md hover:bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-              onClick={() => setMobileOpen(!mobileOpen)}
-              aria-label="Toggle navigation menu"
-            >
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path d="M3 6h14M3 10h14M3 14h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            </button>
-
-            {/* Breadcrumb Info */}
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-[11px] font-mono tracking-wider text-[var(--text-muted)] uppercase hidden sm:inline">
-                {activeGroupLabel}
-              </span>
-              <span className="text-[var(--border)] hidden sm:inline">/</span>
-              <span className="font-semibold text-sm text-[var(--text-primary)] tracking-tight">{activeTitle}</span>
+        {/* ── Unified Sticky Header Suite (Ticker + Navigation Bar) ── */}
+        <div className="sticky top-0 z-20 shrink-0">
+          {/* Continuous Acid Marquee Ticker */}
+          <div className="bg-black/95 border-b border-[#CCFF00]/20 overflow-hidden h-6 select-none flex items-center">
+            <div className="relative flex overflow-x-hidden w-full items-center">
+              <div className="animate-acid-marquee flex items-center gap-8 text-[10px] font-mono font-bold tracking-widest text-[#CCFF00] shrink-0">
+                <span>⚡ EXAMGUARD PROTOCOL // LIQUID CHROME CORE // ONNX AI BIOMETRIC INFERENCE</span>
+                <span className="text-[#FF00FF]">✦ ZERO-TRUST ADMISSION GATE ✦</span>
+                <span className="text-[#00F0FF]">⬡ HIGH-FREQUENCY IDENTITY VERIFICATION ACTIVE</span>
+                <span className="text-[#E0E2EC]">⚡ CRYPTOGRAPHIC ATTENDANCE LEDGER VERIFIED</span>
+              </div>
+              <div className="animate-acid-marquee flex items-center gap-8 text-[10px] font-mono font-bold tracking-widest text-[#CCFF00] shrink-0" aria-hidden="true">
+                <span>⚡ EXAMGUARD PROTOCOL // LIQUID CHROME CORE // ONNX AI BIOMETRIC INFERENCE</span>
+                <span className="text-[#FF00FF]">✦ ZERO-TRUST ADMISSION GATE ✦</span>
+                <span className="text-[#00F0FF]">⬡ HIGH-FREQUENCY IDENTITY VERIFICATION ACTIVE</span>
+                <span className="text-[#E0E2EC]">⚡ CRYPTOGRAPHIC ATTENDANCE LEDGER VERIFIED</span>
+              </div>
             </div>
           </div>
 
-          {/* Right Header: Role & User Status */}
-          <div className="flex items-center gap-3">
-            {authed && user && (
-              <div className="hidden sm:flex items-center gap-2.5 px-3 py-1.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border)]">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#CCFF00] shadow-[0_0_8px_#CCFF00]" />
-                  <span className="text-[11px] font-mono font-bold text-[#CCFF00] uppercase tracking-wider">
-                    {examAssignment?.account_role || user.role}
-                  </span>
-                </div>
-                {examAssignment?.hall_name && (
-                  <span className="text-xs text-[var(--text-secondary)] border-l border-[var(--border)] pl-2">
-                    {examAssignment.hall_name}
-                  </span>
-                )}
-                {user.full_name && (
-                  <span className="text-xs text-[var(--text-secondary)] border-l border-[var(--border)] pl-2 max-w-[140px] truncate">
-                    {user.full_name}
-                  </span>
-                )}
-              </div>
-            )}
-
-            {authed ? (
+          {/* ── Persistent Top Header ── */}
+          <header className="h-14 bg-[var(--bg-secondary)]/95 backdrop-blur-md border-b border-[var(--border)] px-4 lg:px-8 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {/* Mobile Hamburger */}
               <button
                 type="button"
-                onClick={() => signOut()}
-                className="px-3.5 py-1.5 text-xs font-mono uppercase tracking-wider rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-elevated)] border border-[var(--border)] hover:border-[#CCFF00] hover:text-[#CCFF00] transition-colors"
+                className="lg:hidden p-2 rounded-md hover:bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                onClick={() => setMobileOpen(!mobileOpen)}
+                aria-label="Toggle navigation menu"
               >
-                Sign Out
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M3 6h14M3 10h14M3 14h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
               </button>
-            ) : (
-              <Link
-                href="/"
-                className="px-4 py-1.5 text-xs font-black uppercase tracking-tight rounded-md btn-chrome text-black transition-all"
-              >
-                ⚡ Sign In
-              </Link>
-            )}
-          </div>
-        </header>
+
+              {/* Breadcrumb Info */}
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-[11px] font-mono tracking-wider text-[var(--text-muted)] uppercase hidden sm:inline">
+                  {activeGroupLabel}
+                </span>
+                <span className="text-[var(--border)] hidden sm:inline">/</span>
+                <span className="font-semibold text-sm text-[var(--text-primary)] tracking-tight">{activeTitle}</span>
+              </div>
+            </div>
+
+            {/* Right Header: Role & User Status */}
+            <div className="flex items-center gap-3">
+              {authed && user && (
+                <div className="hidden sm:flex items-center gap-2.5 px-3 py-1.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border)]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#CCFF00] shadow-[0_0_8px_#CCFF00]" />
+                    <span className="text-[11px] font-mono font-bold text-[#CCFF00] uppercase tracking-wider">
+                      {examAssignment?.account_role || user.role}
+                    </span>
+                  </div>
+                  {examAssignment?.hall_name && (
+                    <span className="text-xs text-[var(--text-secondary)] border-l border-[var(--border)] pl-2">
+                      {examAssignment.hall_name}
+                    </span>
+                  )}
+                  {user.full_name && (
+                    <span className="text-xs text-[var(--text-secondary)] border-l border-[var(--border)] pl-2 max-w-[140px] truncate">
+                      {user.full_name}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {authed ? (
+                <button
+                  type="button"
+                  onClick={() => signOut()}
+                  className="px-3.5 py-1.5 text-xs font-mono uppercase tracking-wider rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-elevated)] border border-[var(--border)] hover:border-[#CCFF00] hover:text-[#CCFF00] transition-colors"
+                >
+                  Sign Out
+                </button>
+              ) : (
+                <Link
+                  href="/"
+                  className="px-4 py-1.5 text-xs font-bold uppercase tracking-tight rounded-md btn-chrome text-black transition-all"
+                >
+                  ⚡ Sign In
+                </Link>
+              )}
+            </div>
+          </header>
+        </div>
 
         {/* ── Mobile Navigation Drawer ── */}
         {mobileOpen && (

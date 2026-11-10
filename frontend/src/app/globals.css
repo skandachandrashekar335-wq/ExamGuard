@@ -243,10 +243,10 @@ body {
 }
 
 .chrome-text {
-  background: linear-gradient(180deg, #FFFFFF 0%, #D8DCE0 20%, #70757D 48%, #2D3035 52%, #CBD0D6 78%, #FFFFFF 100%);
+  background: linear-gradient(180deg, #FFFFFF 0%, #E2E5EB 35%, #B8BDC6 70%, #9DA3AF 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.9));
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.8));
 }
 
 .volt-text {
@@ -333,37 +333,61 @@ body {
   outline-offset: 2px;
 }
 
-/* Metallic Cylinder Liquid Chrome Button */
+/* Precision Metallic Chrome & Action Buttons */
 .eg-btn-primary, .btn-chrome {
-  background: linear-gradient(180deg, #FFFFFF 0%, #D4D8DC 22%, #686D74 48%, #282B30 52%, #C4C8CC 75%, #FFFFFF 100%);
-  color: #000000 !important;
+  background: linear-gradient(180deg, #FFFFFF 0%, #ECEEF2 35%, #D4D8DF 70%, #C6CBD4 100%);
+  color: #050608 !important;
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: -0.01em;
-  border: 1px solid rgba(255, 255, 255, 0.95);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.8), inset 0 1px 1px #FFFFFF, 0 0 15px rgba(204, 255, 0, 0.35);
-  border-radius: 8px;
+  letter-spacing: 0.02em;
+  border: 1px solid #FFFFFF;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1), inset 0 -1px 0 rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.6);
+  border-radius: 6px;
+  position: relative;
+  transition: all 0.15s ease-out;
 }
 
 .eg-btn-primary:hover:not(:disabled), .btn-chrome:hover:not(:disabled) {
-  transform: scale(1.06) rotate(1deg);
-  box-shadow: 0 0 35px rgba(204, 255, 0, 0.75), 0 0 16px rgba(255, 0, 255, 0.5);
+  background: linear-gradient(180deg, #FFFFFF 0%, #F4F6F9 35%, #DFE3EB 70%, #D0D6E0 100%);
   border-color: #CCFF00;
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 4px 14px rgba(0, 0, 0, 0.8), 0 0 18px rgba(204, 255, 0, 0.45);
   color: #000000 !important;
+  transform: translateY(-1px);
+}
+
+.eg-btn-primary:active:not(:disabled), .btn-chrome:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.eg-btn-primary:disabled, .btn-chrome:disabled {
+  background: #2A2D35;
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #6A6E78 !important;
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
 }
 
 .eg-btn-blue {
-  background: linear-gradient(135deg, #00F0FF 0%, #0088FF 100%);
+  background: linear-gradient(180deg, #33F5FF 0%, #00F0FF 40%, #00B8FF 100%);
   color: #000000;
   font-weight: 700;
-  border-color: #00F0FF;
-  box-shadow: 0 0 18px rgba(0, 240, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 2px 8px rgba(0, 0, 0, 0.5), 0 0 18px rgba(0, 240, 255, 0.35);
+  border-radius: 6px;
+  transition: all 0.15s ease-out;
 }
 
 .eg-btn-blue:hover:not(:disabled) {
-  box-shadow: 0 0 28px rgba(0, 240, 255, 0.7);
-  transform: scale(1.04);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8), 0 0 24px rgba(0, 240, 255, 0.65);
+  transform: translateY(-1px);
+}
+
+.eg-btn-blue:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 /* ========================================
@@ -372,13 +396,13 @@ body {
 
 @keyframes acidMarquee {
   0% { transform: translateX(0%); }
-  100% { transform: translateX(-50%); }
+  100% { transform: translateX(-100%); }
 }
 
 .animate-acid-marquee {
   display: flex;
-  width: max-content;
-  animation: acidMarquee 28s linear infinite;
+  min-width: 100%;
+  animation: acidMarquee 35s linear infinite;
 }
 
 .animate-acid-marquee:hover {
@@ -1022,25 +1046,30 @@ body {
 }
 
 .eg-pill-nav .eg-nav-cta {
-  background: linear-gradient(180deg, #FFFFFF 0%, #D4D8DC 25%, #6A6E75 49%, #2A2D32 51%, #C8CCD0 75%, #FFFFFF 100%);
-  color: #000000 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #FFFFFF 0%, #ECEEF2 35%, #D4D8DF 70%, #C6CBD4 100%);
+  color: #050608 !important;
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.02em;
   padding: 0.5rem 1.15rem;
   margin-left: 0.35rem;
   border-radius: var(--radius-pill);
-  border: 1px solid rgba(255, 255, 255, 0.95);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.8), inset 0 1px 1px #FFFFFF, 0 0 16px rgba(204, 255, 0, 0.4);
-  transition: all 0.2s cubic-bezier(0.19, 1, 0.22, 1);
+  border: 1px solid #FFFFFF;
+  box-shadow: inset 0 1px 0 #FFFFFF, inset 0 -1px 0 rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.6);
+  transition: all 0.15s ease-out;
+  white-space: nowrap;
 }
 
 .eg-pill-nav .eg-nav-cta:hover {
-  transform: scale(1.06) rotate(1deg);
-  box-shadow: 0 0 35px rgba(204, 255, 0, 0.8), 0 0 18px rgba(255, 0, 255, 0.5);
+  background: linear-gradient(180deg, #FFFFFF 0%, #F4F6F9 35%, #DFE3EB 70%, #D0D6E0 100%);
   border-color: #CCFF00;
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 4px 14px rgba(0, 0, 0, 0.8), 0 0 18px rgba(204, 255, 0, 0.45);
   color: #000000 !important;
+  transform: translateY(-1px);
 }
 
 /* ========================================
@@ -1219,13 +1248,13 @@ body {
 
 .eg-page-title {
   font-family: var(--font-display);
-  font-size: 2rem;
+  font-size: 1.875rem;
   font-weight: 800;
   color: var(--text-primary);
-  letter-spacing: -0.04em;
+  letter-spacing: -0.03em;
   text-transform: uppercase;
   margin-bottom: 0.375rem;
-  text-shadow: 1.5px 0 0 #FF00FF, -1.5px 0 0 #00F0FF;
+  line-height: 1.1;
 }
 
 .eg-page-desc {
@@ -1717,14 +1746,13 @@ body {
 
 .eg-section__title {
   font-family: var(--font-display);
-  font-size: 2.5rem;
+  font-size: 2.25rem;
   font-weight: 800;
   color: var(--text-primary);
-  letter-spacing: -0.04em;
+  letter-spacing: -0.03em;
   text-transform: uppercase;
-  line-height: 1.05;
+  line-height: 1.1;
   margin-bottom: 1rem;
-  text-shadow: 1.5px 0 0 #FF00FF, -1.5px 0 0 #00F0FF;
 }
 
 .eg-section__sub {
@@ -1767,6 +1795,7 @@ body {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  overflow: hidden;
 }
 
 .eg-hero__orb {
@@ -2663,6 +2692,14 @@ body {
   }
   .eg-bento__item--wide {
     grid-column: span 1;
+  }
+  .eg-bento__card--wide {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+  .eg-bento__card-visual {
+    margin-top: 1rem;
+    max-width: 100%;
   }
   .eg-ai-flow {
     grid-template-columns: 1fr;
