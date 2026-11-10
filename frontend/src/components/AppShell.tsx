@@ -280,17 +280,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <aside className="hidden lg:flex w-64 bg-[var(--bg-secondary)] border-r border-[var(--border)] flex-col justify-between fixed top-0 bottom-0 left-0 z-30 select-none">
         <div className="flex flex-col min-h-0 flex-1">
           {/* Acid Liquid Chrome Brand Header */}
-          <div className="h-16 flex items-center justify-between px-4 border-b border-[var(--border)] bg-black">
-            <Link href="/" className="flex items-center gap-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/icon.svg" alt="ExamGuard" className="w-6 h-6 hover:rotate-12 transition-transform duration-300" />
-              <span className="font-extrabold text-sm tracking-tight text-white acid-chromatic uppercase font-[family-name:var(--font-syne)]">
+          <div className="h-16 flex items-center px-4 border-b border-[var(--border)] bg-black">
+            <Link href="/" className="eg-brand-lockup">
+              <div className="eg-brand-icon-box">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icon.svg" alt="ExamGuard" className="w-full h-full object-contain" />
+              </div>
+              <span className="eg-brand-wordmark font-[family-name:var(--font-syne)]">
                 EXAMGUARD
               </span>
+              <div className="eg-brand-badge" aria-label="Acid V3">
+                <span className="eg-brand-badge-text">ACID</span>
+                <span className="eg-brand-badge-text">V3</span>
+              </div>
             </Link>
-            <span className="text-[9px] font-mono px-2 py-0.5 rounded border border-[#CCFF00] text-[#CCFF00] bg-[#CCFF00]/10 tracking-widest font-black shadow-[0_0_12px_rgba(204,255,0,0.3)]">
-              ACID V3
-            </span>
           </div>
 
           {/* Navigation Groups */}
@@ -442,10 +445,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="fixed inset-y-0 left-0 w-72 bg-[var(--bg-secondary)] border-r border-[var(--border)] p-5 flex flex-col justify-between overflow-y-auto z-50 shadow-2xl">
               <div>
                 <div className="flex items-center justify-between pb-4 mb-4 border-b border-[var(--border)]">
-                  <Link href="/" onClick={() => setMobileOpen(false)} className="flex items-center gap-2">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/icon.svg" alt="ExamGuard" className="w-6 h-6" />
-                    <span className="font-semibold text-sm text-[var(--text-primary)]">ExamGuard</span>
+                  <Link href="/" onClick={() => setMobileOpen(false)} className="eg-brand-lockup">
+                    <div className="eg-brand-icon-box">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/icon.svg" alt="ExamGuard" className="w-full h-full object-contain" />
+                    </div>
+                    <span className="eg-brand-wordmark font-[family-name:var(--font-syne)]">
+                      EXAMGUARD
+                    </span>
+                    <div className="eg-brand-badge" aria-label="Acid V3">
+                      <span className="eg-brand-badge-text">ACID</span>
+                      <span className="eg-brand-badge-text">V3</span>
+                    </div>
                   </Link>
                   <button
                     type="button"

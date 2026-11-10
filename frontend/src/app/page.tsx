@@ -29,12 +29,19 @@ export default function Home() {
       <nav className={`eg-pill-nav${scrolled ? " eg-pill-nav--scrolled" : ""}`}>
         <Link
           href="/"
-          className="eg-nav-brand"
-          style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}
+          className="eg-brand-lockup eg-nav-brand"
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icon.svg" alt="" className="w-5 h-5" />
-          ExamGuard
+          <div className="eg-brand-icon-box" style={{ width: "26px", height: "26px" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icon.svg" alt="ExamGuard" className="w-full h-full object-contain" />
+          </div>
+          <span className="eg-brand-wordmark font-[family-name:var(--font-syne)]" style={{ fontSize: "0.85rem" }}>
+            EXAMGUARD
+          </span>
+          <div className="eg-brand-badge" aria-label="Acid V3" style={{ padding: "1px 4px" }}>
+            <span className="eg-brand-badge-text" style={{ fontSize: "6.5px" }}>ACID</span>
+            <span className="eg-brand-badge-text" style={{ fontSize: "6.5px" }}>V3</span>
+          </div>
         </Link>
         <a href="#pipeline" className="eg-hide-mobile">Pipeline</a>
         <a href="#features" className="eg-hide-mobile">Features</a>

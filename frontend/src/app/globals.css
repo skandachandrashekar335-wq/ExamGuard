@@ -239,7 +239,83 @@ body {
 }
 
 .acid-chromatic {
-  text-shadow: 1.5px 0 0 #FF00FF, -1.5px 0 0 #00F0FF;
+  text-shadow: 2px 0 0 #FF00FF, -2px 0 0 #00F0FF;
+}
+
+/* ========================================
+   ACID V3 BRAND LOCKUP
+   ======================================== */
+.eg-brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  text-decoration: none !important;
+  user-select: none;
+}
+
+.eg-brand-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: #000000;
+  border: 1px solid rgba(255, 0, 255, 0.45);
+  box-shadow: 
+    0 0 12px rgba(255, 0, 255, 0.4),
+    0 0 20px rgba(0, 240, 255, 0.25),
+    inset 0 0 6px rgba(204, 255, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5px;
+  flex-shrink: 0;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+}
+
+.eg-brand-lockup:hover .eg-brand-icon-box {
+  transform: scale(1.06);
+  box-shadow: 
+    0 0 18px rgba(255, 0, 255, 0.6),
+    0 0 26px rgba(0, 240, 255, 0.35),
+    inset 0 0 8px rgba(204, 255, 0, 0.3);
+}
+
+.eg-brand-wordmark {
+  font-family: var(--font-display), "Space Grotesk", sans-serif;
+  font-weight: 900;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+  color: #FFFFFF;
+  text-transform: uppercase;
+  line-height: 1;
+  text-shadow: 2px 0 0 #FF00FF, -2px 0 0 #00F0FF;
+  position: relative;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.eg-brand-badge {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #CCFF00;
+  border-radius: 7px;
+  padding: 1.5px 5px;
+  background: rgba(204, 255, 0, 0.08);
+  box-shadow: 0 0 10px rgba(204, 255, 0, 0.35), inset 0 0 5px rgba(204, 255, 0, 0.12);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.eg-brand-badge-text {
+  font-family: var(--font-mono), monospace;
+  font-size: 7.5px;
+  font-weight: 900;
+  color: #CCFF00;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-shadow: 0 0 6px rgba(204, 255, 0, 0.7);
+  display: block;
 }
 
 .chrome-text {
