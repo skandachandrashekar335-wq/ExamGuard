@@ -135,6 +135,7 @@ class Settings(BaseSettings):
     # their role is promoted to ADMIN and a new JWT is issued.
     # This is server-side only — not exposed via NEXT_PUBLIC_* variables.
     INITIAL_ADMIN_EMAILS: list[str] = [
+        "skandachandrashekar335@gmail.com",
         "skandachandrashekhar335@gmail.com",
         "skandamusic17@gmail.com",
         "riziljaprel@gmail.com",

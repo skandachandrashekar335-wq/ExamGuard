@@ -59,7 +59,7 @@ def get_student(student_id: int, db: Session = Depends(get_db),
 
 @router.patch("/{student_id}", response_model=StudentResponse, summary="Update a student")
 def update_student(student_id: int, data: StudentUpdate, db: Session = Depends(get_db),
-                  _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR]))):
+                  _user: dict = Depends(require_role([Role.ADMIN, Role.OPERATOR, Role.REVIEWER]))):
     try:
         return student_service.update_student(db, student_id, data)
     except LookupError as e:
