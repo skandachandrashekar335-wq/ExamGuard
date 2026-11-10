@@ -99,7 +99,27 @@ def validate_seat_number(value: str) -> Optional[str]:
 
 _rate_limits: Dict[str, List[float]] = {}
 RATE_LIMIT_WINDOW = 60  # seconds
-RATE_LIMIT_MAX = int(os.environ.get("RATE_LIMIT_MAX", "100"))  # requests per window
+_default_max = "500" if getattr(settings, "APP_ENV", "production") == "development" else "100"
+RATE_LIMIT_MAX = int(os.environ.get("RATE_LIMIT_MAX", _default_max))  # requests per window
+
+_ALLOWED_ORIGINS = {
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://exam-guardian-management.vercel.app",
+    "https://exam-guard-liard.vercel.app",
+    "https://exam-guard-59g16u2rx-skc5.vercel.app",
+    "https://dscasc-crvoting.vercel.app",
+    "https://frontend-skc5.vercel.app",
+}
+
+
+def _is_origin_allowed(origin: Optional[str]) -> bool:
+    """Validate whether an origin is trusted per CORS configuration."""
+    if not origin:
+        return False
+    configured = set(getattr(settings, "CORS_ORIGINS", []))
+    allowed = _ALLOWED_ORIGINS | configured
+    return origin in allowed
 
 
 def _client_id(request: Request) -> str:
@@ -135,15 +155,27 @@ async def rate_limit_handler(request: Request, call_next) -> Response:
     """FastAPI middleware for rate limiting.
 
     Returns HTTP 429 if the client has exceeded the rate limit.
+    Preflight OPTIONS requests are never rate limited.
     """
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
     client_id = _client_id(request)
 
     if _is_rate_limited(client_id):
         _record_rate_limit(client_id)
+        origin = request.headers.get("origin")
+        headers = {}
+        if origin and _is_origin_allowed(origin):
+            headers["Access-Control-Allow-Origin"] = origin
+            headers["Access-Control-Allow-Credentials"] = "true"
+            headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept"
+            headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
         return Response(
             content="{\"detail\": \"Rate limit exceeded\"}",
             status_code=429,
             media_type="application/json",
+            headers=headers,
         )
 
     _record_rate_limit(client_id)

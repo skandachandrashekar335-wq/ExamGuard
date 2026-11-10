@@ -39,7 +39,7 @@ export default function OverrideDialog({
   };
 
   return (
-    <div className="border border-[var(--border)] p-4 bg-[#0a0a0a] rounded">
+    <div className="border border-[var(--border)] p-4 bg-[var(--bg-surface)] rounded-lg">
       <h4 className="eg-mono-sm text-[var(--text-secondary)] mb-3">
         Human Override
       </h4>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import * as XLSX from "xlsx";
 import AppShell from "@/components/AppShell";
+import { useAuth } from "@/context/AuthContext";
 import { apiRequest, qs } from "@/lib/api";
 import {
   parseSpreadsheet,
@@ -48,6 +49,7 @@ interface RowState {
 }
 
 export default function ImportRegistrationsPage() {
+  const { isAuthenticated, loading } = useAuth();
   const [exams, setExams] = useState<ExamOption[]>([]);
   const [selectedExamId, setSelectedExamId] = useState<number | null>(null);
   const [phase, setPhase] = useState<Phase>("select");
@@ -61,10 +63,11 @@ export default function ImportRegistrationsPage() {
   const invalidCount = rows.filter((r) => !r.valid).length;
 
   useEffect(() => {
+    if (!isAuthenticated || loading) return;
     apiRequest<{ items: ExamOption[] }>(`/api/v1/exams${qs({ page: "1", page_size: "100" })}`)
       .then((data) => setExams(data.items || []))
       .catch(() => {});
-  }, []);
+  }, [isAuthenticated, loading]);
 
   const reset = useCallback(() => {
     setPhase("select");

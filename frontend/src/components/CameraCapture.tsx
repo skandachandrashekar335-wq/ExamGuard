@@ -203,11 +203,11 @@ const CameraCapture = forwardRef<CameraCaptureHandle, CameraCaptureProps>(
           )}
         </div>
 
-        <div className="relative aspect-[4/3]" style={{ background: "#101713" }}>
+        <div className="relative aspect-[4/3] bg-[var(--void)]">
           <canvas ref={canvasRef} className="hidden" />
 
           {showIdleControls && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[var(--void)]">
               <button
                 onClick={startCamera}
                 disabled={disabled}
@@ -219,8 +219,8 @@ const CameraCapture = forwardRef<CameraCaptureHandle, CameraCaptureProps>(
           )}
 
           {state === "requesting" && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="eg-mono" style={{ color: "rgba(255,255,255,0.75)" }}>
+            <div className="absolute inset-0 flex items-center justify-center bg-[var(--void)]">
+              <span className="eg-mono text-[var(--text-secondary)]">
                 Starting camera...
               </span>
             </div>
@@ -247,8 +247,8 @@ const CameraCapture = forwardRef<CameraCaptureHandle, CameraCaptureProps>(
                     width: "58%",
                     height: "78%",
                     borderRadius: "50%",
-                    border: "2px solid rgba(74, 144, 217, 0.85)",
-                    boxShadow: "0 0 0 9999px rgba(16, 23, 19, 0.35)",
+                    border: "2px solid #CCFF00",
+                    boxShadow: "0 0 25px rgba(204, 255, 0, 0.5), 0 0 0 9999px rgba(0, 0, 0, 0.75)",
                   }}
                 />
               </div>
@@ -256,11 +256,11 @@ const CameraCapture = forwardRef<CameraCaptureHandle, CameraCaptureProps>(
                 className="absolute left-0 right-0 px-4 py-2 text-center"
                 style={{
                   bottom: 0,
-                  background: "linear-gradient(transparent, rgba(16, 23, 19, 0.75))",
+                  background: "linear-gradient(transparent, rgba(0, 0, 0, 0.9))",
                 }}
               >
-                <span className="eg-mono-sm" style={{ color: "rgba(255,255,255,0.85)" }}>
-                  Center your face inside the oval
+                <span className="eg-mono-sm text-[#CCFF00] font-bold tracking-widest">
+                  ⚡ ACID BIOMETRIC RETICLE // ALIGN FACE INSIDE TARGET
                 </span>
               </div>
             </>

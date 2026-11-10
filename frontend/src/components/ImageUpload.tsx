@@ -41,7 +41,7 @@ export default function ImageUpload({
   };
 
   return (
-    <div className="border border-[var(--border)] bg-[#0a0a0a] rounded">
+    <div className="border border-[var(--border)] bg-[var(--bg-surface)] rounded-lg overflow-hidden">
       <div className="px-4 py-2 border-b border-[var(--border)] flex items-center justify-between">
         <span className="eg-mono-sm text-[var(--text-secondary)]">{label}</span>
         {fileName && (

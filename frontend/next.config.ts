@@ -19,7 +19,7 @@ const securityHeaders = [
   },
   {
     key: "Permissions-Policy",
-    value: "camera=(self), microphone=(), geolocation=(), browsing-topics=(), attribution-reporting=(), private-aggregation=(), join-ad-interest-group=(), run-ad-auction()",
+    value: "camera=(self), microphone=(), geolocation=(), browsing-topics=(), attribution-reporting=(), private-aggregation=(), join-ad-interest-group=(), run-ad-auction=()",
   },
   {
     key: "Strict-Transport-Security",

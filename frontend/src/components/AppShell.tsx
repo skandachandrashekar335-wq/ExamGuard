@@ -279,15 +279,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* ── Persistent Desktop Sidebar ── */}
       <aside className="hidden lg:flex w-64 bg-[var(--bg-secondary)] border-r border-[var(--border)] flex-col justify-between fixed top-0 bottom-0 left-0 z-30 select-none">
         <div className="flex flex-col min-h-0 flex-1">
-          {/* Institutional Brand Header */}
-          <div className="h-16 flex items-center justify-between px-5 border-b border-[var(--border)]">
-            <Link href="/" className="flex items-center gap-2.5">
+          {/* Acid Liquid Chrome Brand Header */}
+          <div className="h-16 flex items-center justify-between px-4 border-b border-[var(--border)] bg-black">
+            <Link href="/" className="flex items-center gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/icon.svg" alt="ExamGuard" className="w-6 h-6" />
-              <span className="font-semibold text-sm tracking-tight text-[var(--text-primary)]">ExamGuard</span>
+              <img src="/icon.svg" alt="ExamGuard" className="w-6 h-6 hover:rotate-12 transition-transform duration-300" />
+              <span className="font-extrabold text-sm tracking-tight text-white acid-chromatic uppercase font-[family-name:var(--font-syne)]">
+                EXAMGUARD
+              </span>
             </Link>
-            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-[#C9A96E]/40 text-[#C9A96E] bg-[#C9A96E]/10 tracking-widest font-semibold">
-              INSTITUTIONAL
+            <span className="text-[9px] font-mono px-2 py-0.5 rounded border border-[#CCFF00] text-[#CCFF00] bg-[#CCFF00]/10 tracking-widest font-black shadow-[0_0_12px_rgba(204,255,0,0.3)]">
+              ACID V3
             </span>
           </div>
 
@@ -295,7 +297,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5" aria-label="Sidebar Navigation">
             {visibleGroups.map((group) => (
               <div key={group.label} className="space-y-1">
-                <p className="px-2.5 text-[10px] font-mono font-bold tracking-widest text-[var(--text-muted)] uppercase">
+                <p className="px-2.5 text-[10px] font-mono font-bold tracking-widest text-[#8E93A4] uppercase">
                   {group.label}
                 </p>
                 <div className="space-y-0.5 pt-0.5">
@@ -305,15 +307,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       <Link
                         key={link.href}
                         href={link.href}
-                        className={`group flex items-center justify-between px-3 py-1.5 rounded text-xs transition-colors ${
+                        className={`group flex items-center justify-between px-3 py-1.5 rounded text-xs transition-all ${
                           active
-                            ? "bg-[var(--bg-surface)] text-[var(--text-primary)] border-l-2 border-[var(--accent-gold)] font-medium pl-2.5 shadow-sm"
-                            : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/70"
+                            ? "bg-[#CCFF00]/10 text-white border-l-2 border-[#CCFF00] font-bold pl-2.5 shadow-[0_0_18px_rgba(204,255,0,0.25)]"
+                            : "text-[var(--text-muted)] hover:text-white hover:bg-[var(--bg-surface)] hover:border-l border-white/20"
                         }`}
                       >
-                        <span>{link.label}</span>
+                        <span className={active ? "text-[#CCFF00]" : ""}>{link.label}</span>
                         {active && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-gold)]" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#CCFF00] shadow-[0_0_8px_#CCFF00]" />
                         )}
                       </Link>
                     );
@@ -325,22 +327,39 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Operational Status Footer in Sidebar */}
-        <div className="p-3.5 border-t border-[var(--border)] bg-[#0C1017]">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)]">SYSTEM HUD</span>
+        <div className="p-3.5 border-t border-[var(--border)] bg-[#07070A]">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-[#8E93A4]">TELEMETRY HUD</span>
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[10px] font-mono text-emerald-400 font-semibold tracking-wider">ONLINE</span>
+              <span className="w-2 h-2 rounded-full bg-[#CCFF00] shadow-[0_0_10px_#CCFF00] animate-pulse" />
+              <span className="text-[10px] font-mono text-[#CCFF00] font-black tracking-wider">VOLT ONLINE</span>
             </div>
           </div>
-          <p className="text-[11px] text-[var(--text-muted)] truncate">Precision Biometrics Engine</p>
+          <div className="flex items-center justify-between text-[10px] font-mono text-[#8E93A4] border-t border-[var(--border-subtle)] pt-1.5">
+            <span>LATENCY: 18ms</span>
+            <span className="text-[#00F0FF] font-semibold">ONNX ACID</span>
+          </div>
         </div>
       </aside>
 
       {/* ── Main Application Column ── */}
       <div className="flex-1 flex flex-col min-w-0 lg:pl-64">
+        {/* Continuous Acid Marquee Ticker */}
+        <div className="bg-black border-b border-[#CCFF00]/25 overflow-hidden py-1 select-none flex items-center sticky top-0 z-30">
+          <div className="animate-acid-marquee flex items-center gap-8 text-[10px] font-mono font-bold tracking-widest text-[#CCFF00]">
+            <span>⚡ EXAMGUARD PROTOCOL // LIQUID CHROME CORE // ONNX AI BIOMETRIC INFERENCE</span>
+            <span className="text-[#FF00FF]">✦ ZERO-TRUST ADMISSION GATE ✦</span>
+            <span className="text-[#00F0FF]">⬡ HIGH-FREQUENCY IDENTITY VERIFICATION ACTIVE</span>
+            <span>⚡ CRYPTOGRAPHIC ATTENDANCE LEDGER ON-CHAIN VERIFIED</span>
+            <span className="text-[#CCFF00]">⚡ EXAMGUARD PROTOCOL // LIQUID CHROME CORE // ONNX AI BIOMETRIC INFERENCE</span>
+            <span className="text-[#FF00FF]">✦ ZERO-TRUST ADMISSION GATE ✦</span>
+            <span className="text-[#00F0FF]">⬡ HIGH-FREQUENCY IDENTITY VERIFICATION ACTIVE</span>
+            <span>⚡ CRYPTOGRAPHIC ATTENDANCE LEDGER ON-CHAIN VERIFIED</span>
+          </div>
+        </div>
+
         {/* ── Persistent Top Header ── */}
-        <header className="h-16 bg-[var(--bg-secondary)]/90 backdrop-blur-md border-b border-[var(--border)] px-4 lg:px-8 flex items-center justify-between sticky top-0 z-20">
+        <header className="h-16 bg-[var(--bg-secondary)]/95 backdrop-blur-md border-b border-[var(--border)] px-4 lg:px-8 flex items-center justify-between sticky top-[25px] z-20">
           <div className="flex items-center gap-3">
             {/* Mobile Hamburger */}
             <button
@@ -369,8 +388,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             {authed && user && (
               <div className="hidden sm:flex items-center gap-2.5 px-3 py-1.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border)]">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-gold)]" />
-                  <span className="text-[11px] font-mono font-medium text-[var(--accent-gold)] uppercase tracking-wider">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#CCFF00] shadow-[0_0_8px_#CCFF00]" />
+                  <span className="text-[11px] font-mono font-bold text-[#CCFF00] uppercase tracking-wider">
                     {examAssignment?.account_role || user.role}
                   </span>
                 </div>
@@ -391,16 +410,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={() => signOut()}
-                className="px-3 py-1.5 text-xs font-medium rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-elevated)] border border-[var(--border)] hover:border-[var(--border-strong)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                className="px-3.5 py-1.5 text-xs font-mono uppercase tracking-wider rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-elevated)] border border-[var(--border)] hover:border-[#CCFF00] hover:text-[#CCFF00] transition-colors"
               >
                 Sign Out
               </button>
             ) : (
               <Link
                 href="/"
-                className="px-3.5 py-1.5 text-xs font-semibold rounded-md bg-[var(--accent-gold)] hover:bg-[var(--accent-hover)] text-[#08080D] transition-colors shadow-sm"
+                className="px-4 py-1.5 text-xs font-black uppercase tracking-tight rounded-md btn-chrome text-black transition-all"
               >
-                Sign In
+                ⚡ Sign In
               </Link>
             )}
           </div>

@@ -148,22 +148,22 @@ export default function ChatbotPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] max-w-5xl mx-auto p-4 sm:p-6">
       {/* Top Header Card */}
-      <div className="glass rounded-xl p-4 sm:p-5 mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-[var(--border-subtle)]">
+      <div className="glass rounded-xl p-4 sm:p-5 mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-[var(--border)] shadow-[0_0_20px_rgba(0,0,0,0.8)]">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-lg">
-            AI
+          <div className="w-10 h-10 rounded-lg bg-[#CCFF00]/10 border border-[#CCFF00] flex items-center justify-center text-[#CCFF00] font-black text-lg shadow-[0_0_15px_rgba(204,255,0,0.35)]">
+            ⚡
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold text-[var(--text-primary)]">
+              <h1 className="text-lg font-black text-white acid-chromatic tracking-tight uppercase font-[family-name:var(--font-syne)]">
                 Admission & Campus Guidance
               </h1>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-medium">
-                Live Knowledge Base
+              <span className="text-xs px-2 py-0.5 rounded-full bg-[#CCFF00]/15 text-[#CCFF00] border border-[#CCFF00]/40 font-mono font-bold">
+                LIVE NEURAL KB
               </span>
             </div>
             <p className="text-xs text-[var(--text-secondary)]">
-              Grounded information for prospective students, applicants, and examinees
+              Grounded institutional knowledge for applicants, examinees, and candidates
             </p>
           </div>
         </div>
@@ -171,14 +171,14 @@ export default function ChatbotPage() {
         <div className="flex items-center gap-2 self-end sm:self-auto">
           <button
             onClick={handleClearHistory}
-            className="px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] rounded-lg transition-colors"
+            className="px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:text-white bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] border border-[var(--border)] rounded-lg transition-colors font-mono uppercase"
             title="Reset conversation"
           >
             Clear Chat
           </button>
           <Link
             href="/"
-            className="px-3 py-1.5 text-xs text-sky-400 hover:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 rounded-lg transition-colors"
+            className="px-3 py-1.5 text-xs text-[#00F0FF] hover:text-white bg-[#00F0FF]/10 hover:bg-[#00F0FF]/20 border border-[#00F0FF]/40 rounded-lg transition-colors font-mono uppercase"
           >
             Back to Home
           </Link>
@@ -187,8 +187,8 @@ export default function ChatbotPage() {
 
       {/* Category Pills Bar */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-3 no-scrollbar text-xs">
-        <span className="text-[var(--text-secondary)] whitespace-nowrap pl-1 font-medium">
-          Explore Topics:
+        <span className="text-[var(--text-secondary)] whitespace-nowrap pl-1 font-mono uppercase text-[11px] font-bold">
+          Topics:
         </span>
         {categories.map((cat) => (
           <button
@@ -196,8 +196,8 @@ export default function ChatbotPage() {
             onClick={() => handleCategoryClick(cat.name)}
             className={`px-3 py-1 rounded-full whitespace-nowrap transition-all border ${
               selectedCategory === cat.name
-                ? "bg-sky-500 text-white border-sky-400 shadow-sm"
-                : "bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-[var(--border-subtle)] hover:border-[var(--border-base)]"
+                ? "bg-[#CCFF00] text-black border-[#CCFF00] font-bold shadow-[0_0_15px_rgba(204,255,0,0.5)]"
+                : "bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-white border-[var(--border)] hover:border-[#CCFF00]"
             }`}
           >
             {cat.title}
@@ -206,7 +206,7 @@ export default function ChatbotPage() {
       </div>
 
       {/* Main Chat Scroll Container */}
-      <div className="flex-1 overflow-y-auto glass rounded-xl p-4 sm:p-6 mb-4 space-y-4 border border-[var(--border-subtle)] flex flex-col">
+      <div className="flex-1 overflow-y-auto glass rounded-xl p-4 sm:p-6 mb-4 space-y-4 border border-[var(--border)] flex flex-col">
         {messages.map((msg) => (
           <div
             key={msg.id}
@@ -217,25 +217,25 @@ export default function ChatbotPage() {
             <div
               className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                 msg.sender === "user"
-                  ? "bg-[var(--tech-blue)] text-white rounded-br-sm shadow-md"
-                  : "bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-bl-sm"
+                  ? "bg-gradient-to-r from-[#00F0FF] to-[#00A3FF] text-black font-semibold rounded-br-sm shadow-[0_0_20px_rgba(0,240,255,0.3)]"
+                  : "bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border)] rounded-bl-sm"
               }`}
             >
               {/* Category & Status Badges */}
               {msg.sender === "bot" && (msg.category || msg.requiresAdminConfirmation) && (
-                <div className="flex flex-wrap items-center gap-1.5 mb-2 pb-2 border-b border-[var(--border-subtle)] text-[10px] uppercase font-semibold tracking-wider">
+                <div className="flex flex-wrap items-center gap-1.5 mb-2 pb-2 border-b border-[var(--border)] text-[10px] uppercase font-semibold tracking-wider">
                   {msg.category && (
-                    <span className="px-2 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                    <span className="px-2 py-0.5 rounded bg-[#00F0FF]/15 text-[#00F0FF] border border-[#00F0FF]/30 font-mono">
                       {msg.category}
                     </span>
                   )}
                   {msg.isVerified && (
-                    <span className="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                    <span className="px-2 py-0.5 rounded bg-[#CCFF00]/15 text-[#CCFF00] border border-[#CCFF00]/40 font-mono">
                       Verified Policy
                     </span>
                   )}
                   {msg.requiresAdminConfirmation && (
-                    <span className="px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                    <span className="px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-mono">
                       Confirm with Admin
                     </span>
                   )}
@@ -345,7 +345,7 @@ export default function ChatbotPage() {
         <button
           type="submit"
           disabled={loading || !inputQuery.trim()}
-          className="px-5 py-3 rounded-xl bg-[var(--accent-gold)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-[#08080D] font-semibold text-sm flex items-center gap-2 transition-all shadow-md shrink-0 cursor-pointer disabled:cursor-not-allowed"
+          className="px-6 py-3 rounded-xl btn-chrome disabled:opacity-40 text-black font-extrabold uppercase text-xs flex items-center gap-2 transition-all shadow-md shrink-0 cursor-pointer disabled:cursor-not-allowed hover:shadow-[0_0_25px_rgba(204,255,0,0.65)]"
         >
           <span>Send</span>
           <svg
